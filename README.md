@@ -24,6 +24,9 @@ A real-time listening statistics dashboard for Spotify, powered by Spicetify.
 ## Installation
 
 ### Quick Install (Recommended)
+Make sure you have Spicetify installed and working.  
+https://spicetify.app/
+
 
 **Linux / macOS:**
 ```bash
