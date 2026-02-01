@@ -6,6 +6,8 @@ A real-time listening statistics dashboard for Spotify, powered by Spicetify.
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Spicetify](https://img.shields.io/badge/spicetify-2.x-1DB954)
 
+<img width="2552" height="1373" alt="image" src="https://github.com/user-attachments/assets/6bfdeb96-2e81-4ae0-9a41-1bf647bac215" />
+
 ## Features
 
 - **Track listening time**: See how much music you've listened to today, this week, this month, or all time
