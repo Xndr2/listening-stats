@@ -904,7 +904,7 @@ var ListeningStatsApp = (() => {
   var INSTALL_CMD_WINDOWS = `iwr -useb 'https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.ps1' | iex`;
   function getCurrentVersion() {
     try {
-      return "1.0.42";
+      return "1.0.43";
     } catch {
       return "0.0.0";
     }
@@ -1145,9 +1145,16 @@ var ListeningStatsApp = (() => {
         this.setState({ showUpdateConfirmModal: false, showUpdateModal: false });
         const copied = await copyInstallCommand();
         if (copied) {
-          Spicetify.showNotification("Install command copied! Paste in terminal to update.", false, 5e3);
+          Spicetify.showNotification(
+            "Install command copied! Paste in terminal to update.",
+            false,
+            5e3
+          );
         } else {
-          Spicetify.showNotification("Failed to copy command. Check console for install command.", true);
+          Spicetify.showNotification(
+            "Failed to copy command. Check console for install command.",
+            true
+          );
           console.log("[ListeningStats] Install command:", getInstallCommand());
         }
       };
@@ -1421,7 +1428,7 @@ var ListeningStatsApp = (() => {
         },
         "Update v",
         updateInfo.latestVersion
-      )), /* @__PURE__ */ Spicetify.React.createElement("span", { className: "version-text" }, "v", VERSION), /* @__PURE__ */ Spicetify.React.createElement("span", { className: "version-text" }, "\u2764\uFE0F made with love by Xndr")), showSettings && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-panel" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn", onClick: () => this.loadStats() }, "Refresh"), /* @__PURE__ */ Spicetify.React.createElement(
+      )), /* @__PURE__ */ Spicetify.React.createElement("span", { className: "version-text" }, "v", VERSION, " - \u2764\uFE0F made with love by Xndr")), showSettings && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-panel" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn", onClick: () => this.loadStats() }, "Refresh"), /* @__PURE__ */ Spicetify.React.createElement(
         "button",
         {
           className: "footer-btn",
@@ -1443,14 +1450,7 @@ var ListeningStatsApp = (() => {
           }
         },
         "Clear Cache"
-      ), /* @__PURE__ */ Spicetify.React.createElement(
-        "button",
-        {
-          className: "footer-btn",
-          onClick: this.checkUpdatesManual
-        },
-        "Check Updates"
-      ), /* @__PURE__ */ Spicetify.React.createElement(
+      ), /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn", onClick: this.checkUpdatesManual }, "Check Updates"), /* @__PURE__ */ Spicetify.React.createElement(
         "button",
         {
           className: "footer-btn danger",

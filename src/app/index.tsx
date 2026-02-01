@@ -114,12 +114,12 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
   // Auto-check for updates on startup
   checkAndAutoUpdate = async () => {
     if (!shouldCheckForUpdate()) return;
-    
+
     const info = await checkForUpdates();
     if (!info.available) return;
-    
+
     this.setState({ updateInfo: info });
-    
+
     // Show update modal if not dismissed
     if (!wasVersionDismissed(info.latestVersion)) {
       this.setState({ showUpdateModal: true });
@@ -129,28 +129,35 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
   // Manual check for updates (from settings button)
   checkUpdatesManual = async () => {
     clearDismissedVersion();
-    
+
     const info = await checkForUpdates();
     this.setState({ updateInfo: info });
-    
+
     if (info.available) {
       // Show confirmation modal before updating
       this.setState({ showUpdateConfirmModal: true });
     } else {
-      Spicetify.showNotification('You are on the latest version!');
+      Spicetify.showNotification("You are on the latest version!");
     }
   };
 
   // Perform update - copy command to clipboard
   performUpdate = async () => {
     this.setState({ showUpdateConfirmModal: false, showUpdateModal: false });
-    
+
     const copied = await copyInstallCommand();
     if (copied) {
-      Spicetify.showNotification('Install command copied! Paste in terminal to update.', false, 5000);
+      Spicetify.showNotification(
+        "Install command copied! Paste in terminal to update.",
+        false,
+        5000,
+      );
     } else {
-      Spicetify.showNotification('Failed to copy command. Check console for install command.', true);
-      console.log('[ListeningStats] Install command:', getInstallCommand());
+      Spicetify.showNotification(
+        "Failed to copy command. Check console for install command.",
+        true,
+      );
+      console.log("[ListeningStats] Install command:", getInstallCommand());
     }
   };
 
@@ -278,7 +285,9 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
               <div className="modal-actions">
                 <button
                   className="modal-btn primary"
-                  onClick={() => this.setState({ showUpdateSuccessModal: false })}
+                  onClick={() =>
+                    this.setState({ showUpdateSuccessModal: false })
+                  }
                 >
                   Got it!
                 </button>
@@ -308,12 +317,17 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
                 <div className="modal-changelog">{updateInfo.changelog}</div>
               )}
               <div className="modal-body">
-                <p>This will copy an install command to your clipboard. Paste it in your terminal to update.</p>
+                <p>
+                  This will copy an install command to your clipboard. Paste it
+                  in your terminal to update.
+                </p>
               </div>
               <div className="modal-actions">
                 <button
                   className="modal-btn secondary"
-                  onClick={() => this.setState({ showUpdateConfirmModal: false })}
+                  onClick={() =>
+                    this.setState({ showUpdateConfirmModal: false })
+                  }
                 >
                   Cancel
                 </button>
@@ -346,7 +360,9 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
                 <div className="modal-changelog">{updateInfo.changelog}</div>
               )}
               <div className="modal-body">
-                <p><strong>How to update:</strong></p>
+                <p>
+                  <strong>How to update:</strong>
+                </p>
                 <ol className="update-steps">
                   <li>Click "Copy Install Command" below</li>
                   <li>Open a terminal</li>
@@ -677,8 +693,9 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
               </button>
             )}
           </div>
-          <span className="version-text">v{VERSION}</span>
-          <span className="version-text">❤️ made with love by Xndr</span>
+          <span className="version-text">
+            v{VERSION} - ❤️ made with love by Xndr
+          </span>
         </div>
 
         {/* Settings Panel */}
@@ -708,10 +725,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
               >
                 Clear Cache
               </button>
-              <button
-                className="footer-btn"
-                onClick={this.checkUpdatesManual}
-              >
+              <button className="footer-btn" onClick={this.checkUpdatesManual}>
                 Check Updates
               </button>
               <button
