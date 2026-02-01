@@ -223,7 +223,10 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
               this.setState({ showUpdateModal: false });
             }}
           >
-            <div className="modal-content update-modal" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="modal-content update-modal"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="modal-header">
                 <div className="modal-icon">🎉</div>
                 <div className="modal-title">Update Available!</div>
@@ -237,8 +240,8 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
               <div className="modal-instructions">
                 <div className="instruction-title">After downloading:</div>
                 <div className="instruction-text">
-                  {navigator.platform.includes('Win') 
-                    ? getInstallInstructions().windows 
+                  {navigator.platform.includes("Win")
+                    ? getInstallInstructions().windows
                     : getInstallInstructions().linux}
                 </div>
               </div>
@@ -255,7 +258,9 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
                 {updateInfo.releaseUrl && (
                   <button
                     className="modal-btn secondary"
-                    onClick={() => window.open(updateInfo.releaseUrl!, '_blank')}
+                    onClick={() =>
+                      window.open(updateInfo.releaseUrl!, "_blank")
+                    }
                   >
                     View Release
                   </button>
@@ -265,7 +270,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
                     className="modal-btn primary"
                     onClick={() => {
                       downloadUpdate(updateInfo.downloadUrl!);
-                      Spicetify.showNotification('Download started!');
+                      Spicetify.showNotification("Download started!");
                     }}
                   >
                     Download Update
@@ -579,6 +584,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
             )}
           </div>
           <span className="version-text">v{VERSION}</span>
+          <span className="version-text">❤️ made with love by Xndr</span>
         </div>
 
         {/* Settings Panel */}
