@@ -35,8 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.
 ```
 
 
-**Windows (PowerShell):**  
-### Please see https://github.com/Xndr2/listening-stats/issues/1 for install issues on windows!!!  
+**Windows (PowerShell):**    
 ```powershell
 iwr -useb 'https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1' | iex
 ```
