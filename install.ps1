@@ -8,14 +8,14 @@ $ErrorActionPreference = 'Stop'
 $repoUrl = 'https://github.com/Xndr2/listening-stats'
 $appName = 'listening-stats'
 
-Write-Host '
+Write-Host @'
  _     _     _             _               ____  _        _       
 | |   (_)___| |_ ___ _ __ (_)_ __   __ _  / ___|| |_ __ _| |_ ___ 
 | |   | / __| __/ _ \ '\''_ \| | '\''_ \ / _` | \___ \| __/ _` | __/ __|
 | |___| \__ \ ||  __/ | | | | | | | (_| |  ___) | || (_| | |_\__ \
 |_____|_|___/\__\___|_| |_|_|_| |_|\__, | |____/ \__\__,_|\__|___/
                                    |___/                          
-' -ForegroundColor 'Green'
+'@ -ForegroundColor 'Green'
 
 Write-Host 'Listening Stats Installer for Windows' -ForegroundColor 'Cyan'
 Write-Host ''
