@@ -2,10 +2,9 @@
 
 A real-time listening statistics dashboard for Spotify, powered by Spicetify.
 
-![Version](https://img.shields.io/badge/version-1.0.42-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/github/v/release/Xndr2/listening-stats)
 ![Spicetify](https://img.shields.io/badge/spicetify-2.x-1DB954)
-![Downloads](https://img.shields.io/github/downloads/Xndr2/listening-stats/total?color=blue)
+![Downloads](https://img.shields.io/github/downloads/Xndr2/listening-stats/total)
 
 <img width="2552" height="1373" alt="image" src="https://github.com/user-attachments/assets/6bfdeb96-2e81-4ae0-9a41-1bf647bac215" />
 
