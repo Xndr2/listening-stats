@@ -15,15 +15,10 @@ import { clearAllData } from "../services/storage";
 import { runBackgroundEnrichment } from "../services/tracker";
 import {
   checkForUpdates,
-  checkJustUpdated,
-  clearDismissedVersion,
   copyInstallCommand,
-  dismissVersion,
   getCurrentVersion,
   getInstallCommand,
-  shouldCheckForUpdate,
   UpdateInfo,
-  wasVersionDismissed,
 } from "../services/updater";
 import { ListeningStats, TimePeriod } from "../types";
 import { Icons } from "./icons";
@@ -49,9 +44,8 @@ interface State {
   likedTracks: Map<string, boolean>;
   artistImages: Map<string, string>;
   updateInfo: UpdateInfo | null;
-  showUpdateModal: boolean;
-  showUpdateSuccessModal: boolean;
-  showUpdateConfirmModal: boolean;
+  showUpdateBanner: boolean;
+  commandCopied: boolean;
   showSettings: boolean;
   apiAvailable: boolean;
   lastUpdateTimestamp: number;
@@ -69,9 +63,8 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       likedTracks: new Map(),
       artistImages: new Map(),
       updateInfo: null,
-      showUpdateModal: false,
-      showUpdateSuccessModal: false,
-      showUpdateConfirmModal: false,
+      showUpdateBanner: false,
+      commandCopied: false,
       showSettings: false,
       apiAvailable: true,
       lastUpdateTimestamp: 0,
@@ -81,11 +74,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
   componentDidMount() {
     injectStyles();
     this.loadStats();
-
-    // Check if we just updated (show success modal)
-    if (checkJustUpdated()) {
-      this.setState({ showUpdateSuccessModal: true });
-    }
+    this.checkForUpdateOnLoad();
 
     this.pollInterval = window.setInterval(() => {
       const ts = localStorage.getItem("listening-stats:lastUpdate");
@@ -98,9 +87,6 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       }
       this.setState({ apiAvailable: isApiAvailable() });
     }, 2000);
-
-    // Auto-check and auto-update on startup
-    this.checkAndAutoUpdate();
   }
 
   componentWillUnmount() {
@@ -111,54 +97,44 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
     if (prev.period !== this.state.period) this.loadStats();
   }
 
-  // Auto-check for updates on startup
-  checkAndAutoUpdate = async () => {
-    if (!shouldCheckForUpdate()) return;
-
+  // Check for updates when the stats page loads
+  checkForUpdateOnLoad = async () => {
     const info = await checkForUpdates();
-    if (!info.available) return;
-
-    this.setState({ updateInfo: info });
-
-    // Show update modal if not dismissed
-    if (!wasVersionDismissed(info.latestVersion)) {
-      this.setState({ showUpdateModal: true });
+    if (info.available) {
+      this.setState({ updateInfo: info, showUpdateBanner: true });
     }
   };
 
   // Manual check for updates (from settings button)
   checkUpdatesManual = async () => {
-    clearDismissedVersion();
-
     const info = await checkForUpdates();
-    this.setState({ updateInfo: info });
+    this.setState({ updateInfo: info, commandCopied: false });
 
     if (info.available) {
-      // Show confirmation modal before updating
-      this.setState({ showUpdateConfirmModal: true });
+      this.setState({ showUpdateBanner: true });
     } else {
       Spicetify.showNotification("You are on the latest version!");
     }
   };
 
-  // Perform update - copy command to clipboard
-  performUpdate = async () => {
-    this.setState({ showUpdateConfirmModal: false, showUpdateModal: false });
-
+  // Copy update command to clipboard
+  copyUpdateCommand = async () => {
     const copied = await copyInstallCommand();
     if (copied) {
-      Spicetify.showNotification(
-        "Install command copied! Paste in terminal to update.",
-        false,
-        5000,
-      );
+      this.setState({ commandCopied: true });
+      Spicetify.showNotification("Command copied! Paste in your terminal.");
     } else {
       Spicetify.showNotification(
-        "Failed to copy command. Check console for install command.",
+        "Failed to copy. Check console for command.",
         true,
       );
       console.log("[ListeningStats] Install command:", getInstallCommand());
     }
+  };
+
+  // Dismiss the update banner for this session
+  dismissUpdateBanner = () => {
+    this.setState({ showUpdateBanner: false });
   };
 
   loadStats = async () => {
@@ -201,13 +177,53 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       likedTracks,
       artistImages,
       updateInfo,
-      showUpdateModal,
-      showUpdateSuccessModal,
-      showUpdateConfirmModal,
+      showUpdateBanner,
+      commandCopied,
       showSettings,
       apiAvailable,
     } = this.state;
     const React = Spicetify.React;
+
+    // Update UI takes absolute priority - render ONLY this when update is available and not dismissed
+    if (showUpdateBanner && updateInfo) {
+      return (
+        <div className="stats-page">
+          <div className="update-banner-container">
+            <div className="update-banner">
+              <div className="update-banner-header">
+                <div className="update-banner-icon">🎉</div>
+                <div className="update-banner-title">Update Available!</div>
+                <div className="update-banner-version">
+                  v{updateInfo.currentVersion} → v{updateInfo.latestVersion}
+                </div>
+              </div>
+              {updateInfo.changelog && (
+                <div className="update-banner-changelog">
+                  {updateInfo.changelog}
+                </div>
+              )}
+              <div className="update-banner-actions">
+                <button
+                  className="update-banner-btn secondary"
+                  onClick={this.dismissUpdateBanner}
+                >
+                  I'll do this later
+                </button>
+                <button
+                  className={`update-banner-btn primary ${commandCopied ? "copied" : ""}`}
+                  onClick={this.copyUpdateCommand}
+                >
+                  {commandCopied ? "✓ Copied!" : "📋 Copy Command"}
+                </button>
+              </div>
+              <div className="updating-text">
+                Paste the command in your terminal, then restart Spotify.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     if (loading) {
       return (
@@ -245,17 +261,105 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
             <h1 className="stats-title">Listening Stats</h1>
             <p className="stats-subtitle">Your personal music analytics</p>
           </div>
-          {periodTabs}
-          <div className="empty-state">
-            <div
-              className="empty-icon"
-              dangerouslySetInnerHTML={{ __html: Icons.headphones }}
-            />
-            <div className="empty-title">
-              No data for {getPeriodDisplayName(period)}
+
+          {/* Overview Cards Row */}
+          <div className="overview-row">
+            {/* Hero - Time Listened */}
+            <div className="overview-card hero">
+              <div className="overview-value">
+                {formatDurationLong(stats.totalTimeMs)}
+              </div>
+              <div className="overview-label">
+                No data for {getPeriodDisplayName(period)}
+              </div>
+              {periodTabs}
+              <div className="overview-secondary">
+                Start listening to see your stats!
+              </div>
             </div>
-            <p className="empty-text">Start listening to see your stats!</p>
           </div>
+
+          {/* Footer */}
+          <div className="stats-footer">
+            <div className="footer-left">
+              <button
+                className="settings-toggle"
+                onClick={() => this.setState({ showSettings: !showSettings })}
+              >
+                <span dangerouslySetInnerHTML={{ __html: Icons.settings }} />
+                Settings
+              </button>
+              {updateInfo?.available && (
+                <button
+                  className="footer-btn primary"
+                  onClick={() => this.setState({ showUpdateBanner: true })}
+                >
+                  Update v{updateInfo.latestVersion}
+                </button>
+              )}
+            </div>
+            <span className="version-text">
+              v{VERSION} - ❤️ made with love by{" "}
+              <a href="https://github.com/Xndr2/listening-stats">Xndr</a>
+            </span>
+          </div>
+
+          {/* Settings Panel */}
+          {showSettings && (
+            <div className="settings-panel">
+              <div className="settings-row">
+                <button className="footer-btn" onClick={() => this.loadStats()}>
+                  Refresh
+                </button>
+                <button
+                  className="footer-btn"
+                  onClick={async () => {
+                    await runBackgroundEnrichment(true);
+                    this.loadStats();
+                    Spicetify.showNotification("Data enriched");
+                  }}
+                >
+                  Enrich Data
+                </button>
+                <button
+                  className="footer-btn"
+                  onClick={() => {
+                    resetRateLimit();
+                    clearApiCaches();
+                    Spicetify.showNotification("Cache cleared");
+                  }}
+                >
+                  Clear Cache
+                </button>
+                <button
+                  className="footer-btn"
+                  onClick={this.checkUpdatesManual}
+                >
+                  Check Updates
+                </button>
+                <button
+                  className="footer-btn danger"
+                  onClick={async () => {
+                    if (confirm("Delete all listening data?")) {
+                      await clearAllData();
+                      this.setState({ stats: null });
+                    }
+                  }}
+                >
+                  Reset Data
+                </button>
+              </div>
+              <div className="api-status">
+                <span
+                  className={`status-dot ${apiAvailable ? "green" : "red"}`}
+                />
+                API:{" "}
+                {apiAvailable
+                  ? "Available"
+                  : `Limited (${Math.ceil(getRateLimitRemaining() / 60)}m)`}
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -264,129 +368,41 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
 
     return (
       <div className="stats-page">
-        {/* Update Success Modal */}
-        {showUpdateSuccessModal && (
-          <div
-            className="modal-overlay"
-            onClick={() => this.setState({ showUpdateSuccessModal: false })}
-          >
-            <div
-              className="modal-content update-success-modal"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="modal-header">
-                <div className="modal-icon success">✓</div>
-                <div className="modal-title">ListeningStats Updated!</div>
-                <div className="modal-subtitle">v{VERSION}</div>
-              </div>
-              <div className="modal-body">
-                <p>The extension has been updated successfully.</p>
-              </div>
-              <div className="modal-actions">
-                <button
-                  className="modal-btn primary"
-                  onClick={() =>
-                    this.setState({ showUpdateSuccessModal: false })
-                  }
-                >
-                  Got it!
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Update Confirm Modal (for manual check) */}
-        {showUpdateConfirmModal && updateInfo && (
-          <div
-            className="modal-overlay"
-            onClick={() => this.setState({ showUpdateConfirmModal: false })}
-          >
-            <div
-              className="modal-content update-modal"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="modal-header">
-                <div className="modal-icon">🎉</div>
-                <div className="modal-title">Update Available!</div>
-                <div className="modal-subtitle">
+        {/* Update Banner */}
+        {showUpdateBanner && updateInfo && (
+          <div className="update-banner-backdrop">
+            <div className="update-banner">
+              <div className="update-banner-header">
+                <div className="update-banner-icon">🎉</div>
+                <div className="update-banner-title">Update Available!</div>
+                <div className="update-banner-version">
                   v{updateInfo.currentVersion} → v{updateInfo.latestVersion}
                 </div>
               </div>
               {updateInfo.changelog && (
-                <div className="modal-changelog">{updateInfo.changelog}</div>
-              )}
-              <div className="modal-body">
-                <p>
-                  This will copy an install command to your clipboard. Paste it
-                  in your terminal to update.
-                </p>
-              </div>
-              <div className="modal-actions">
-                <button
-                  className="modal-btn secondary"
-                  onClick={() =>
-                    this.setState({ showUpdateConfirmModal: false })
-                  }
-                >
-                  Cancel
-                </button>
-                <button
-                  className="modal-btn primary"
-                  onClick={this.performUpdate}
-                >
-                  📋 Copy Install Command
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Update Modal - Floating non-blocking popup */}
-        {showUpdateModal && updateInfo && (
-          <div className="modal-overlay floating">
-            <div
-              className="modal-content update-modal"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="modal-header">
-                <div className="modal-icon">🎉</div>
-                <div className="modal-title">Update Available!</div>
-                <div className="modal-subtitle">
-                  v{updateInfo.currentVersion} → v{updateInfo.latestVersion}
+                <div className="update-banner-changelog">
+                  {updateInfo.changelog}
                 </div>
-              </div>
-              {updateInfo.changelog && (
-                <div className="modal-changelog">{updateInfo.changelog}</div>
               )}
-              <div className="modal-body">
-                <p>
-                  <strong>How to update:</strong>
-                </p>
-                <ol className="update-steps">
-                  <li>Click "Copy Install Command" below</li>
-                  <li>Open a terminal</li>
-                  <li>Paste and run the command</li>
-                  <li>Restart Spotify</li>
-                </ol>
-              </div>
-              <div className="modal-actions">
+              <div className="update-banner-actions">
                 <button
-                  className="modal-btn secondary"
-                  onClick={() => {
-                    dismissVersion(updateInfo.latestVersion);
-                    this.setState({ showUpdateModal: false });
-                  }}
+                  className="update-banner-btn secondary"
+                  onClick={this.dismissUpdateBanner}
                 >
-                  Dismiss
+                  I'll do this later
                 </button>
                 <button
-                  className="modal-btn primary"
-                  onClick={this.performUpdate}
+                  className={`update-banner-btn primary ${commandCopied ? "copied" : ""}`}
+                  onClick={this.copyUpdateCommand}
                 >
-                  📋 Copy Install Command
+                  {commandCopied ? "✓ Copied!" : "📋 Copy Command"}
                 </button>
               </div>
+              {commandCopied && (
+                <div className="update-banner-hint">
+                  Paste the command in your terminal, then restart Spotify.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -437,7 +453,10 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
               /> */}
                 <div className="stat-text">
                   <div className="overview-value green">${payout}</div>
-                  <div className="overview-label">Paid to Artists</div>
+                  <div className="overview-label">Spotify paid artists</div>
+                  <div className="overview-label-tooltip">
+                    From you listening to their music!
+                  </div>
                 </div>
               </div>
             </div>
@@ -454,6 +473,9 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
                     {stats.streakDays}
                   </div>
                   <div className="overview-label">Day Streak</div>
+                  <div className="overview-label-tooltip">
+                    Resets at midnight local time.
+                  </div>
                 </div>
               </div>
             </div>
@@ -470,6 +492,9 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
                     {stats.newArtistsCount}
                   </div>
                   <div className="overview-label">New Artists</div>
+                  <div className="overview-label-tooltip">
+                    You're cool if this is high!
+                  </div>
                 </div>
               </div>
             </div>
@@ -486,6 +511,9 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
                     {Math.floor(stats.skipRate * 100)}%
                   </div>
                   <div className="overview-label">Skip Rate</div>
+                  <div className="overview-label-tooltip">
+                    Get this as low as possible!
+                  </div>
                 </div>
               </div>
             </div>
@@ -687,14 +715,20 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
             {updateInfo?.available && (
               <button
                 className="footer-btn primary"
-                onClick={() => this.setState({ showUpdateModal: true })}
+                onClick={() =>
+                  this.setState({
+                    showUpdateBanner: true,
+                    commandCopied: false,
+                  })
+                }
               >
                 Update v{updateInfo.latestVersion}
               </button>
             )}
           </div>
           <span className="version-text">
-            v{VERSION} - ❤️ made with love by Xndr
+            v{VERSION} - ❤️ made with love by{" "}
+            <a href="https://github.com/Xndr2/listening-stats">Xndr</a>
           </span>
         </div>
 

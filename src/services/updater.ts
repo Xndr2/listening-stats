@@ -1,8 +1,6 @@
 // GitHub Auto-Update Service
 const GITHUB_REPO = 'Xndr2/listening-stats';
 const STORAGE_KEY = 'listening-stats:lastUpdateCheck';
-const DISMISSED_KEY = 'listening-stats:dismissedVersion';
-const JUST_UPDATED_KEY = 'listening-stats:justUpdated';
 
 // Version is injected at build time by esbuild
 declare const __APP_VERSION__: string;
@@ -109,42 +107,6 @@ function isNewerVersion(latest: string, current: string): boolean {
   return false;
 }
 
-// Always check for updates on startup
-export function shouldCheckForUpdate(): boolean {
-  return true;
-}
-
-// Check if user dismissed this version
-export function wasVersionDismissed(version: string): boolean {
-  try {
-    const dismissed = localStorage.getItem(DISMISSED_KEY);
-    return dismissed === version;
-  } catch {
-    return false;
-  }
-}
-
-// Dismiss a version (user clicked "Later")
-export function dismissVersion(version: string): void {
-  localStorage.setItem(DISMISSED_KEY, version);
-}
-
-// Clear dismissed version (to show update again)
-export function clearDismissedVersion(): void {
-  localStorage.removeItem(DISMISSED_KEY);
-}
-
-// Get cached update info
-export function getCachedUpdateInfo(): { available: boolean; latestVersion: string } | null {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
-    return JSON.parse(stored);
-  } catch {
-    return null;
-  }
-}
-
 // Get the install command for the current platform
 export function getInstallCommand(): string {
   const isWindows = navigator.platform.toLowerCase().includes('win');
@@ -174,18 +136,4 @@ export async function copyInstallCommand(): Promise<boolean> {
       return false;
     }
   }
-}
-
-// Check if we just updated (to show success modal)
-export function checkJustUpdated(): boolean {
-  const justUpdated = localStorage.getItem(JUST_UPDATED_KEY) === 'true';
-  if (justUpdated) {
-    localStorage.removeItem(JUST_UPDATED_KEY);
-  }
-  return justUpdated;
-}
-
-// Mark as just updated (called by install script or manually)
-export function markAsUpdated(): void {
-  localStorage.setItem(JUST_UPDATED_KEY, 'true');
 }
