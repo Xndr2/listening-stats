@@ -643,7 +643,7 @@ var ListeningStatsApp = (() => {
   var INSTALL_CMD_WINDOWS = `iwr -useb 'https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.ps1' | iex`;
   function getCurrentVersion() {
     try {
-      return "1.1.18";
+      return "1.1.19";
     } catch {
       return "0.0.0";
     }
