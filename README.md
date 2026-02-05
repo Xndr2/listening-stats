@@ -1,6 +1,9 @@
-# Listening Stats - Spicetify Extension
+# Listening Stats - Spicetify Custom App
 
-A real-time listening statistics dashboard for Spotify, powered by Spicetify.
+A real-time listening statistics dashboard for Spotify, powered by Spicetify.  
+  
+**Attention:** This app is in development. It only tracks songs you play from your PC, not from your phone.  
+I am working on this but I'm hitting major rate limits. A work-around is being developed but it will take some time.
 
 ![Version](https://img.shields.io/github/v/release/Xndr2/listening-stats)
 ![Spicetify](https://img.shields.io/badge/spicetify-2.x-1DB954)
