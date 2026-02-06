@@ -1,4 +1,3 @@
-// Update Banner Component
 import { UpdateInfo } from "../../services/updater";
 
 interface UpdateBannerProps {

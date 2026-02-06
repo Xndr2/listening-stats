@@ -1,11 +1,13 @@
-import { PlayEvent, TrackInfo } from "../types/listeningstats";
+import { PlayEvent, PollingData, ProviderType } from "../types/listeningstats";
+import { getRecentlyPlayed, getTopArtists } from "./spotify-api";
 import { addPlayEvent } from "./storage";
 
-// Minimum play time to count as a "play" (10 seconds)
-const MIN_PLAY_TIME_MS = 10000;
-
-// Event system for notifying UI of new data (uses window events for cross-context)
+const STORAGE_KEY = "listening-stats:pollingData";
+const POLL_INTERVAL_MS = 15 * 60 * 1000;
+const SKIP_THRESHOLD_MS = 30000;
 const STATS_UPDATED_EVENT = "listening-stats:updated";
+
+let activeProviderType: ProviderType | null = null;
 
 export function onStatsUpdated(callback: () => void): () => void {
   const handler = () => callback();
@@ -15,209 +17,289 @@ export function onStatsUpdated(callback: () => void): () => void {
 
 function emitStatsUpdated(): void {
   window.dispatchEvent(new CustomEvent(STATS_UPDATED_EVENT));
-  // Also store timestamp for polling fallback
   localStorage.setItem("listening-stats:lastUpdate", Date.now().toString());
 }
 
-// Current tracking state
-let currentTrack: TrackInfo | null = null;
+function defaultPollingData(): PollingData {
+  return {
+    hourlyDistribution: new Array(24).fill(0),
+    activityDates: [],
+    knownArtistUris: [],
+    skipEvents: 0,
+    totalPlays: 0,
+    lastPollTimestamp: 0,
+    trackPlayCounts: {},
+    artistPlayCounts: {},
+    seeded: false,
+  };
+}
+
+export function getPollingData(): PollingData {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed.hourlyDistribution) || parsed.hourlyDistribution.length !== 24) {
+        parsed.hourlyDistribution = new Array(24).fill(0);
+      }
+      if (!parsed.trackPlayCounts) parsed.trackPlayCounts = {};
+      if (!parsed.artistPlayCounts) parsed.artistPlayCounts = {};
+      if (parsed.seeded === undefined) parsed.seeded = false;
+      return parsed;
+    }
+  } catch (error) {
+    console.warn("[ListeningStats] Failed to load polling data:", error);
+  }
+  return defaultPollingData();
+}
+
+function savePollingData(data: PollingData): void {
+  try {
+    if (data.activityDates.length > 400) {
+      data.activityDates = data.activityDates.slice(-365);
+    }
+    if (data.knownArtistUris.length > 5000) {
+      data.knownArtistUris = data.knownArtistUris.slice(-5000);
+    }
+    const trackEntries = Object.entries(data.trackPlayCounts);
+    if (trackEntries.length > 2000) {
+      const sorted = trackEntries.sort((a, b) => b[1] - a[1]).slice(0, 2000);
+      data.trackPlayCounts = Object.fromEntries(sorted);
+    }
+    const artistEntries = Object.entries(data.artistPlayCounts);
+    if (artistEntries.length > 1000) {
+      const sorted = artistEntries.sort((a, b) => b[1] - a[1]).slice(0, 1000);
+      data.artistPlayCounts = Object.fromEntries(sorted);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (error) {
+    console.warn("[ListeningStats] Failed to save polling data:", error);
+  }
+}
+
+export function clearPollingData(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+async function seedKnownArtists(data: PollingData): Promise<void> {
+  if (data.seeded) return;
+
+  try {
+    const artists = await getTopArtists("long_term");
+    if (!artists || !artists.length) return;
+
+    const knownSet = new Set(data.knownArtistUris);
+    for (const a of artists) {
+      const uri = `spotify:artist:${a.id}`;
+      knownSet.add(uri);
+    }
+
+    data.knownArtistUris = Array.from(knownSet);
+    data.seeded = true;
+    savePollingData(data);
+  } catch (error) {
+    console.warn("[ListeningStats] Failed to seed known artists:", error);
+  }
+}
+
+async function pollRecentlyPlayed(): Promise<void> {
+  try {
+    const response = await getRecentlyPlayed();
+    if (!response?.items?.length) return;
+
+    const data = getPollingData();
+    const lastPoll = data.lastPollTimestamp;
+    const knownSet = new Set(data.knownArtistUris);
+    const dateSet = new Set(data.activityDates);
+
+    for (const item of response.items) {
+      const playedAt = new Date(item.played_at).getTime();
+      if (lastPoll > 0 && playedAt <= lastPoll) continue;
+
+      const track = item.track;
+      if (!track) continue;
+
+      const hour = new Date(item.played_at).getHours();
+      data.hourlyDistribution[hour] += track.duration_ms;
+
+      const dateKey = new Date(item.played_at).toISOString().split("T")[0];
+      dateSet.add(dateKey);
+
+      data.trackPlayCounts[track.uri] = (data.trackPlayCounts[track.uri] || 0) + 1;
+
+      const artistUri = track.artists?.[0]?.uri;
+      if (artistUri) {
+        data.artistPlayCounts[artistUri] = (data.artistPlayCounts[artistUri] || 0) + 1;
+        knownSet.add(artistUri);
+      }
+    }
+
+    data.activityDates = Array.from(dateSet);
+    data.knownArtistUris = Array.from(knownSet);
+
+    const latestTimestamp = Math.max(
+      ...response.items.map((item) => new Date(item.played_at).getTime()),
+    );
+    if (latestTimestamp > data.lastPollTimestamp) {
+      data.lastPollTimestamp = latestTimestamp;
+    }
+
+    savePollingData(data);
+    emitStatsUpdated();
+  } catch (error) {
+    console.warn("[ListeningStats] Poll failed:", error);
+  }
+}
+
+let currentTrackUri: string | null = null;
 let playStartTime: number | null = null;
 let accumulatedPlayTime = 0;
 let isPlaying = false;
+let currentTrackDuration = 0;
 
-// Extract track info from Spicetify player data
-function extractTrackInfo(): TrackInfo | null {
-  const data = Spicetify.Player.data;
-  if (!data?.item) return null;
+function handleSongChange(): void {
+  if (currentTrackUri && playStartTime !== null) {
+    const totalPlayedMs = accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
+    const data = getPollingData();
+    data.totalPlays++;
 
-  const item = data.item;
-  const metadata = item.metadata;
+    if (totalPlayedMs < SKIP_THRESHOLD_MS && currentTrackDuration > SKIP_THRESHOLD_MS) {
+      data.skipEvents++;
+    }
 
-  return {
-    uri: item.uri,
-    name: metadata?.title || item.name || "Unknown",
-    artistName: metadata?.artist_name || "Unknown Artist",
-    artistUri: metadata?.artist_uri || "",
-    albumName: metadata?.album_title || "Unknown Album",
-    albumUri: metadata?.album_uri || "",
-    albumArt: metadata?.image_xlarge_url || metadata?.image_url,
-    albumReleaseDate: metadata?.album_disc_number ? undefined : metadata?.year, // Year if available
-    durationMs:
-      item.duration?.milliseconds || Spicetify.Player.getDuration() || 0,
-    context: data.context_uri,
-    isExplicit: metadata?.is_explicit === "true" || item.isExplicit === true,
-  };
-}
+    savePollingData(data);
 
-// Save the current play session
-async function saveCurrentSession(): Promise<void> {
-  if (!currentTrack || !playStartTime) return;
-
-  // Calculate total played time
-  const now = Date.now();
-  let totalPlayedMs = accumulatedPlayTime;
-  if (isPlaying) {
-    totalPlayedMs += now - playStartTime;
+    if (activeProviderType === "local") {
+      writePlayEvent(totalPlayedMs);
+    }
   }
 
-  // Only save if played for minimum time
-  if (totalPlayedMs < MIN_PLAY_TIME_MS) {
-    console.log("[ListeningStats] Skipped saving - played less than 10s");
+  const playerData = Spicetify.Player.data;
+  if (playerData?.item) {
+    currentTrackUri = playerData.item.uri;
+    currentTrackDuration = playerData.item.duration?.milliseconds || Spicetify.Player.getDuration() || 0;
+    playStartTime = Date.now();
+    accumulatedPlayTime = 0;
+    isPlaying = !playerData.isPaused;
+  } else {
+    currentTrackUri = null;
+    playStartTime = null;
+    accumulatedPlayTime = 0;
+    isPlaying = false;
+    currentTrackDuration = 0;
+  }
+}
+
+let previousTrackData: {
+  trackUri: string; trackName: string; artistName: string;
+  artistUri: string; albumName: string; albumUri: string;
+  albumArt?: string; durationMs: number; startedAt: number;
+} | null = null;
+
+function captureCurrentTrackData(): void {
+  const playerData = Spicetify.Player.data;
+  if (!playerData?.item) {
+    previousTrackData = null;
     return;
   }
+  const meta = playerData.item.metadata;
+  previousTrackData = {
+    trackUri: playerData.item.uri,
+    trackName: playerData.item.name || meta?.title || "Unknown Track",
+    artistName: meta?.artist_name || "Unknown Artist",
+    artistUri: meta?.artist_uri || "",
+    albumName: meta?.album_title || "Unknown Album",
+    albumUri: meta?.album_uri || "",
+    albumArt: meta?.image_url || meta?.image_xlarge_url,
+    durationMs: playerData.item.duration?.milliseconds || Spicetify.Player.getDuration() || 0,
+    startedAt: Date.now(),
+  };
+}
 
-  // Save the basic event first (no API calls needed)
-  const event: Omit<PlayEvent, "id"> = {
-    trackUri: currentTrack.uri,
-    trackName: currentTrack.name,
-    artistName: currentTrack.artistName,
-    artistUri: currentTrack.artistUri,
-    albumName: currentTrack.albumName,
-    albumUri: currentTrack.albumUri,
-    albumArt: currentTrack.albumArt,
-    albumReleaseDate: currentTrack.albumReleaseDate,
-    durationMs: currentTrack.durationMs,
+function writePlayEvent(totalPlayedMs: number): void {
+  if (!previousTrackData) return;
+
+  const event: PlayEvent = {
+    trackUri: previousTrackData.trackUri,
+    trackName: previousTrackData.trackName,
+    artistName: previousTrackData.artistName,
+    artistUri: previousTrackData.artistUri,
+    albumName: previousTrackData.albumName,
+    albumUri: previousTrackData.albumUri,
+    albumArt: previousTrackData.albumArt,
+    durationMs: previousTrackData.durationMs,
     playedMs: totalPlayedMs,
-    startedAt: playStartTime - accumulatedPlayTime, // Adjust for accumulated time
-    endedAt: now,
-    context: currentTrack.context,
-    isExplicit: currentTrack.isExplicit,
-    // Audio features and genres will be fetched lazily when viewing stats
+    startedAt: previousTrackData.startedAt,
+    endedAt: Date.now(),
   };
 
-  try {
-    await addPlayEvent(event);
-    console.log(
-      `[ListeningStats] Saved: ${currentTrack.name} - ${formatTime(totalPlayedMs)}`,
-    );
-    // Notify listeners that new data is available
-    emitStatsUpdated();
-  } catch (error) {
-    console.error("[ListeningStats] Failed to save play event:", error);
-  }
+  addPlayEvent(event).catch((err) => {
+    console.warn("[ListeningStats] Failed to write play event:", err);
+  });
+
+  emitStatsUpdated();
 }
 
-// Format milliseconds to readable time
-function formatTime(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-}
-
-// Handle song change
-async function handleSongChange(): Promise<void> {
-  // Save the previous track first
-  await saveCurrentSession();
-
-  // Reset tracking for new track
-  const newTrack = extractTrackInfo();
-  currentTrack = newTrack;
-  accumulatedPlayTime = 0;
-
-  if (newTrack) {
-    playStartTime = Date.now();
-    isPlaying = !Spicetify.Player.data?.isPaused;
-    console.log(
-      `[ListeningStats] Now tracking: ${newTrack.name} by ${newTrack.artistName}`,
-    );
-  } else {
-    playStartTime = null;
-    isPlaying = false;
-  }
-}
-
-// Handle play/pause state changes
 function handlePlayPause(): void {
   const wasPlaying = isPlaying;
   isPlaying = !Spicetify.Player.data?.isPaused;
 
-  if (!currentTrack || !playStartTime) return;
+  if (!currentTrackUri || playStartTime === null) return;
 
   if (wasPlaying && !isPlaying) {
-    // Paused - accumulate play time
     accumulatedPlayTime += Date.now() - playStartTime;
-    console.log(
-      `[ListeningStats] Paused - accumulated ${formatTime(accumulatedPlayTime)}`,
-    );
   } else if (!wasPlaying && isPlaying) {
-    // Resumed - reset start time
     playStartTime = Date.now();
-    console.log("[ListeningStats] Resumed playback");
   }
 }
 
-// Initialize the tracker
-export function initTracker(): void {
-  console.log("[ListeningStats] Initializing tracker...");
+let pollIntervalId: number | null = null;
+let activeSongChangeHandler: (() => void) | null = null;
 
-  // Set up event listeners
-  Spicetify.Player.addEventListener("songchange", handleSongChange);
+export function initPoller(providerType: ProviderType): void {
+  activeProviderType = providerType;
+
+  if (providerType === "local") {
+    captureCurrentTrackData();
+    activeSongChangeHandler = () => {
+      handleSongChange();
+      captureCurrentTrackData();
+    };
+  } else {
+    activeSongChangeHandler = handleSongChange;
+  }
+
+  Spicetify.Player.addEventListener("songchange", activeSongChangeHandler);
   Spicetify.Player.addEventListener("onplaypause", handlePlayPause);
 
-  // Track current song if already playing
-  const initialTrack = extractTrackInfo();
-  if (initialTrack) {
-    currentTrack = initialTrack;
+  const playerData = Spicetify.Player.data;
+  if (playerData?.item) {
+    currentTrackUri = playerData.item.uri;
+    currentTrackDuration = playerData.item.duration?.milliseconds || Spicetify.Player.getDuration() || 0;
     playStartTime = Date.now();
-    isPlaying = !Spicetify.Player.data?.isPaused;
-    console.log(`[ListeningStats] Initial track: ${initialTrack.name}`);
+    isPlaying = !playerData.isPaused;
   }
 
-  // Save session before page unload
-  window.addEventListener("beforeunload", () => {
-    // Use sync localStorage as fallback for unsaved data
-    if (currentTrack && playStartTime) {
-      const totalPlayedMs =
-        accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
-      if (totalPlayedMs >= MIN_PLAY_TIME_MS) {
-        // Store pending event in localStorage for recovery
-        const pendingEvent = {
-          trackUri: currentTrack.uri,
-          trackName: currentTrack.name,
-          artistName: currentTrack.artistName,
-          artistUri: currentTrack.artistUri,
-          albumName: currentTrack.albumName,
-          albumUri: currentTrack.albumUri,
-          albumArt: currentTrack.albumArt,
-          albumReleaseDate: currentTrack.albumReleaseDate,
-          durationMs: currentTrack.durationMs,
-          playedMs: totalPlayedMs,
-          startedAt: playStartTime - accumulatedPlayTime,
-          endedAt: Date.now(),
-          context: currentTrack.context,
-          isExplicit: currentTrack.isExplicit,
-        };
-        localStorage.setItem(
-          "listening-stats:pendingEvent",
-          JSON.stringify(pendingEvent),
-        );
-      }
-    }
-  });
+  if (providerType === "spotify") {
+    setTimeout(() => {
+      const data = getPollingData();
+      seedKnownArtists(data).then(() => pollRecentlyPlayed());
+    }, 5000);
 
-  console.log("[ListeningStats] Tracker initialized!");
-}
-
-// Recover any pending events from localStorage
-export async function recoverPendingEvents(): Promise<void> {
-  const pending = localStorage.getItem("listening-stats:pendingEvent");
-  if (pending) {
-    try {
-      const event = JSON.parse(pending);
-      await addPlayEvent(event);
-      console.log("[ListeningStats] Recovered pending event:", event.trackName);
-      localStorage.removeItem("listening-stats:pendingEvent");
-    } catch (error) {
-      console.error("[ListeningStats] Failed to recover pending event:", error);
-    }
+    pollIntervalId = window.setInterval(pollRecentlyPlayed, POLL_INTERVAL_MS);
   }
 }
 
-// Clean up tracker (for extension disable)
-export function destroyTracker(): void {
-  Spicetify.Player.removeEventListener("songchange", handleSongChange);
+export function destroyPoller(): void {
+  if (activeSongChangeHandler) {
+    Spicetify.Player.removeEventListener("songchange", activeSongChangeHandler);
+    activeSongChangeHandler = null;
+  }
   Spicetify.Player.removeEventListener("onplaypause", handlePlayPause);
-  saveCurrentSession();
-  console.log("[ListeningStats] Tracker destroyed");
+  if (pollIntervalId !== null) {
+    clearInterval(pollIntervalId);
+    pollIntervalId = null;
+  }
+  activeProviderType = null;
+  previousTrackData = null;
 }

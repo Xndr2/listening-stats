@@ -1,17 +1,24 @@
-// Activity Chart Component
 import { formatHour, formatMinutes } from "../utils";
 
 interface ActivityChartProps {
   hourlyDistribution: number[];
   peakHour: number;
+  hourlyUnit?: "ms" | "plays";
 }
 
-export function ActivityChart({ hourlyDistribution, peakHour }: ActivityChartProps) {
+export function ActivityChart({ hourlyDistribution, peakHour, hourlyUnit = "ms" }: ActivityChartProps) {
   if (!hourlyDistribution.some((h) => h > 0)) {
     return null;
   }
 
   const max = Math.max(...hourlyDistribution, 1);
+
+  const formatValue = (val: number) => {
+    if (hourlyUnit === "plays") {
+      return `${val} ${val === 1 ? "play" : "plays"}`;
+    }
+    return formatMinutes(val);
+  };
 
   return (
     <div className="activity-section">
@@ -31,7 +38,7 @@ export function ActivityChart({ hourlyDistribution, peakHour }: ActivityChartPro
               style={{ height: `${h}%` }}
             >
               <div className="activity-bar-tooltip">
-                {formatHour(hr)}: {formatMinutes(val)}
+                {formatHour(hr)}: {formatValue(val)}
               </div>
             </div>
           );

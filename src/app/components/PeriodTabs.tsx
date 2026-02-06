@@ -1,28 +1,20 @@
-// Period Tabs Component
-import { TimePeriod } from "../../types";
-
 interface PeriodTabsProps {
-  period: TimePeriod;
-  onPeriodChange: (period: TimePeriod) => void;
+  period: string;
+  periods: string[];
+  periodLabels: Record<string, string>;
+  onPeriodChange: (period: string) => void;
 }
 
-const PERIOD_LABELS: Record<TimePeriod, string> = {
-  today: "Today",
-  week: "This Week",
-  month: "This Month",
-  allTime: "All Time",
-};
-
-export function PeriodTabs({ period, onPeriodChange }: PeriodTabsProps) {
+export function PeriodTabs({ period, periods, periodLabels, onPeriodChange }: PeriodTabsProps) {
   return (
     <div className="period-tabs">
-      {(["today", "week", "month", "allTime"] as TimePeriod[]).map((p) => (
+      {periods.map((p) => (
         <button
           key={p}
           className={`period-tab ${period === p ? "active" : ""}`}
           onClick={() => onPeriodChange(p)}
         >
-          {PERIOD_LABELS[p]}
+          {periodLabels[p] || p}
         </button>
       ))}
     </div>

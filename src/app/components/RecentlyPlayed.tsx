@@ -1,9 +1,8 @@
-// Recently Played Component
-import { PlayEvent } from "../../types";
-import { navigateToUri } from "../utils";
+import { RecentTrack } from "../../types";
+import { lazyNavigate, navigateToUri, timeAgo } from "../utils";
 
 interface RecentlyPlayedProps {
-  recentTracks: PlayEvent[];
+  recentTracks: RecentTrack[];
 }
 
 export function RecentlyPlayed({ recentTracks }: RecentlyPlayedProps) {
@@ -11,25 +10,28 @@ export function RecentlyPlayed({ recentTracks }: RecentlyPlayedProps) {
     return null;
   }
 
+  const limit = 12;
+
   return (
     <div className="recent-section">
       <div className="recent-header">
         <h3 className="recent-title">Recently Played</h3>
       </div>
       <div className="recent-scroll">
-        {recentTracks.slice(0, 12).map((t) => (
+        {recentTracks.slice(0, limit).map((t) => (
           <div
-            key={`${t.trackUri}-${t.startedAt}`}
+            key={`${t.trackUri || t.trackName}-${t.playedAt}`}
             className="recent-card"
-            onClick={() => navigateToUri(t.trackUri)}
+            onClick={() => t.trackUri ? navigateToUri(t.trackUri) : lazyNavigate("track", t.trackName, t.artistName)}
           >
             {t.albumArt ? (
               <img src={t.albumArt} className="recent-art" alt="" />
             ) : (
-              <div className="recent-art" />
+              <div className="recent-art placeholder" />
             )}
             <div className="recent-name">{t.trackName}</div>
             <div className="recent-meta">{t.artistName}</div>
+            <div className="recent-time">{timeAgo(t.playedAt)}</div>
           </div>
         ))}
       </div>

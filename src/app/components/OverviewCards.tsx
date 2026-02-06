@@ -1,45 +1,49 @@
-// Overview Cards Component
 import { formatDurationLong } from "../../services/stats";
 import { ListeningStats } from "../../types";
 import { estimateArtistPayout } from "../utils";
+import { AnimatedNumber } from "./AnimatedNumber";
 import { PeriodTabs } from "./PeriodTabs";
-import { TimePeriod } from "../../types";
 
 interface OverviewCardsProps {
   stats: ListeningStats;
-  period: TimePeriod;
-  onPeriodChange: (period: TimePeriod) => void;
+  period: string;
+  periods: string[];
+  periodLabels: Record<string, string>;
+  onPeriodChange: (period: string) => void;
 }
 
-export function OverviewCards({ stats, period, onPeriodChange }: OverviewCardsProps) {
+export function OverviewCards({ stats, period, periods, periodLabels, onPeriodChange }: OverviewCardsProps) {
   const payout = estimateArtistPayout(stats.trackCount);
 
   return (
     <div className="overview-row">
-      {/* Hero - Time Listened */}
       <div className="overview-card hero">
         <div className="overview-value">{formatDurationLong(stats.totalTimeMs)}</div>
         <div className="overview-label">Time Listened</div>
-        <PeriodTabs period={period} onPeriodChange={onPeriodChange} />
+        <PeriodTabs period={period} periods={periods} periodLabels={periodLabels} onPeriodChange={onPeriodChange} />
         <div className="overview-secondary">
           <div className="overview-stat">
-            <div className="overview-stat-value">{stats.trackCount}</div>
+            <div className="overview-stat-value"><AnimatedNumber value={stats.trackCount} /></div>
             <div className="overview-stat-label">Tracks</div>
           </div>
           <div className="overview-stat">
-            <div className="overview-stat-value">{stats.uniqueArtistCount}</div>
+            <div className="overview-stat-value"><AnimatedNumber value={stats.uniqueArtistCount} /></div>
             <div className="overview-stat-label">Artists</div>
           </div>
           <div className="overview-stat">
-            <div className="overview-stat-value">{stats.uniqueTrackCount}</div>
+            <div className="overview-stat-value"><AnimatedNumber value={stats.uniqueTrackCount} /></div>
             <div className="overview-stat-label">Unique</div>
           </div>
+          {stats.lastfmConnected && stats.totalScrobbles ? (
+            <div className="overview-stat">
+              <div className="overview-stat-value">{stats.totalScrobbles.toLocaleString()}</div>
+              <div className="overview-stat-label">Scrobbles</div>
+            </div>
+          ) : null}
         </div>
       </div>
 
-      {/* 4 info cards */}
       <div className="overview-card-list">
-        {/* Payout */}
         <div className="overview-card">
           <div className="stat-colored">
             <div className="stat-text">
@@ -52,7 +56,6 @@ export function OverviewCards({ stats, period, onPeriodChange }: OverviewCardsPr
           </div>
         </div>
 
-        {/* Streak */}
         <div className="overview-card">
           <div className="stat-colored">
             <div className="stat-text">
@@ -65,20 +68,30 @@ export function OverviewCards({ stats, period, onPeriodChange }: OverviewCardsPr
           </div>
         </div>
 
-        {/* New Artists */}
         <div className="overview-card">
           <div className="stat-colored">
             <div className="stat-text">
-              <div className="overview-value purple">{stats.newArtistsCount}</div>
-              <div className="overview-label">New Artists</div>
-              <div className="overview-label-tooltip">
-                You're cool if this is high!
-              </div>
+              {stats.newArtistsCount > 0 ? (
+                <>
+                  <div className="overview-value purple">{stats.newArtistsCount}</div>
+                  <div className="overview-label">New Artists</div>
+                  <div className="overview-label-tooltip">
+                    You're cool if this is high!
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="overview-value purple">{stats.listenedDays}</div>
+                  <div className="overview-label">Days Listened</div>
+                  <div className="overview-label-tooltip">
+                    Days with at least one play.
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Skip Rate */}
         <div className="overview-card">
           <div className="stat-colored">
             <div className="stat-text">

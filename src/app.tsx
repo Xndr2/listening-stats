@@ -1,25 +1,25 @@
-// Listening Stats - Tracker Extension
-// This extension runs in the background to track listening activity.
-// The UI is provided by the CustomApp.
+import {
+  getSelectedProviderType,
+  hasExistingData,
+  activateProvider,
+  setSelectedProviderType,
+} from "./services/providers";
 
-import { initTracker, recoverPendingEvents } from "./services/tracker";
-
-// Main extension entry point
 async function main(): Promise<void> {
-  console.log("[ListeningStats] Tracker extension starting...");
+  let providerType = getSelectedProviderType();
 
-  // Recover any pending events from last session
-  await recoverPendingEvents();
+  if (!providerType && hasExistingData()) {
+    providerType = "spotify";
+    setSelectedProviderType("spotify");
+  }
 
-  // Initialize the play tracker
-  initTracker();
-
-  console.log("[ListeningStats] Tracker extension loaded!");
+  if (providerType) {
+    activateProvider(providerType);
+  }
 }
 
-// Wait for Spicetify APIs to be ready
 (function init() {
-  if (!Spicetify.Player || !Spicetify.Platform) {
+  if (!Spicetify.Player || !Spicetify.Platform || !Spicetify.CosmosAsync) {
     setTimeout(init, 100);
     return;
   }

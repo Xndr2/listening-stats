@@ -1,16 +1,12 @@
-// CSS module declarations
 declare module '*.css' {
   const content: string;
   export default content;
 }
 
-// Spicetify global type declarations
 declare namespace Spicetify {
-  // React module
   const React: typeof import('react');
   const ReactDOM: typeof import('react-dom');
 
-  // Player API
   namespace Player {
     interface PlayerData {
       item?: {
@@ -36,23 +32,22 @@ declare namespace Spicetify {
     }
 
     const data: PlayerData | undefined;
-    
+
     function addEventListener(
       type: 'songchange' | 'onplaypause' | 'onprogress',
       callback: (event?: Event) => void
     ): void;
-    
+
     function removeEventListener(
       type: 'songchange' | 'onplaypause' | 'onprogress',
       callback: (event?: Event) => void
     ): void;
-    
+
     function getDuration(): number;
     function getProgress(): number;
     function isPlaying(): boolean;
   }
 
-  // Platform API
   namespace Platform {
     interface Session {
       accessToken: string;
@@ -83,14 +78,12 @@ declare namespace Spicetify {
     const LibraryAPI: LibraryAPIInterface;
   }
 
-  // LocalStorage API
   namespace LocalStorage {
     function get(key: string): string | null;
     function set(key: string, value: string): void;
     function remove(key: string): void;
   }
 
-  // Topbar API
   namespace Topbar {
     class Button {
       constructor(
@@ -108,7 +101,6 @@ declare namespace Spicetify {
     }
   }
 
-  // PopupModal API
   namespace PopupModal {
     function display(options: {
       title: string;
@@ -118,7 +110,6 @@ declare namespace Spicetify {
     function hide(): void;
   }
 
-  // CosmosAsync API for Spotify Web API calls
   namespace CosmosAsync {
     function get(url: string): Promise<any>;
     function post(url: string, body?: any): Promise<any>;
@@ -126,30 +117,14 @@ declare namespace Spicetify {
     function del(url: string): Promise<any>;
   }
 
-  // Audio data from internal API (no rate limits)
-  interface AudioAnalysisTrack {
-    tempo: number;
-    key: number;
-    mode: number;
-    time_signature: number;
-    loudness: number;
-  }
-  interface AudioAnalysisData {
-    track?: AudioAnalysisTrack;
-  }
-  function getAudioData(uri: string): Promise<AudioAnalysisData>;
-
-  // Notification
   function showNotification(message: string, isError?: boolean, msTimeout?: number): void;
 }
 
-// Make Spicetify available globally
 declare global {
   const Spicetify: typeof Spicetify;
   const React: typeof Spicetify.React;
   const ReactDOM: typeof Spicetify.ReactDOM;
 
-  // JSX namespace for React elements
   namespace JSX {
     interface IntrinsicElements {
       div: React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;

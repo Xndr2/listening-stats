@@ -28,3 +28,9 @@ Development.md
 
 # Changelog Editor
 ChangelogEditor/
+
+# AI files for generating the wiki and readme
+.claude/
+
+# Wiki files
+Wiki/

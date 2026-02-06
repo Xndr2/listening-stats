@@ -1,6 +1,4 @@
-// Main Stats Page Component
-import { isApiAvailable } from "../services/spotify-api";
-import { calculateStats } from "../services/stats";
+import { calculateStats, clearStatsCache } from "../services/stats";
 import {
   checkForUpdates,
   copyInstallCommand,
@@ -8,81 +6,111 @@ import {
   getInstallCommand,
   UpdateInfo,
 } from "../services/updater";
-import { ListeningStats, TimePeriod } from "../types/listeningstats";
+import { ListeningStats, ProviderType } from "../types/listeningstats";
+import {
+  getSelectedProviderType,
+  getActiveProvider,
+  activateProvider,
+} from "../services/providers";
+import { onStatsUpdated } from "../services/tracker";
 import {
   ActivityChart,
   EmptyState,
   Footer,
+  GenreTimeline,
+  LoadingSkeleton,
   OverviewCards,
   RecentlyPlayed,
+  SetupScreen,
   SettingsPanel,
   TopLists,
   UpdateBanner,
 } from "./components";
 import { Header } from "./components/Header";
 import { injectStyles } from "./styles";
-import { checkLikedTracks, fetchArtistImages, toggleLike } from "./utils";
+import { ShareCardModal } from "./components/ShareCardModal";
+import { checkLikedTracks, toggleLike } from "./utils";
 
 const VERSION = getCurrentVersion();
 
 interface State {
-  period: TimePeriod;
+  period: string;
   stats: ListeningStats | null;
   loading: boolean;
+  error: string | null;
   likedTracks: Map<string, boolean>;
-  artistImages: Map<string, string>;
   updateInfo: UpdateInfo | null;
   showUpdateBanner: boolean;
   commandCopied: boolean;
   showSettings: boolean;
-  apiAvailable: boolean;
   lastUpdateTimestamp: number;
+  needsSetup: boolean;
+  providerType: ProviderType | null;
+  showShareModal: boolean;
 }
 
 class StatsPage extends Spicetify.React.Component<{}, State> {
   private pollInterval: number | null = null;
+  private unsubStatsUpdate: (() => void) | null = null;
 
   constructor(props: {}) {
     super(props);
+
+    let providerType = getSelectedProviderType();
+    let needsSetup = false;
+
+    if (!providerType) {
+      needsSetup = true;
+    }
+
+    if (providerType && !getActiveProvider()) {
+      activateProvider(providerType, true);
+    }
+
+    const provider = getActiveProvider();
+
     this.state = {
-      period: "today",
+      period: provider?.defaultPeriod || "recent",
       stats: null,
-      loading: true,
+      loading: !needsSetup,
+      error: null,
       likedTracks: new Map(),
-      artistImages: new Map(),
       updateInfo: null,
       showUpdateBanner: false,
       commandCopied: false,
       showSettings: false,
-      apiAvailable: true,
       lastUpdateTimestamp: 0,
+      needsSetup,
+      providerType,
+      showShareModal: false,
     };
   }
 
   componentDidMount() {
     injectStyles();
-    this.loadStats();
-    this.checkForUpdateOnLoad();
 
-    this.pollInterval = window.setInterval(() => {
-      const ts = localStorage.getItem("listening-stats:lastUpdate");
-      if (ts) {
-        const t = parseInt(ts, 10);
-        if (t > this.state.lastUpdateTimestamp) {
-          this.setState({ lastUpdateTimestamp: t });
-          this.loadStats();
-        }
+    if (!this.state.needsSetup) {
+      this.loadStats();
+      this.checkForUpdateOnLoad();
+    }
+
+    this.unsubStatsUpdate = onStatsUpdated(() => {
+      if (!this.state.needsSetup && !this.state.loading) {
+        clearStatsCache();
+        this.loadStats();
       }
-      this.setState({ apiAvailable: isApiAvailable() });
-    }, 2000);
+    });
   }
 
   componentWillUnmount() {
     if (this.pollInterval) clearInterval(this.pollInterval);
+    this.unsubStatsUpdate?.();
   }
 
   componentDidUpdate(_: {}, prev: State) {
-    if (prev.period !== this.state.period) this.loadStats();
+    if (prev.period !== this.state.period && !this.state.needsSetup) {
+      this.loadStats();
+    }
   }
 
   checkForUpdateOnLoad = async () => {
@@ -122,25 +150,30 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
   };
 
   loadStats = async () => {
-    this.setState({ loading: true });
+    this.setState({ loading: true, error: null });
     try {
       const data = await calculateStats(this.state.period);
       this.setState({ stats: data, loading: false });
 
-      if (data.topTracks.length > 0) {
-        const uris = data.topTracks.map((t) => t.trackUri);
-        const liked = await checkLikedTracks(uris);
-        this.setState({ likedTracks: liked });
+      if (data.topTracks.length > 0 && data.topTracks[0].trackUri) {
+        const uris = data.topTracks.map((t) => t.trackUri).filter(Boolean);
+        if (uris.length > 0) {
+          const liked = await checkLikedTracks(uris);
+          this.setState({ likedTracks: liked });
+        }
       }
 
-      if (data.topArtists.length > 0) {
-        const uris = data.topArtists.map((a) => a.artistUri).filter(Boolean);
-        const images = await fetchArtistImages(uris);
-        this.setState({ artistImages: images });
+      const provider = getActiveProvider();
+      if (provider?.prefetchPeriod) {
+        const idx = provider.periods.indexOf(this.state.period);
+        const adjacent = [provider.periods[idx - 1], provider.periods[idx + 1]].filter(Boolean);
+        for (const p of adjacent) {
+          provider.prefetchPeriod(p);
+        }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("[ListeningStats] Load failed:", e);
-      this.setState({ loading: false });
+      this.setState({ loading: false, error: e.message || "Failed to load stats" });
     }
   };
 
@@ -153,8 +186,43 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
     this.setState({ likedTracks: m });
   };
 
-  handlePeriodChange = (period: TimePeriod) => {
+  handlePeriodChange = (period: string) => {
     this.setState({ period });
+  };
+
+  handleShare = () => {
+    this.setState({ showShareModal: true });
+  };
+
+  handleProviderSelected = () => {
+    const provider = getActiveProvider();
+    if (provider) {
+      this.setState({
+        needsSetup: false,
+        providerType: provider.type,
+        period: provider.defaultPeriod,
+        loading: true,
+      }, () => {
+        this.loadStats();
+        this.checkForUpdateOnLoad();
+      });
+    }
+  };
+
+  handleProviderChanged = () => {
+    clearStatsCache();
+    const provider = getActiveProvider();
+    if (provider) {
+      this.setState({
+        providerType: provider.type,
+        period: provider.defaultPeriod,
+        stats: null,
+        loading: true,
+        showSettings: false,
+      }, () => {
+        this.loadStats();
+      });
+    }
   };
 
   render() {
@@ -162,16 +230,30 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       period,
       stats,
       loading,
+      error,
       likedTracks,
-      artistImages,
       updateInfo,
       showUpdateBanner,
       commandCopied,
       showSettings,
-      apiAvailable,
+      needsSetup,
+      providerType,
+      showShareModal,
     } = this.state;
 
-    // Update UI takes absolute priority
+    if (needsSetup) {
+      return (
+        <div className="stats-page">
+          <SetupScreen onProviderSelected={this.handleProviderSelected} />
+        </div>
+      );
+    }
+
+    const provider = getActiveProvider();
+    const periods = provider?.periods || ["recent"];
+    const periodLabels = provider?.periodLabels || { recent: "Recent" };
+    const showLikeButtons = providerType !== "lastfm";
+
     if (showUpdateBanner && updateInfo) {
       return (
         <UpdateBanner
@@ -184,86 +266,124 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
     }
 
     if (loading) {
+      return <LoadingSkeleton />;
+    }
+
+    if (error && !stats) {
       return (
         <div className="stats-page">
-          <div className="loading">Loading...</div>
+          <Header
+            onToggleSettings={() => this.setState({ showSettings: !showSettings })}
+            providerType={providerType}
+          />
+          <div className="error-state">
+            <div className="error-message">
+              <h3>Something went wrong</h3>
+              <p>{error}</p>
+              <button className="footer-btn primary" onClick={this.loadStats}>
+                Try Again
+              </button>
+            </div>
+          </div>
         </div>
       );
     }
 
-    // Empty state
-    if (!stats || stats.trackCount === 0) {
+    const settingsModal = showSettings ? Spicetify.ReactDOM.createPortal(
+      <div className="settings-overlay" onClick={(e) => {
+        if ((e.target as HTMLElement).classList.contains("settings-overlay")) {
+          this.setState({ showSettings: false });
+        }
+      }}>
+        <SettingsPanel
+          onRefresh={this.loadStats}
+          onCheckUpdates={this.checkUpdatesManual}
+          onProviderChanged={this.handleProviderChanged}
+          onClose={() => this.setState({ showSettings: false })}
+          stats={stats}
+          period={period}
+        />
+      </div>,
+      document.body,
+    ) : null;
+
+    if (!stats || (stats.topTracks.length === 0 && stats.recentTracks.length === 0)) {
       return (
         <div className="stats-page">
+          <Header
+            onShare={stats ? this.handleShare : undefined}
+            onToggleSettings={() => this.setState({ showSettings: !showSettings })}
+            providerType={providerType}
+          />
           <EmptyState
             stats={stats}
             period={period}
+            periods={periods}
+            periodLabels={periodLabels}
             onPeriodChange={this.handlePeriodChange}
           />
           <Footer
             version={VERSION}
-            showSettings={showSettings}
             updateInfo={updateInfo}
-            onToggleSettings={() =>
-              this.setState({ showSettings: !showSettings })
-            }
             onShowUpdate={() => this.setState({ showUpdateBanner: true })}
           />
-          {showSettings && (
-            <SettingsPanel
-              apiAvailable={apiAvailable}
-              onRefresh={this.loadStats}
-              onCheckUpdates={this.checkUpdatesManual}
-              onDataCleared={() => this.setState({ stats: null })}
-            />
-          )}
+          {settingsModal}
         </div>
       );
     }
 
     return (
       <div className="stats-page">
-        <Header />
+        <Header
+          onShare={this.handleShare}
+          onToggleSettings={() => this.setState({ showSettings: !showSettings })}
+          providerType={providerType}
+        />
 
         <OverviewCards
           stats={stats}
           period={period}
+          periods={periods}
+          periodLabels={periodLabels}
           onPeriodChange={this.handlePeriodChange}
         />
 
         <TopLists
           stats={stats}
           likedTracks={likedTracks}
-          artistImages={artistImages}
           onLikeToggle={this.handleLikeToggle}
+          showLikeButtons={showLikeButtons}
+          period={period}
         />
+
+        <GenreTimeline />
 
         <ActivityChart
           hourlyDistribution={stats.hourlyDistribution}
           peakHour={stats.peakHour}
+          hourlyUnit={stats.hourlyUnit}
         />
 
         <RecentlyPlayed recentTracks={stats.recentTracks} />
 
         <Footer
           version={VERSION}
-          showSettings={showSettings}
           updateInfo={updateInfo}
-          onToggleSettings={() =>
-            this.setState({ showSettings: !showSettings })
-          }
           onShowUpdate={() =>
             this.setState({ showUpdateBanner: true, commandCopied: false })
           }
         />
 
-        {showSettings && (
-          <SettingsPanel
-            apiAvailable={apiAvailable}
-            onRefresh={this.loadStats}
-            onCheckUpdates={this.checkUpdatesManual}
-            onDataCleared={() => this.setState({ stats: null })}
-          />
+        {settingsModal}
+
+        {showShareModal && stats && Spicetify.ReactDOM.createPortal(
+          <ShareCardModal
+            stats={stats}
+            period={period}
+            providerType={providerType}
+            onClose={() => this.setState({ showShareModal: false })}
+          />,
+          document.body,
         )}
       </div>
     );

@@ -1,8 +1,5 @@
-// Utility functions for the Listening Stats app
+import { searchTrack, searchArtist, searchAlbum } from "../services/spotify-api";
 
-/**
- * Navigate to a Spotify URI
- */
 export function navigateToUri(uri: string): void {
   if (uri && Spicetify.Platform?.History) {
     const [, type, id] = uri.split(':');
@@ -12,9 +9,24 @@ export function navigateToUri(uri: string): void {
   }
 }
 
-/**
- * Toggle like status for a track
- */
+export async function lazyNavigate(
+  type: "track" | "artist" | "album",
+  name: string,
+  artistName?: string,
+): Promise<void> {
+  let result;
+  if (type === "track") {
+    result = await searchTrack(name, artistName || "");
+  } else if (type === "artist") {
+    result = await searchArtist(name);
+  } else {
+    result = await searchAlbum(name, artistName || "");
+  }
+  if (result?.uri) {
+    navigateToUri(result.uri);
+  }
+}
+
 export async function toggleLike(trackUri: string, isLiked: boolean): Promise<boolean> {
   try {
     if (isLiked) {
@@ -29,13 +41,10 @@ export async function toggleLike(trackUri: string, isLiked: boolean): Promise<bo
   }
 }
 
-/**
- * Check liked status for multiple tracks
- */
 export async function checkLikedTracks(trackUris: string[]): Promise<Map<string, boolean>> {
   const result = new Map<string, boolean>();
   if (trackUris.length === 0) return result;
-  
+
   try {
     const contains = await Spicetify.Platform.LibraryAPI.contains(...trackUris);
     trackUris.forEach((uri, i) => result.set(uri, contains[i]));
@@ -45,50 +54,16 @@ export async function checkLikedTracks(trackUris: string[]): Promise<Map<string,
   return result;
 }
 
-/**
- * Fetch artist images from Spotify API
- */
-export async function fetchArtistImages(artistUris: string[]): Promise<Map<string, string>> {
-  const result = new Map<string, string>();
-  const validUris = artistUris.filter(uri => uri?.startsWith('spotify:artist:'));
-  if (validUris.length === 0) return result;
-  
-  try {
-    const ids = validUris.map(uri => uri.split(':')[2]).join(',');
-    const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${ids}`);
-    if (response?.artists) {
-      response.artists.forEach((artist: any, i: number) => {
-        if (artist?.images?.[0]?.url) {
-          result.set(validUris[i], artist.images[0].url);
-        }
-      });
-    }
-  } catch (error) {
-    console.warn('[ListeningStats] Failed to fetch artist images:', error);
-  }
-  return result;
-}
-
-/**
- * Format hour number to 12h format
- */
 export function formatHour(h: number): string {
   if (h === 0) return '12am';
   if (h === 12) return '12pm';
   return h < 12 ? `${h}am` : `${h - 12}pm`;
 }
 
-/**
- * Format milliseconds to minutes string
- */
 export function formatMinutes(ms: number): string {
   return `${Math.round(ms / 60000)} min`;
 }
 
-/**
- * Estimate artist payout based on stream count
- * Spotify pays roughly $0.003-0.005 per stream on average
- */
 const PAYOUT_PER_STREAM = 0.004;
 
 export function estimateArtistPayout(streamCount: number): string {
@@ -96,12 +71,31 @@ export function estimateArtistPayout(streamCount: number): string {
   return payout.toFixed(2);
 }
 
-/**
- * Get rank CSS class based on position
- */
 export function getRankClass(index: number): string {
   if (index === 0) return 'gold';
   if (index === 1) return 'silver';
   if (index === 2) return 'bronze';
   return '';
+}
+
+export function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+
+  return new Date(dateStr).toLocaleDateString();
 }

@@ -1,49 +1,52 @@
 # Listening Stats - Spicetify Custom App
 
-A real-time listening statistics dashboard for Spotify, powered by Spicetify.  
-  
-**Attention:** This app is in development. It only tracks songs you play from your PC, not from your phone.  
-I am working on this but I'm hitting major rate limits. A work-around is being developed but it will take some time.
+A real-time listening statistics dashboard for Spotify, powered by Spicetify.
 
 ![Version](https://img.shields.io/github/v/release/Xndr2/listening-stats)
 ![Spicetify](https://img.shields.io/badge/spicetify-2.x-1DB954)
 ![Downloads](https://img.shields.io/github/downloads/Xndr2/listening-stats/total)
 
-<img width="2552" height="1373" alt="image" src="https://github.com/user-attachments/assets/6bfdeb96-2e81-4ae0-9a41-1bf647bac215" />
+<img alt="image" src="https://github.com/user-attachments/assets/6bfdeb96-2e81-4ae0-9a41-1bf647bac215" />
 
 ## Features
 
-- **Track listening time**: See how much music you've listened to today, this week, this month, or all time
-- **Top tracks, artists & albums**: View your most played content with play counts and listening time
-- **Activity chart**: Visualize your listening patterns by hour
-- **Artist payout estimate**: See how much you've contributed to artists
-- **Streak tracking**: Track consecutive listening days
-- **Skip rate**: Track how often you skip songs
-- **New artists discovered**: See how many new artists you've listened to
-- **Local storage**: All data stored locally in IndexedDB
-- **Accurate tracking**: Handles pauses, skips, and session recovery
-- **Auto-update notifications**: Get notified when updates are available
+- **Multiple data providers** — choose between Last.fm, local tracking, or Spotify's API
+- **Last.fm integration** — accurate play counts and listening history across all your devices with 7 time periods
+- **Local tracking** — on-device tracking via IndexedDB, no account needed
+- **Top tracks, artists & albums** — view your most played content with play counts and listening time
+- **Activity chart** — visualize your listening patterns by hour
+- **Genre timeline** — see how your genre preferences shift across time periods
+- **Share cards** — generate shareable stat images in story or landscape format
+- **Data export** — export your stats as JSON or CSV
+- **Artist payout estimate** — see how much you've contributed to artists
+- **Streak tracking** — track consecutive listening days
+- **Skip rate** — track how often you skip songs
+- **Animated dashboard** — smooth number animations and loading states
+- **Auto-update notifications** — get notified when updates are available
 
 ## Installation
 
 ### Quick Install (Recommended)
-Make sure you have Spicetify installed and working.  
-https://spicetify.app/  
-  
+
+Make sure you have Spicetify installed and working.
+https://spicetify.app/
+
 Then run the following command for your operating system:
-  
+
 **Linux / macOS:**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.sh | bash
 ```
 
+**Windows (PowerShell):**
 
-**Windows (PowerShell):**    
 ```powershell
 iwr -useb 'https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1' | iex
 ```
 
 The installer will automatically:
+
 - Download the latest release
 - Install to your Spicetify CustomApps folder
 - Configure and apply Spicetify
@@ -71,9 +74,10 @@ npm run deploy
 
 ## Updating
 
-Listening Stats will notify you when a new version is available. A non-intrusive popup will appear in the top-right corner with update instructions.
+Listening Stats will notify you when a new version is available. A non-intrusive popup will appear with update instructions.
 
 **To update:**
+
 1. Click "Copy Install Command" in the update popup
 2. Open a terminal
 3. Paste and run the command
@@ -83,27 +87,36 @@ Alternatively, run the install command again - it handles updates automatically.
 
 ## Usage
 
-After installation, you'll find "Listening Stats" in Spotify's sidebar. Click it to open the dashboard.
+After installation, you'll find "Listening Stats" in Spotify's sidebar. On first launch, you'll be asked to choose a data provider:
 
-**Dashboard shows:**
+- **Last.fm** — connect your Last.fm account for accurate play counts across all devices. Requires a Last.fm username and API key ([get one here](https://www.last.fm/api/account/create))
+- **Local Tracking** — tracks on this device only, no account needed
+
+Once set up, the dashboard shows:
 
 - Time listened with track/artist/unique counts
 - Estimated artist payout
-- Listening streak
-- Skip rate
-- New artists discovered
+- Listening streak and skip rate
 - Top tracks, artists, and albums
+- Genre timeline across periods
 - Hourly activity chart
 - Recently played tracks
 
-Use the period tabs to switch between **Today**, **This Week**, **This Month**, and **All Time**.
+Use the period tabs to switch between time ranges. Available periods depend on your provider.
 
-**Settings panel** (click Settings in footer):
-- Refresh stats
-- Enrich data (fetch missing album art, etc.)
-- Clear cache
+**Settings panel** (gear icon in the header):
+
+- Switch data provider
+- Export stats (JSON / CSV)
+- Refresh stats and clear cache
 - Check for updates
-- Reset all data
+- Manage Last.fm account (when using Last.fm)
+
+**Share cards** (share icon in the header):
+
+- Generate a shareable image of your stats
+- Choose between story (vertical) and landscape formats
+- Copy to clipboard, download, or share directly
 
 ## Troubleshooting
 
@@ -116,27 +129,32 @@ Use the period tabs to switch between **Today**, **This Week**, **This Month**, 
 
 - Check DevTools console for errors
 - Verify tracker is running: should log "Now tracking: ..."
-- Check IndexedDB has data
+- For local provider: check IndexedDB has data
 
 **Rate limit errors (429)**
 
 - Normal for heavy usage
-- Extension backs off automatically
-- Settings → "Clear Cache" resets rate limit state
+- Extension backs off automatically with exponential retry
+- Settings → "Clear Cache" resets state
 
-**CSS not applying**
+**Last.fm connection issues**
 
-- Styles inject at runtime; check `injectStyles()` called
-- Inspect element to see if styles present
+- Verify your API key is valid at [last.fm/api](https://www.last.fm/api)
+- Check that your username is correct
+- See the [Last.fm Setup Guide](https://github.com/Xndr2/listening-stats/wiki/Last.fm-Setup-Guide) for help
 
 ## Privacy
 
-All data stored locally in IndexedDB. Nothing sent to external servers.
+All data stored locally. Nothing sent to external servers beyond the APIs you choose to use:
 
-API calls go directly to `api.spotify.com` using your existing Spotify session, no proxy, no data collection.
+- **Local provider**: all data in IndexedDB, API calls go to `api.spotify.com` using your existing session
+- **Last.fm provider**: calls go to `ws.audioscrobbler.com` (Last.fm API) and `api.spotify.com` for enrichment
+
+No proxy, no analytics, no data collection.
 
 ## AI
-AI was only used to write documentation (like this readme or comments, english is not my main language so it's easier to let AI do this), write the install scripts and generate the svg icons.
+
+AI was only used to write documentation (like this readme, english is not my main language so it's easier to let AI do this), write the install scripts and generate the svg icons.
 No AI was used to develop this project!
 
 ## Contributing
