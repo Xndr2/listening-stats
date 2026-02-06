@@ -1,5 +1,6 @@
 import * as LastFm from "../../services/lastfm";
 import { activateProvider } from "../../services/providers";
+import * as Statsfm from "../../services/statsfm";
 import { Icons } from "../icons";
 
 const { useState } = Spicetify.React;
@@ -14,6 +15,10 @@ export function SetupScreen({ onProviderSelected }: SetupScreenProps) {
   const [lfmValidating, setLfmValidating] = useState(false);
   const [lfmError, setLfmError] = useState("");
 
+  const [sfmUsername, setSfmUsername] = useState("");
+  const [sfmValidating, setSfmValidating] = useState(false);
+  const [sfmError, setSfmError] = useState("");
+
   const handleLastfmSelect = async () => {
     if (!lfmUsername.trim() || !lfmApiKey.trim()) {
       setLfmError("Both username and API key are required");
@@ -22,7 +27,10 @@ export function SetupScreen({ onProviderSelected }: SetupScreenProps) {
     setLfmValidating(true);
     setLfmError("");
     try {
-      const info = await LastFm.validateUser(lfmUsername.trim(), lfmApiKey.trim());
+      const info = await LastFm.validateUser(
+        lfmUsername.trim(),
+        lfmApiKey.trim(),
+      );
       LastFm.saveConfig({ username: info.username, apiKey: lfmApiKey.trim() });
       activateProvider("lastfm");
       onProviderSelected();
@@ -30,6 +38,25 @@ export function SetupScreen({ onProviderSelected }: SetupScreenProps) {
       setLfmError(err.message || "Connection failed");
     } finally {
       setLfmValidating(false);
+    }
+  };
+
+  const handleStatsfmSelect = async () => {
+    if (!sfmUsername.trim()) {
+      setSfmError("Username is required");
+      return;
+    }
+    setSfmValidating(true);
+    setSfmError("");
+    try {
+      const info = await Statsfm.validateUser(sfmUsername.trim());
+      Statsfm.saveConfig({ username: info.customId });
+      activateProvider("statsfm");
+      onProviderSelected();
+    } catch (err: any) {
+      setSfmError(err.message || "Connection failed");
+    } finally {
+      setSfmValidating(false);
     }
   };
 
@@ -42,14 +69,76 @@ export function SetupScreen({ onProviderSelected }: SetupScreenProps) {
     <div className="setup-screen">
       <div className="setup-header">
         <h1 className="setup-title">Listening Stats</h1>
-        <p className="setup-subtitle">Connect your Last.fm account to get started</p>
+        <p className="setup-subtitle">
+          Connect your stats.fm or Last.fm account to get started
+        </p>
       </div>
 
       <div className="setup-main">
         <div className="setup-card primary">
           <div className="setup-card-icon">
             <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M10.584 17.21l-.88-2.392s-1.43 1.594-3.573 1.594c-1.897 0-3.244-1.649-3.244-4.288 0-3.382 1.704-4.591 3.381-4.591 2.422 0 3.19 1.567 3.849 3.574l.88 2.749c.88 2.666 2.529 4.81 7.284 4.81 3.409 0 5.718-1.044 5.718-3.793 0-2.227-1.265-3.381-3.63-3.932l-1.758-.385c-1.21-.275-1.567-.77-1.567-1.595 0-.935.742-1.484 1.952-1.484 1.32 0 2.034.495 2.144 1.677l2.749-.33c-.22-2.474-1.924-3.492-4.729-3.492-2.474 0-4.893.935-4.893 3.932 0 1.87.907 3.051 3.189 3.602l1.87.44c1.402.33 1.869.907 1.869 1.704 0 1.017-.99 1.43-2.86 1.43-2.776 0-3.932-1.457-4.59-3.464l-.907-2.75c-1.155-3.573-2.997-4.893-6.653-4.893C2.144 5.333 0 7.89 0 12.233c0 4.18 2.144 6.434 5.993 6.434 3.106 0 4.591-1.457 4.591-1.457z"/>
+              <path d="M2 4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4l-4 4-4-4H4a2 2 0 0 1-2-2V4zm6 3a1 1 0 0 0-1 1v4a1 1 0 0 0 2 0V8a1 1 0 0 0-1-1zm4-1a1 1 0 0 0-1 1v6a1 1 0 0 0 2 0V7a1 1 0 0 0-1-1zm4 2a1 1 0 0 0-1 1v3a1 1 0 0 0 2 0V9a1 1 0 0 0-1-1z" />
+            </svg>
+          </div>
+          <h3>
+            stats.fm <span className="setup-badge">Recommended</span>
+          </h3>
+          <p className="setup-card-desc">
+            Detailed listening statistics with accurate play counts and
+            listening time.
+          </p>
+          <ul className="setup-card-pros">
+            <li>Accurate play counts & duration</li>
+            <li>No API key needed</li>
+            <li>Easy setup, just your username</li>
+          </ul>
+
+          <div className="setup-lastfm-form">
+            <input
+              className="lastfm-input"
+              type="text"
+              placeholder="stats.fm username - From the URL bar, not the display name!"
+              value={sfmUsername}
+              onChange={(e: any) => setSfmUsername(e.target.value)}
+              disabled={sfmValidating}
+            />
+            <div className="setup-links">
+              <a
+                className="lastfm-help-link standalone"
+                href="https://github.com/Xndr2/listening-stats/wiki/stats.fm-Setup-Guide"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Setup guide
+                <span dangerouslySetInnerHTML={{ __html: Icons.external }} />
+              </a>
+              <a
+                className="lastfm-help-link standalone"
+                href="https://stats.fm"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Create an account
+                <span dangerouslySetInnerHTML={{ __html: Icons.external }} />
+              </a>
+            </div>
+            {sfmError && <div className="lastfm-error">{sfmError}</div>}
+          </div>
+
+          <button
+            className="footer-btn primary"
+            onClick={handleStatsfmSelect}
+            disabled={sfmValidating}
+          >
+            {sfmValidating ? "Connecting..." : "Connect & Start"}
+          </button>
+        </div>
+
+        <div className="setup-card primary">
+          <div className="setup-card-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10.584 17.21l-.88-2.392s-1.43 1.594-3.573 1.594c-1.897 0-3.244-1.649-3.244-4.288 0-3.382 1.704-4.591 3.381-4.591 2.422 0 3.19 1.567 3.849 3.574l.88 2.749c.88 2.666 2.529 4.81 7.284 4.81 3.409 0 5.718-1.044 5.718-3.793 0-2.227-1.265-3.381-3.63-3.932l-1.758-.385c-1.21-.275-1.567-.77-1.567-1.595 0-.935.742-1.484 1.952-1.484 1.32 0 2.034.495 2.144 1.677l2.749-.33c-.22-2.474-1.924-3.492-4.729-3.492-2.474 0-4.893.935-4.893 3.932 0 1.87.907 3.051 3.189 3.602l1.87.44c1.402.33 1.869.907 1.869 1.704 0 1.017-.99 1.43-2.86 1.43-2.776 0-3.932-1.457-4.59-3.464l-.907-2.75c-1.155-3.573-2.997-4.893-6.653-4.893C2.144 5.333 0 7.89 0 12.233c0 4.18 2.144 6.434 5.993 6.434 3.106 0 4.591-1.457 4.591-1.457z" />
             </svg>
           </div>
           <h3>Last.fm</h3>

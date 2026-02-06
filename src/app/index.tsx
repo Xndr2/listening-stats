@@ -1,4 +1,11 @@
+import {
+  activateProvider,
+  getActiveProvider,
+  getSelectedProviderType,
+} from "../services/providers";
 import { calculateStats, clearStatsCache } from "../services/stats";
+import * as Statsfm from "../services/statsfm";
+import { onStatsUpdated } from "../services/tracker";
 import {
   checkForUpdates,
   copyInstallCommand,
@@ -8,28 +15,23 @@ import {
 } from "../services/updater";
 import { ListeningStats, ProviderType } from "../types/listeningstats";
 import {
-  getSelectedProviderType,
-  getActiveProvider,
-  activateProvider,
-} from "../services/providers";
-import { onStatsUpdated } from "../services/tracker";
-import {
   ActivityChart,
   EmptyState,
   Footer,
-  GenreTimeline,
   LoadingSkeleton,
   OverviewCards,
   RecentlyPlayed,
-  SetupScreen,
   SettingsPanel,
+  SetupScreen,
   TopLists,
   UpdateBanner,
 } from "./components";
 import { Header } from "./components/Header";
-import { injectStyles } from "./styles";
 import { ShareCardModal } from "./components/ShareCardModal";
+import { injectStyles } from "./styles";
 import { checkLikedTracks, toggleLike } from "./utils";
+
+const SFM_PROMO_KEY = "listening-stats:sfm-promo-dismissed";
 
 const VERSION = getCurrentVersion();
 
@@ -47,6 +49,7 @@ interface State {
   needsSetup: boolean;
   providerType: ProviderType | null;
   showShareModal: boolean;
+  showSfmPromo: boolean;
 }
 
 class StatsPage extends Spicetify.React.Component<{}, State> {
@@ -83,6 +86,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       needsSetup,
       providerType,
       showShareModal: false,
+      showSfmPromo: false,
     };
   }
 
@@ -92,6 +96,16 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
     if (!this.state.needsSetup) {
       this.loadStats();
       this.checkForUpdateOnLoad();
+
+      if (this.state.providerType && this.state.providerType !== "statsfm") {
+        try {
+          if (!localStorage.getItem(SFM_PROMO_KEY)) {
+            this.setState({ showSfmPromo: true });
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     }
 
     this.unsubStatsUpdate = onStatsUpdated(() => {
@@ -166,14 +180,20 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       const provider = getActiveProvider();
       if (provider?.prefetchPeriod) {
         const idx = provider.periods.indexOf(this.state.period);
-        const adjacent = [provider.periods[idx - 1], provider.periods[idx + 1]].filter(Boolean);
+        const adjacent = [
+          provider.periods[idx - 1],
+          provider.periods[idx + 1],
+        ].filter(Boolean);
         for (const p of adjacent) {
           provider.prefetchPeriod(p);
         }
       }
     } catch (e: any) {
       console.error("[ListeningStats] Load failed:", e);
-      this.setState({ loading: false, error: e.message || "Failed to load stats" });
+      this.setState({
+        loading: false,
+        error: e.message || "Failed to load stats",
+      });
     }
   };
 
@@ -194,18 +214,66 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
     this.setState({ showShareModal: true });
   };
 
+  dismissSfmPromo = () => {
+    this.setState({ showSfmPromo: false });
+    try {
+      localStorage.setItem(SFM_PROMO_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  handleSfmSwitch = async (username: string) => {
+    try {
+      const info = await Statsfm.validateUser(username.trim());
+      Statsfm.saveConfig({ username: info.customId });
+      this.dismissSfmPromo();
+      activateProvider("statsfm");
+      this.handleProviderChanged();
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  handleReset = () => {
+    this.setState({
+      needsSetup: true,
+      providerType: null,
+      stats: null,
+      loading: false,
+      error: null,
+      showSettings: false,
+      showSfmPromo: false,
+      likedTracks: new Map(),
+    });
+  };
+
   handleProviderSelected = () => {
     const provider = getActiveProvider();
     if (provider) {
-      this.setState({
-        needsSetup: false,
-        providerType: provider.type,
-        period: provider.defaultPeriod,
-        loading: true,
-      }, () => {
-        this.loadStats();
-        this.checkForUpdateOnLoad();
-      });
+      let showSfmPromo = false;
+      if (provider.type !== "statsfm") {
+        try {
+          if (!localStorage.getItem(SFM_PROMO_KEY)) {
+            showSfmPromo = true;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      this.setState(
+        {
+          needsSetup: false,
+          providerType: provider.type,
+          period: provider.defaultPeriod,
+          loading: true,
+          showSfmPromo,
+        },
+        () => {
+          this.loadStats();
+          this.checkForUpdateOnLoad();
+        },
+      );
     }
   };
 
@@ -213,15 +281,18 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
     clearStatsCache();
     const provider = getActiveProvider();
     if (provider) {
-      this.setState({
-        providerType: provider.type,
-        period: provider.defaultPeriod,
-        stats: null,
-        loading: true,
-        showSettings: false,
-      }, () => {
-        this.loadStats();
-      });
+      this.setState(
+        {
+          providerType: provider.type,
+          period: provider.defaultPeriod,
+          stats: null,
+          loading: true,
+          showSettings: false,
+        },
+        () => {
+          this.loadStats();
+        },
+      );
     }
   };
 
@@ -239,6 +310,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       needsSetup,
       providerType,
       showShareModal,
+      showSfmPromo,
     } = this.state;
 
     if (needsSetup) {
@@ -254,26 +326,72 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
     const periodLabels = provider?.periodLabels || { recent: "Recent" };
     const showLikeButtons = providerType !== "lastfm";
 
+    const sfmPromoPortal = showSfmPromo
+      ? Spicetify.ReactDOM.createPortal(
+          <SfmPromoPopup
+            onDismiss={this.dismissSfmPromo}
+            onSwitch={this.handleSfmSwitch}
+          />,
+          document.body,
+        )
+      : null;
+
     if (showUpdateBanner && updateInfo) {
       return (
-        <UpdateBanner
-          updateInfo={updateInfo}
-          commandCopied={commandCopied}
-          onDismiss={this.dismissUpdateBanner}
-          onCopyCommand={this.copyUpdateCommand}
-        />
+        <>
+          <UpdateBanner
+            updateInfo={updateInfo}
+            commandCopied={commandCopied}
+            onDismiss={this.dismissUpdateBanner}
+            onCopyCommand={this.copyUpdateCommand}
+          />
+          {sfmPromoPortal}
+        </>
       );
     }
 
     if (loading) {
-      return <LoadingSkeleton />;
+      return (
+        <>
+          <LoadingSkeleton />
+          {sfmPromoPortal}
+        </>
+      );
     }
+
+    const settingsModal = showSettings
+      ? Spicetify.ReactDOM.createPortal(
+          <div
+            className="settings-overlay"
+            onClick={(e) => {
+              if (
+                (e.target as HTMLElement).classList.contains("settings-overlay")
+              ) {
+                this.setState({ showSettings: false });
+              }
+            }}
+          >
+            <SettingsPanel
+              onRefresh={this.loadStats}
+              onCheckUpdates={this.checkUpdatesManual}
+              onProviderChanged={this.handleProviderChanged}
+              onClose={() => this.setState({ showSettings: false })}
+              onReset={this.handleReset}
+              stats={stats}
+              period={period}
+            />
+          </div>,
+          document.body,
+        )
+      : null;
 
     if (error && !stats) {
       return (
         <div className="stats-page">
           <Header
-            onToggleSettings={() => this.setState({ showSettings: !showSettings })}
+            onToggleSettings={() =>
+              this.setState({ showSettings: !showSettings })
+            }
             providerType={providerType}
           />
           <div className="error-state">
@@ -285,34 +403,27 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
               </button>
             </div>
           </div>
+          <Footer
+            version={VERSION}
+            updateInfo={updateInfo}
+            onShowUpdate={() => this.setState({ showUpdateBanner: true })}
+          />
+          {settingsModal}
         </div>
       );
     }
 
-    const settingsModal = showSettings ? Spicetify.ReactDOM.createPortal(
-      <div className="settings-overlay" onClick={(e) => {
-        if ((e.target as HTMLElement).classList.contains("settings-overlay")) {
-          this.setState({ showSettings: false });
-        }
-      }}>
-        <SettingsPanel
-          onRefresh={this.loadStats}
-          onCheckUpdates={this.checkUpdatesManual}
-          onProviderChanged={this.handleProviderChanged}
-          onClose={() => this.setState({ showSettings: false })}
-          stats={stats}
-          period={period}
-        />
-      </div>,
-      document.body,
-    ) : null;
-
-    if (!stats || (stats.topTracks.length === 0 && stats.recentTracks.length === 0)) {
+    if (
+      !stats ||
+      (stats.topTracks.length === 0 && stats.recentTracks.length === 0)
+    ) {
       return (
         <div className="stats-page">
           <Header
             onShare={stats ? this.handleShare : undefined}
-            onToggleSettings={() => this.setState({ showSettings: !showSettings })}
+            onToggleSettings={() =>
+              this.setState({ showSettings: !showSettings })
+            }
             providerType={providerType}
           />
           <EmptyState
@@ -336,7 +447,9 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       <div className="stats-page">
         <Header
           onShare={this.handleShare}
-          onToggleSettings={() => this.setState({ showSettings: !showSettings })}
+          onToggleSettings={() =>
+            this.setState({ showSettings: !showSettings })
+          }
           providerType={providerType}
         />
 
@@ -356,8 +469,6 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
           period={period}
         />
 
-        <GenreTimeline />
-
         <ActivityChart
           hourlyDistribution={stats.hourlyDistribution}
           peakHour={stats.peakHour}
@@ -376,18 +487,94 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
 
         {settingsModal}
 
-        {showShareModal && stats && Spicetify.ReactDOM.createPortal(
-          <ShareCardModal
-            stats={stats}
-            period={period}
-            providerType={providerType}
-            onClose={() => this.setState({ showShareModal: false })}
-          />,
-          document.body,
-        )}
+        {showShareModal &&
+          stats &&
+          Spicetify.ReactDOM.createPortal(
+            <ShareCardModal
+              stats={stats}
+              period={period}
+              providerType={providerType}
+              onClose={() => this.setState({ showShareModal: false })}
+            />,
+            document.body,
+          )}
+
+        {sfmPromoPortal}
       </div>
     );
   }
+}
+
+function SfmPromoPopup({
+  onDismiss,
+  onSwitch,
+}: {
+  onDismiss: () => void;
+  onSwitch: (username: string) => Promise<void>;
+}) {
+  const [username, setUsername] = Spicetify.React.useState("");
+  const [loading, setLoading] = Spicetify.React.useState(false);
+  const [error, setError] = Spicetify.React.useState("");
+
+  const handleSwitch = async () => {
+    if (!username.trim()) {
+      setError("Username is required");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await onSwitch(username);
+    } catch (err: any) {
+      setError(err.message || "Connection failed");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="settings-overlay"
+      onClick={(e) => {
+        if ((e.target as HTMLElement).classList.contains("settings-overlay")) {
+          onDismiss();
+        }
+      }}
+    >
+      <div className="sfm-promo-popup">
+        <h3>Switch to stats.fm?</h3>
+        <p>
+          We now support <strong>stats.fm</strong> as a data source. It provides
+          accurate play counts, listening duration, and only needs your username
+          to set up.
+          <br />
+          This is highly recommended for a better experience!
+        </p>
+        <div className="setup-lastfm-form">
+          <input
+            className="lastfm-input"
+            type="text"
+            placeholder="stats.fm username"
+            value={username}
+            onChange={(e: any) => setUsername(e.target.value)}
+            disabled={loading}
+          />
+          {error && <div className="lastfm-error">{error}</div>}
+        </div>
+        <div className="sfm-promo-actions">
+          <button
+            className="footer-btn primary"
+            onClick={handleSwitch}
+            disabled={loading}
+          >
+            {loading ? "Connecting..." : "Switch to stats.fm"}
+          </button>
+          <button className="footer-btn" onClick={onDismiss}>
+            No thanks
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default StatsPage;

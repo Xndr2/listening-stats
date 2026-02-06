@@ -4,13 +4,23 @@ import {
   activateProvider,
   setSelectedProviderType,
 } from "./services/providers";
+import { clearConfig as clearLastfmConfig } from "./services/lastfm";
+
+(window as any).ListeningStats = {
+  resetLastfmKey: () => {
+    clearLastfmConfig();
+    console.log(
+      "[Listening Stats] Last.fm API key cleared. Reload the app to reconfigure.",
+    );
+  },
+};
 
 async function main(): Promise<void> {
   let providerType = getSelectedProviderType();
 
   if (!providerType && hasExistingData()) {
-    providerType = "spotify";
-    setSelectedProviderType("spotify");
+    providerType = "local";
+    setSelectedProviderType("local");
   }
 
   if (providerType) {

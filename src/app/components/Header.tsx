@@ -9,8 +9,8 @@ interface HeaderProps {
 
 const PROVIDER_NAMES: Record<ProviderType, string> = {
   local: "Local Tracking",
-  spotify: "Spotify API",
   lastfm: "Last.fm",
+  statsfm: "stats.fm",
 };
 
 export function Header({
@@ -32,8 +32,12 @@ export function Header({
             )}
           </p>
           <p className="stats-dev-note">
-            Dev note: This is an early build of the new tracking system. Bugs
-            are expected, please report them on{" "}
+            Dev note: I just added Stats.fm tracking. This works way better then
+            Last.fm so if you can, please change to this for a better
+            experience.
+            <br />
+            You can change using the setting icon on the right. Bugs are
+            expected, please report them on{" "}
             <a href="https://github.com/Xndr2/listening-stats/issues/new?template=bug_report.md">
               github
             </a>

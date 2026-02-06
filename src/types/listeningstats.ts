@@ -1,4 +1,4 @@
-export type ProviderType = "local" | "spotify" | "lastfm";
+export type ProviderType = "local" | "lastfm" | "statsfm";
 
 export type TimePeriod = string;
 
@@ -73,6 +73,10 @@ export interface PollingData {
 export interface LastfmConfig {
   username: string;
   apiKey: string;
+}
+
+export interface StatsfmConfig {
+  username: string;
 }
 
 export interface PlayEvent {
