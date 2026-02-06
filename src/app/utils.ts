@@ -1,8 +1,12 @@
-import { searchTrack, searchArtist, searchAlbum } from "../services/spotify-api";
+import {
+  searchTrack,
+  searchArtist,
+  searchAlbum,
+} from "../services/spotify-api";
 
 export function navigateToUri(uri: string): void {
   if (uri && Spicetify.Platform?.History) {
-    const [, type, id] = uri.split(':');
+    const [, type, id] = uri.split(":");
     if (type && id) {
       Spicetify.Platform.History.push(`/${type}/${id}`);
     }
@@ -27,7 +31,10 @@ export async function lazyNavigate(
   }
 }
 
-export async function toggleLike(trackUri: string, isLiked: boolean): Promise<boolean> {
+export async function toggleLike(
+  trackUri: string,
+  isLiked: boolean,
+): Promise<boolean> {
   try {
     if (isLiked) {
       await Spicetify.Platform.LibraryAPI.remove({ uris: [trackUri] });
@@ -36,12 +43,14 @@ export async function toggleLike(trackUri: string, isLiked: boolean): Promise<bo
     }
     return !isLiked;
   } catch (error) {
-    console.error('[ListeningStats] Failed to toggle like:', error);
+    console.error("[ListeningStats] Failed to toggle like:", error);
     return isLiked;
   }
 }
 
-export async function checkLikedTracks(trackUris: string[]): Promise<Map<string, boolean>> {
+export async function checkLikedTracks(
+  trackUris: string[],
+): Promise<Map<string, boolean>> {
   const result = new Map<string, boolean>();
   if (trackUris.length === 0) return result;
 
@@ -49,14 +58,14 @@ export async function checkLikedTracks(trackUris: string[]): Promise<Map<string,
     const contains = await Spicetify.Platform.LibraryAPI.contains(...trackUris);
     trackUris.forEach((uri, i) => result.set(uri, contains[i]));
   } catch (error) {
-    console.error('[ListeningStats] Failed to check liked status:', error);
+    console.error("[ListeningStats] Failed to check liked status:", error);
   }
   return result;
 }
 
 export function formatHour(h: number): string {
-  if (h === 0) return '12am';
-  if (h === 12) return '12pm';
+  if (h === 0) return "12am";
+  if (h === 12) return "12pm";
   return h < 12 ? `${h}am` : `${h - 12}pm`;
 }
 
@@ -72,10 +81,10 @@ export function estimateArtistPayout(streamCount: number): string {
 }
 
 export function getRankClass(index: number): string {
-  if (index === 0) return 'gold';
-  if (index === 1) return 'silver';
-  if (index === 2) return 'bronze';
-  return '';
+  if (index === 0) return "gold";
+  if (index === 1) return "silver";
+  if (index === 2) return "bronze";
+  return "";
 }
 
 export function timeAgo(dateStr: string): string {

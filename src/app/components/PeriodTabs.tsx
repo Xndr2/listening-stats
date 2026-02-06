@@ -5,7 +5,12 @@ interface PeriodTabsProps {
   onPeriodChange: (period: string) => void;
 }
 
-export function PeriodTabs({ period, periods, periodLabels, onPeriodChange }: PeriodTabsProps) {
+export function PeriodTabs({
+  period,
+  periods,
+  periodLabels,
+  onPeriodChange,
+}: PeriodTabsProps) {
   return (
     <div className="period-tabs">
       {periods.map((p) => (

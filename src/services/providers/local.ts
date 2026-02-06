@@ -1,5 +1,13 @@
-import { ListeningStats, PlayEvent, RecentTrack } from "../../types/listeningstats";
-import { getPlayEventsByTimeRange, getAllPlayEvents, clearAllData } from "../storage";
+import {
+  ListeningStats,
+  PlayEvent,
+  RecentTrack,
+} from "../../types/listeningstats";
+import {
+  getPlayEventsByTimeRange,
+  getAllPlayEvents,
+  clearAllData,
+} from "../storage";
 import { getArtistsBatch, isApiAvailable } from "../spotify-api";
 import { initPoller, destroyPoller, getPollingData } from "../tracker";
 import type { TrackingProvider } from "./types";
@@ -80,10 +88,17 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
   const pollingData = getPollingData();
 
   // Top tracks by play count
-  const trackMap = new Map<string, {
-    trackUri: string; trackName: string; artistName: string;
-    albumArt?: string; count: number; totalMs: number;
-  }>();
+  const trackMap = new Map<
+    string,
+    {
+      trackUri: string;
+      trackName: string;
+      artistName: string;
+      albumArt?: string;
+      count: number;
+      totalMs: number;
+    }
+  >();
   for (const e of events) {
     const existing = trackMap.get(e.trackUri);
     if (existing) {
@@ -91,9 +106,12 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
       existing.totalMs += e.playedMs;
     } else {
       trackMap.set(e.trackUri, {
-        trackUri: e.trackUri, trackName: e.trackName,
-        artistName: e.artistName, albumArt: e.albumArt,
-        count: 1, totalMs: e.playedMs,
+        trackUri: e.trackUri,
+        trackName: e.trackName,
+        artistName: e.artistName,
+        albumArt: e.albumArt,
+        count: 1,
+        totalMs: e.playedMs,
       });
     }
   }
@@ -111,9 +129,14 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
     }));
 
   // Top artists by play count
-  const artistMap = new Map<string, {
-    artistUri: string; artistName: string; count: number;
-  }>();
+  const artistMap = new Map<
+    string,
+    {
+      artistUri: string;
+      artistName: string;
+      count: number;
+    }
+  >();
   for (const e of events) {
     const key = e.artistUri || e.artistName;
     const existing = artistMap.get(key);
@@ -121,7 +144,9 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
       existing.count++;
     } else {
       artistMap.set(key, {
-        artistUri: e.artistUri, artistName: e.artistName, count: 1,
+        artistUri: e.artistUri,
+        artistName: e.artistName,
+        count: 1,
       });
     }
   }
@@ -137,7 +162,9 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
   if (artistIds.length > 0 && isApiAvailable()) {
     try {
       artistDetails = await getArtistsBatch(artistIds);
-    } catch { /* graceful degradation without images */ }
+    } catch {
+      /* graceful degradation without images */
+    }
   }
   const artistDetailMap = new Map(
     artistDetails.map((a) => [`spotify:artist:${a.id}`, a]),
@@ -156,18 +183,26 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
   });
 
   // Top albums
-  const albumMap = new Map<string, {
-    albumUri: string; albumName: string; artistName: string;
-    albumArt?: string; trackCount: number;
-  }>();
+  const albumMap = new Map<
+    string,
+    {
+      albumUri: string;
+      albumName: string;
+      artistName: string;
+      albumArt?: string;
+      trackCount: number;
+    }
+  >();
   for (const e of events) {
     const existing = albumMap.get(e.albumUri);
     if (existing) {
       existing.trackCount++;
     } else {
       albumMap.set(e.albumUri, {
-        albumUri: e.albumUri, albumName: e.albumName || "Unknown Album",
-        artistName: e.artistName, albumArt: e.albumArt,
+        albumUri: e.albumUri,
+        albumName: e.albumName || "Unknown Album",
+        artistName: e.artistName,
+        albumArt: e.albumArt,
         trackCount: 1,
       });
     }
@@ -202,9 +237,7 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
     .slice(0, 10);
 
   // Recent tracks (last 50)
-  const recent = events
-    .sort((a, b) => b.startedAt - a.startedAt)
-    .slice(0, 50);
+  const recent = events.sort((a, b) => b.startedAt - a.startedAt).slice(0, 50);
   const recentTracks: RecentTrack[] = recent.map((e) => ({
     trackUri: e.trackUri,
     trackName: e.trackName,
@@ -219,12 +252,14 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
 
   // Unique counts
   const uniqueTrackUris = new Set(events.map((e) => e.trackUri));
-  const uniqueArtistUris = new Set(events.map((e) => e.artistUri).filter(Boolean));
+  const uniqueArtistUris = new Set(
+    events.map((e) => e.artistUri).filter(Boolean),
+  );
 
   // Activity dates for streak
-  const dateSet = new Set(events.map((e) =>
-    new Date(e.startedAt).toISOString().split("T")[0],
-  ));
+  const dateSet = new Set(
+    events.map((e) => new Date(e.startedAt).toISOString().split("T")[0]),
+  );
 
   const totalTimeMs = events.reduce((sum, e) => sum + e.playedMs, 0);
 

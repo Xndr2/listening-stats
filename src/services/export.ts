@@ -1,7 +1,11 @@
 import type { ListeningStats } from "../types/listeningstats";
 import { getPeriodDisplayName, formatDuration } from "./stats";
 
-function downloadFile(content: string, filename: string, mimeType: string): void {
+function downloadFile(
+  content: string,
+  filename: string,
+  mimeType: string,
+): void {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -67,21 +71,27 @@ export function exportStatsAsCSV(stats: ListeningStats, period: string): void {
   lines.push("Top Tracks");
   lines.push("Rank,Track,Artist,Play Count");
   for (const t of stats.topTracks) {
-    lines.push(`${t.rank},"${t.trackName.replace(/"/g, '""')}","${t.artistName.replace(/"/g, '""')}",${t.playCount || 0}`);
+    lines.push(
+      `${t.rank},"${t.trackName.replace(/"/g, '""')}","${t.artistName.replace(/"/g, '""')}",${t.playCount || 0}`,
+    );
   }
   lines.push("");
 
   lines.push("Top Artists");
   lines.push("Rank,Artist,Genres,Play Count");
   for (const a of stats.topArtists) {
-    lines.push(`${a.rank},"${a.artistName.replace(/"/g, '""')}","${(a.genres || []).join("; ")}",${a.playCount || 0}`);
+    lines.push(
+      `${a.rank},"${a.artistName.replace(/"/g, '""')}","${(a.genres || []).join("; ")}",${a.playCount || 0}`,
+    );
   }
   lines.push("");
 
   lines.push("Top Albums");
   lines.push("Album,Artist,Play Count");
   for (const a of stats.topAlbums) {
-    lines.push(`"${a.albumName.replace(/"/g, '""')}","${a.artistName.replace(/"/g, '""')}",${a.playCount || 0}`);
+    lines.push(
+      `"${a.albumName.replace(/"/g, '""')}","${a.artistName.replace(/"/g, '""')}",${a.playCount || 0}`,
+    );
   }
 
   const filename = `listening-stats-${period}-${new Date().toISOString().split("T")[0]}.csv`;
@@ -99,17 +109,21 @@ export async function exportRawEventsAsCSV(): Promise<void> {
   const { getAllPlayEvents } = await import("./storage");
   const events = await getAllPlayEvents();
   const lines: string[] = [];
-  lines.push("Track,Artist,Album,Duration (ms),Played (ms),Started At,Ended At");
+  lines.push(
+    "Track,Artist,Album,Duration (ms),Played (ms),Started At,Ended At",
+  );
   for (const e of events) {
-    lines.push([
-      `"${e.trackName.replace(/"/g, '""')}"`,
-      `"${e.artistName.replace(/"/g, '""')}"`,
-      `"${e.albumName.replace(/"/g, '""')}"`,
-      e.durationMs,
-      e.playedMs,
-      new Date(e.startedAt).toISOString(),
-      new Date(e.endedAt).toISOString(),
-    ].join(","));
+    lines.push(
+      [
+        `"${e.trackName.replace(/"/g, '""')}"`,
+        `"${e.artistName.replace(/"/g, '""')}"`,
+        `"${e.albumName.replace(/"/g, '""')}"`,
+        e.durationMs,
+        e.playedMs,
+        new Date(e.startedAt).toISOString(),
+        new Date(e.endedAt).toISOString(),
+      ].join(","),
+    );
   }
   const filename = `listening-stats-raw-${new Date().toISOString().split("T")[0]}.csv`;
   downloadFile(lines.join("\n"), filename, "text/csv");

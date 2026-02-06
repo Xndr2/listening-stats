@@ -1,11 +1,11 @@
-declare module '*.css' {
+declare module "*.css" {
   const content: string;
   export default content;
 }
 
 declare namespace Spicetify {
-  const React: typeof import('react');
-  const ReactDOM: typeof import('react-dom');
+  const React: typeof import("react");
+  const ReactDOM: typeof import("react-dom");
 
   namespace Player {
     interface PlayerData {
@@ -34,13 +34,13 @@ declare namespace Spicetify {
     const data: PlayerData | undefined;
 
     function addEventListener(
-      type: 'songchange' | 'onplaypause' | 'onprogress',
-      callback: (event?: Event) => void
+      type: "songchange" | "onplaypause" | "onprogress",
+      callback: (event?: Event) => void,
     ): void;
 
     function removeEventListener(
-      type: 'songchange' | 'onplaypause' | 'onprogress',
-      callback: (event?: Event) => void
+      type: "songchange" | "onplaypause" | "onprogress",
+      callback: (event?: Event) => void,
     ): void;
 
     function getDuration(): number;
@@ -91,7 +91,7 @@ declare namespace Spicetify {
         icon: string,
         onClick: () => void,
         disabled?: boolean,
-        active?: boolean
+        active?: boolean,
       );
       label: string;
       icon: string;
@@ -117,7 +117,11 @@ declare namespace Spicetify {
     function del(url: string): Promise<any>;
   }
 
-  function showNotification(message: string, isError?: boolean, msTimeout?: number): void;
+  function showNotification(
+    message: string,
+    isError?: boolean,
+    msTimeout?: number,
+  ): void;
 }
 
 declare global {
@@ -127,13 +131,34 @@ declare global {
 
   namespace JSX {
     interface IntrinsicElements {
-      div: React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
-      span: React.DetailedHTMLProps<React.HTMLAttributes<HTMLSpanElement>, HTMLSpanElement>;
-      button: React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>;
-      h2: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
-      h3: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
-      img: React.DetailedHTMLProps<React.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>;
-      br: React.DetailedHTMLProps<React.HTMLAttributes<HTMLBRElement>, HTMLBRElement>;
+      div: React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLDivElement>,
+        HTMLDivElement
+      >;
+      span: React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLSpanElement>,
+        HTMLSpanElement
+      >;
+      button: React.DetailedHTMLProps<
+        React.ButtonHTMLAttributes<HTMLButtonElement>,
+        HTMLButtonElement
+      >;
+      h2: React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLHeadingElement>,
+        HTMLHeadingElement
+      >;
+      h3: React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLHeadingElement>,
+        HTMLHeadingElement
+      >;
+      img: React.DetailedHTMLProps<
+        React.ImgHTMLAttributes<HTMLImageElement>,
+        HTMLImageElement
+      >;
+      br: React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLBRElement>,
+        HTMLBRElement
+      >;
     }
     interface Element extends React.ReactElement<any, any> {}
     interface ElementClass extends React.Component<any> {

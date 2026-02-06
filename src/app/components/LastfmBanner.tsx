@@ -95,7 +95,10 @@ export function LastfmBanner({ onConnected }: LastfmBannerProps) {
           <h3 className="lastfm-banner-title">Connect Last.fm</h3>
           <button
             className="lastfm-close-btn"
-            onClick={() => { setState("prompt"); setError(""); }}
+            onClick={() => {
+              setState("prompt");
+              setError("");
+            }}
             dangerouslySetInnerHTML={{ __html: Icons.close }}
           />
         </div>
@@ -154,10 +157,15 @@ export function LastfmBanner({ onConnected }: LastfmBannerProps) {
       <div className="lastfm-banner-content">
         <div className="lastfm-prompt-text">
           <strong>Get play counts</strong>
-          <span>Connect Last.fm to see how many times you've played each track</span>
+          <span>
+            Connect Last.fm to see how many times you've played each track
+          </span>
         </div>
         <div className="lastfm-prompt-actions">
-          <button className="lastfm-btn primary" onClick={() => setState("form")}>
+          <button
+            className="lastfm-btn primary"
+            onClick={() => setState("form")}
+          >
             Connect
           </button>
           <button

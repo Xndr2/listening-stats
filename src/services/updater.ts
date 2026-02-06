@@ -1,5 +1,5 @@
-const GITHUB_REPO = 'Xndr2/listening-stats';
-const STORAGE_KEY = 'listening-stats:lastUpdateCheck';
+const GITHUB_REPO = "Xndr2/listening-stats";
+const STORAGE_KEY = "listening-stats:lastUpdateCheck";
 
 declare const __APP_VERSION__: string;
 
@@ -31,7 +31,7 @@ export function getCurrentVersion(): string {
   try {
     return __APP_VERSION__;
   } catch {
-    return '0.0.0';
+    return "0.0.0";
   }
 }
 
@@ -39,45 +39,52 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
   const currentVersion = getCurrentVersion();
 
   try {
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-      headers: { 'Accept': 'application/vnd.github.v3+json' }
-    });
+    const response = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      {
+        headers: { Accept: "application/vnd.github.v3+json" },
+      },
+    );
     if (!response.ok) {
-      throw new Error('Failed to fetch release info');
+      throw new Error("Failed to fetch release info");
     }
 
     const release: GitHubRelease = await response.json();
-    const latestVersion = release.tag_name.replace(/^v/, '');
+    const latestVersion = release.tag_name.replace(/^v/, "");
 
-    const distAsset = release.assets.find(a =>
-      a.name === 'listening-stats.zip' ||
-      a.name === 'dist.zip' ||
-      a.name.endsWith('.zip')
+    const distAsset = release.assets.find(
+      (a) =>
+        a.name === "listening-stats.zip" ||
+        a.name === "dist.zip" ||
+        a.name.endsWith(".zip"),
     );
 
     const available = isNewerVersion(latestVersion, currentVersion);
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      checkedAt: Date.now(),
-      latestVersion,
-      available,
-    }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        checkedAt: Date.now(),
+        latestVersion,
+        available,
+      }),
+    );
 
     return {
       available,
       currentVersion,
       latestVersion,
-      changelog: release.body || 'No changelog provided.',
+      changelog: release.body || "No changelog provided.",
       downloadUrl: distAsset?.browser_download_url || null,
       releaseUrl: release.html_url,
     };
   } catch (error) {
-    console.error('[ListeningStats] Update check failed:', error);
+    console.error("[ListeningStats] Update check failed:", error);
     return {
       available: false,
       currentVersion,
       latestVersion: currentVersion,
-      changelog: '',
+      changelog: "",
       downloadUrl: null,
       releaseUrl: null,
     };
@@ -85,8 +92,8 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
 }
 
 function isNewerVersion(latest: string, current: string): boolean {
-  const latestParts = latest.split('.').map(Number);
-  const currentParts = current.split('.').map(Number);
+  const latestParts = latest.split(".").map(Number);
+  const currentParts = current.split(".").map(Number);
 
   for (let i = 0; i < 3; i++) {
     const l = latestParts[i] || 0;
@@ -98,7 +105,7 @@ function isNewerVersion(latest: string, current: string): boolean {
 }
 
 export function getInstallCommand(): string {
-  const isWindows = navigator.platform.toLowerCase().includes('win');
+  const isWindows = navigator.platform.toLowerCase().includes("win");
   return isWindows ? INSTALL_CMD_WINDOWS : INSTALL_CMD_LINUX;
 }
 
@@ -109,13 +116,13 @@ export async function copyInstallCommand(): Promise<boolean> {
     return true;
   } catch (e) {
     try {
-      const textarea = document.createElement('textarea');
+      const textarea = document.createElement("textarea");
       textarea.value = cmd;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
       document.body.appendChild(textarea);
       textarea.select();
-      document.execCommand('copy');
+      document.execCommand("copy");
       document.body.removeChild(textarea);
       return true;
     } catch {

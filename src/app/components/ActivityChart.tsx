@@ -6,7 +6,11 @@ interface ActivityChartProps {
   hourlyUnit?: "ms" | "plays";
 }
 
-export function ActivityChart({ hourlyDistribution, peakHour, hourlyUnit = "ms" }: ActivityChartProps) {
+export function ActivityChart({
+  hourlyDistribution,
+  peakHour,
+  hourlyUnit = "ms",
+}: ActivityChartProps) {
   if (!hourlyDistribution.some((h) => h > 0)) {
     return null;
   }

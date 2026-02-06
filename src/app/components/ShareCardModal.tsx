@@ -11,7 +11,12 @@ interface ShareCardModalProps {
   onClose: () => void;
 }
 
-export function ShareCardModal({ stats, period, providerType, onClose }: ShareCardModalProps) {
+export function ShareCardModal({
+  stats,
+  period,
+  providerType,
+  onClose,
+}: ShareCardModalProps) {
   const [format, setFormat] = useState<"story" | "landscape">("story");
   const [generating, setGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -24,7 +29,12 @@ export function ShareCardModal({ stats, period, providerType, onClose }: ShareCa
   async function generatePreview() {
     setGenerating(true);
     try {
-      const blob = await generateShareCard({ stats, period, format, providerType });
+      const blob = await generateShareCard({
+        stats,
+        period,
+        format,
+        providerType,
+      });
       blobRef.current = blob;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(blob));
@@ -59,13 +69,19 @@ export function ShareCardModal({ stats, period, providerType, onClose }: ShareCa
   }
 
   return (
-    <div className="share-modal-overlay" onClick={(e) => {
-      if ((e.target as HTMLElement).classList.contains("share-modal-overlay")) onClose();
-    }}>
+    <div
+      className="share-modal-overlay"
+      onClick={(e) => {
+        if ((e.target as HTMLElement).classList.contains("share-modal-overlay"))
+          onClose();
+      }}
+    >
       <div className="share-modal">
         <div className="share-modal-header">
           <h3>Share Your Stats</h3>
-          <button className="settings-close-btn" onClick={onClose}
+          <button
+            className="settings-close-btn"
+            onClick={onClose}
             dangerouslySetInnerHTML={{ __html: Icons.close || "&times;" }}
           />
         </div>
@@ -89,15 +105,27 @@ export function ShareCardModal({ stats, period, providerType, onClose }: ShareCa
           {generating ? (
             <div className="share-generating">Generating...</div>
           ) : previewUrl ? (
-            <img src={previewUrl} className="share-preview-img" alt="Share card preview" />
+            <img
+              src={previewUrl}
+              className="share-preview-img"
+              alt="Share card preview"
+            />
           ) : null}
         </div>
 
         <div className="share-actions">
-          <button className="footer-btn primary" onClick={handleShare} disabled={generating}>
+          <button
+            className="footer-btn primary"
+            onClick={handleShare}
+            disabled={generating}
+          >
             Share / Copy
           </button>
-          <button className="footer-btn" onClick={handleDownload} disabled={generating}>
+          <button
+            className="footer-btn"
+            onClick={handleDownload}
+            disabled={generating}
+          >
             Download
           </button>
         </div>

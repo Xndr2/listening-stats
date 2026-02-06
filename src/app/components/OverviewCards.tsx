@@ -12,31 +12,52 @@ interface OverviewCardsProps {
   onPeriodChange: (period: string) => void;
 }
 
-export function OverviewCards({ stats, period, periods, periodLabels, onPeriodChange }: OverviewCardsProps) {
+export function OverviewCards({
+  stats,
+  period,
+  periods,
+  periodLabels,
+  onPeriodChange,
+}: OverviewCardsProps) {
   const payout = estimateArtistPayout(stats.trackCount);
 
   return (
     <div className="overview-row">
       <div className="overview-card hero">
-        <div className="overview-value">{formatDurationLong(stats.totalTimeMs)}</div>
+        <div className="overview-value">
+          {formatDurationLong(stats.totalTimeMs)}
+        </div>
         <div className="overview-label">Time Listened</div>
-        <PeriodTabs period={period} periods={periods} periodLabels={periodLabels} onPeriodChange={onPeriodChange} />
+        <PeriodTabs
+          period={period}
+          periods={periods}
+          periodLabels={periodLabels}
+          onPeriodChange={onPeriodChange}
+        />
         <div className="overview-secondary">
           <div className="overview-stat">
-            <div className="overview-stat-value"><AnimatedNumber value={stats.trackCount} /></div>
+            <div className="overview-stat-value">
+              <AnimatedNumber value={stats.trackCount} />
+            </div>
             <div className="overview-stat-label">Tracks</div>
           </div>
           <div className="overview-stat">
-            <div className="overview-stat-value"><AnimatedNumber value={stats.uniqueArtistCount} /></div>
+            <div className="overview-stat-value">
+              <AnimatedNumber value={stats.uniqueArtistCount} />
+            </div>
             <div className="overview-stat-label">Artists</div>
           </div>
           <div className="overview-stat">
-            <div className="overview-stat-value"><AnimatedNumber value={stats.uniqueTrackCount} /></div>
+            <div className="overview-stat-value">
+              <AnimatedNumber value={stats.uniqueTrackCount} />
+            </div>
             <div className="overview-stat-label">Unique</div>
           </div>
           {stats.lastfmConnected && stats.totalScrobbles ? (
             <div className="overview-stat">
-              <div className="overview-stat-value">{stats.totalScrobbles.toLocaleString()}</div>
+              <div className="overview-stat-value">
+                {stats.totalScrobbles.toLocaleString()}
+              </div>
               <div className="overview-stat-label">Scrobbles</div>
             </div>
           ) : null}
@@ -73,7 +94,9 @@ export function OverviewCards({ stats, period, periods, periodLabels, onPeriodCh
             <div className="stat-text">
               {stats.newArtistsCount > 0 ? (
                 <>
-                  <div className="overview-value purple">{stats.newArtistsCount}</div>
+                  <div className="overview-value purple">
+                    {stats.newArtistsCount}
+                  </div>
                   <div className="overview-label">New Artists</div>
                   <div className="overview-label-tooltip">
                     You're cool if this is high!
@@ -81,7 +104,9 @@ export function OverviewCards({ stats, period, periods, periodLabels, onPeriodCh
                 </>
               ) : (
                 <>
-                  <div className="overview-value purple">{stats.listenedDays}</div>
+                  <div className="overview-value purple">
+                    {stats.listenedDays}
+                  </div>
                   <div className="overview-label">Days Listened</div>
                   <div className="overview-label-tooltip">
                     Days with at least one play.

@@ -18,7 +18,9 @@ try {
       localStorage.removeItem(`${STORAGE_PREFIX}rateLimitedUntil`);
     }
   }
-} catch { /* ignore */ }
+} catch {
+  /* ignore */
+}
 
 export function isApiAvailable(): boolean {
   return Date.now() >= rateLimitedUntil;
@@ -50,7 +52,10 @@ function setRateLimit(error: any): void {
   }
 
   rateLimitedUntil = Date.now() + backoffMs;
-  localStorage.setItem(`${STORAGE_PREFIX}rateLimitedUntil`, rateLimitedUntil.toString());
+  localStorage.setItem(
+    `${STORAGE_PREFIX}rateLimitedUntil`,
+    rateLimitedUntil.toString(),
+  );
 }
 
 const cache = new Map<string, { data: any; expiresAt: number }>();
@@ -137,7 +142,9 @@ async function apiFetch<T>(url: string): Promise<T> {
     }
     if (response.error) {
       const status = response.error.status;
-      const err: any = new Error(response.error.message || `Spotify API error ${status}`);
+      const err: any = new Error(
+        response.error.message || `Spotify API error ${status}`,
+      );
       err.status = status;
       if (status === 429) setRateLimit(response);
       throw err;
@@ -172,7 +179,9 @@ export async function getRecentlyPlayed(): Promise<Spotify.RecentlyPlayedRespons
   );
 }
 
-export function prefetchPeriod(period: "short_term" | "medium_term" | "long_term"): void {
+export function prefetchPeriod(
+  period: "short_term" | "medium_term" | "long_term",
+): void {
   getTopTracks(period).catch(() => {});
   getTopArtists(period).catch(() => {});
 }
@@ -194,7 +203,9 @@ try {
       searchCache.set(k, v as SpotifySearchResult);
     }
   }
-} catch { /* ignore */ }
+} catch {
+  /* ignore */
+}
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -212,7 +223,9 @@ function schedulePersistSearchCache(): void {
         }
       }
       localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(obj));
-    } catch { /* storage full */ }
+    } catch {
+      /* storage full */
+    }
   }, 2000);
 }
 
@@ -319,7 +332,9 @@ export async function searchArtistImage(
   return (await searchArtist(artistName)).imageUrl;
 }
 
-export async function getArtistsBatch(artistIds: string[]): Promise<Spotify.Artist[]> {
+export async function getArtistsBatch(
+  artistIds: string[],
+): Promise<Spotify.Artist[]> {
   const unique = [...new Set(artistIds)].filter(Boolean);
   if (unique.length === 0) return [];
 

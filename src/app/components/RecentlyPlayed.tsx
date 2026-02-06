@@ -22,7 +22,11 @@ export function RecentlyPlayed({ recentTracks }: RecentlyPlayedProps) {
           <div
             key={`${t.trackUri || t.trackName}-${t.playedAt}`}
             className="recent-card"
-            onClick={() => t.trackUri ? navigateToUri(t.trackUri) : lazyNavigate("track", t.trackName, t.artistName)}
+            onClick={() =>
+              t.trackUri
+                ? navigateToUri(t.trackUri)
+                : lazyNavigate("track", t.trackName, t.artistName)
+            }
           >
             {t.albumArt ? (
               <img src={t.albumArt} className="recent-art" alt="" />

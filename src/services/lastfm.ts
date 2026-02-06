@@ -14,7 +14,9 @@ export function getConfig(): LastfmConfig | null {
       configCache = JSON.parse(stored);
       return configCache!;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   configCache = null;
   return null;
 }
@@ -136,9 +138,12 @@ export function mapPeriod(
   period: "short_term" | "medium_term" | "long_term",
 ): string {
   switch (period) {
-    case "short_term": return "1month";
-    case "medium_term": return "6month";
-    case "long_term": return "overall";
+    case "short_term":
+      return "1month";
+    case "medium_term":
+      return "6month";
+    case "long_term":
+      return "overall";
   }
 }
 
@@ -173,7 +178,9 @@ export async function getTopTracks(
 
   const total = parseInt(data.toptracks?.["@attr"]?.total || "0", 10);
   const tracks = (data.toptracks?.track || []).map((t: any) => {
-    const img = t.image?.find((i: any) => i.size === "large")?.["#text"]?.trim();
+    const img = t.image
+      ?.find((i: any) => i.size === "large")
+      ?.["#text"]?.trim();
     return {
       name: t.name,
       artist: t.artist?.name || "",
@@ -216,7 +223,9 @@ export async function getTopArtists(
 
   const total = parseInt(data.topartists?.["@attr"]?.total || "0", 10);
   const artists = (data.topartists?.artist || []).map((a: any) => {
-    const img = a.image?.find((i: any) => i.size === "large")?.["#text"]?.trim();
+    const img = a.image
+      ?.find((i: any) => i.size === "large")
+      ?.["#text"]?.trim();
     return {
       name: a.name,
       playCount: parseInt(a.playcount, 10) || 0,
@@ -258,7 +267,9 @@ export async function getTopAlbums(
 
   const total = parseInt(data.topalbums?.["@attr"]?.total || "0", 10);
   const albums = (data.topalbums?.album || []).map((a: any) => {
-    const img = a.image?.find((i: any) => i.size === "large")?.["#text"]?.trim();
+    const img = a.image
+      ?.find((i: any) => i.size === "large")
+      ?.["#text"]?.trim();
     return {
       name: a.name,
       artist: a.artist?.name || "",
@@ -280,7 +291,9 @@ export interface LastfmRecentTrack {
   nowPlaying: boolean;
 }
 
-export async function getRecentTracks(limit = 50): Promise<LastfmRecentTrack[]> {
+export async function getRecentTracks(
+  limit = 50,
+): Promise<LastfmRecentTrack[]> {
   const config = getConfig();
   if (!config) return [];
 
@@ -294,7 +307,9 @@ export async function getRecentTracks(limit = 50): Promise<LastfmRecentTrack[]> 
   return tracks
     .filter((t: any) => t.date || t["@attr"]?.nowplaying)
     .map((t: any) => {
-      const img = t.image?.find((i: any) => i.size === "large")?.["#text"]?.trim();
+      const img = t.image
+        ?.find((i: any) => i.size === "large")
+        ?.["#text"]?.trim();
       return {
         name: t.name,
         artist: t.artist?.["#text"] || t.artist?.name || "",

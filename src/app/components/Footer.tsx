@@ -6,11 +6,7 @@ interface FooterProps {
   onShowUpdate: () => void;
 }
 
-export function Footer({
-  version,
-  updateInfo,
-  onShowUpdate,
-}: FooterProps) {
+export function Footer({ version, updateInfo, onShowUpdate }: FooterProps) {
   return (
     <div className="stats-footer">
       <span className="version-text">

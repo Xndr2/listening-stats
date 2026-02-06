@@ -6,7 +6,11 @@ interface AnimatedNumberProps {
   format?: (n: number) => string;
 }
 
-export function AnimatedNumber({ value, duration = 800, format }: AnimatedNumberProps) {
+export function AnimatedNumber({
+  value,
+  duration = 800,
+  format,
+}: AnimatedNumberProps) {
   const [display, setDisplay] = useState("0");
   const prevValue = useRef(0);
 
@@ -28,7 +32,9 @@ export function AnimatedNumber({ value, duration = 800, format }: AnimatedNumber
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = start + (end - start) * eased;
 
-      setDisplay(format ? format(Math.round(current)) : String(Math.round(current)));
+      setDisplay(
+        format ? format(Math.round(current)) : String(Math.round(current)),
+      );
 
       if (progress < 1) {
         requestAnimationFrame(animate);
