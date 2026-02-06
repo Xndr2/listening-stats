@@ -10,4 +10,3 @@ export { LoadingSkeleton } from "./LoadingSkeleton";
 export { LastfmBanner } from "./LastfmBanner";
 export { SetupScreen } from "./SetupScreen";
 export { ActivityChart } from "./ActivityChart";
-export { GenreTimeline } from "./GenreTimeline";
