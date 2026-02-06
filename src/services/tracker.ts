@@ -1,13 +1,33 @@
 import { PlayEvent, PollingData, ProviderType } from "../types/listeningstats";
-import { getRecentlyPlayed, getTopArtists } from "./spotify-api";
 import { addPlayEvent } from "./storage";
 
 const STORAGE_KEY = "listening-stats:pollingData";
-const POLL_INTERVAL_MS = 15 * 60 * 1000;
+const LOGGING_KEY = "listening-stats:logging";
 const SKIP_THRESHOLD_MS = 30000;
 const STATS_UPDATED_EVENT = "listening-stats:updated";
 
 let activeProviderType: ProviderType | null = null;
+
+export function isLoggingEnabled(): boolean {
+  try {
+    return localStorage.getItem(LOGGING_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setLoggingEnabled(enabled: boolean): void {
+  try {
+    if (enabled) localStorage.setItem(LOGGING_KEY, "1");
+    else localStorage.removeItem(LOGGING_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function log(...args: any[]): void {
+  if (isLoggingEnabled()) console.log("[ListeningStats]", ...args);
+}
 
 export function onStatsUpdated(callback: () => void): () => void {
   const handler = () => callback();
@@ -39,7 +59,10 @@ export function getPollingData(): PollingData {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (!Array.isArray(parsed.hourlyDistribution) || parsed.hourlyDistribution.length !== 24) {
+      if (
+        !Array.isArray(parsed.hourlyDistribution) ||
+        parsed.hourlyDistribution.length !== 24
+      ) {
         parsed.hourlyDistribution = new Array(24).fill(0);
       }
       if (!parsed.trackPlayCounts) parsed.trackPlayCounts = {};
@@ -81,76 +104,6 @@ export function clearPollingData(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-async function seedKnownArtists(data: PollingData): Promise<void> {
-  if (data.seeded) return;
-
-  try {
-    const artists = await getTopArtists("long_term");
-    if (!artists || !artists.length) return;
-
-    const knownSet = new Set(data.knownArtistUris);
-    for (const a of artists) {
-      const uri = `spotify:artist:${a.id}`;
-      knownSet.add(uri);
-    }
-
-    data.knownArtistUris = Array.from(knownSet);
-    data.seeded = true;
-    savePollingData(data);
-  } catch (error) {
-    console.warn("[ListeningStats] Failed to seed known artists:", error);
-  }
-}
-
-async function pollRecentlyPlayed(): Promise<void> {
-  try {
-    const response = await getRecentlyPlayed();
-    if (!response?.items?.length) return;
-
-    const data = getPollingData();
-    const lastPoll = data.lastPollTimestamp;
-    const knownSet = new Set(data.knownArtistUris);
-    const dateSet = new Set(data.activityDates);
-
-    for (const item of response.items) {
-      const playedAt = new Date(item.played_at).getTime();
-      if (lastPoll > 0 && playedAt <= lastPoll) continue;
-
-      const track = item.track;
-      if (!track) continue;
-
-      const hour = new Date(item.played_at).getHours();
-      data.hourlyDistribution[hour] += track.duration_ms;
-
-      const dateKey = new Date(item.played_at).toISOString().split("T")[0];
-      dateSet.add(dateKey);
-
-      data.trackPlayCounts[track.uri] = (data.trackPlayCounts[track.uri] || 0) + 1;
-
-      const artistUri = track.artists?.[0]?.uri;
-      if (artistUri) {
-        data.artistPlayCounts[artistUri] = (data.artistPlayCounts[artistUri] || 0) + 1;
-        knownSet.add(artistUri);
-      }
-    }
-
-    data.activityDates = Array.from(dateSet);
-    data.knownArtistUris = Array.from(knownSet);
-
-    const latestTimestamp = Math.max(
-      ...response.items.map((item) => new Date(item.played_at).getTime()),
-    );
-    if (latestTimestamp > data.lastPollTimestamp) {
-      data.lastPollTimestamp = latestTimestamp;
-    }
-
-    savePollingData(data);
-    emitStatsUpdated();
-  } catch (error) {
-    console.warn("[ListeningStats] Poll failed:", error);
-  }
-}
-
 let currentTrackUri: string | null = null;
 let playStartTime: number | null = null;
 let accumulatedPlayTime = 0;
@@ -159,28 +112,46 @@ let currentTrackDuration = 0;
 
 function handleSongChange(): void {
   if (currentTrackUri && playStartTime !== null) {
-    const totalPlayedMs = accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
+    const totalPlayedMs =
+      accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
     const data = getPollingData();
     data.totalPlays++;
 
-    if (totalPlayedMs < SKIP_THRESHOLD_MS && currentTrackDuration > SKIP_THRESHOLD_MS) {
+    const skipped =
+      totalPlayedMs < SKIP_THRESHOLD_MS &&
+      currentTrackDuration > SKIP_THRESHOLD_MS;
+    if (skipped) {
       data.skipEvents++;
     }
 
     savePollingData(data);
 
-    if (activeProviderType === "local") {
-      writePlayEvent(totalPlayedMs);
+    if (previousTrackData) {
+      log(
+        skipped ? "Skipped:" : "Tracked:",
+        `${previousTrackData.artistName} - ${previousTrackData.trackName}`,
+        `(${Math.round(totalPlayedMs / 1000)}s / ${Math.round(currentTrackDuration / 1000)}s)`,
+      );
     }
+
+    writePlayEvent(totalPlayedMs);
   }
 
   const playerData = Spicetify.Player.data;
   if (playerData?.item) {
     currentTrackUri = playerData.item.uri;
-    currentTrackDuration = playerData.item.duration?.milliseconds || Spicetify.Player.getDuration() || 0;
+    currentTrackDuration =
+      playerData.item.duration?.milliseconds ||
+      Spicetify.Player.getDuration() ||
+      0;
     playStartTime = Date.now();
     accumulatedPlayTime = 0;
     isPlaying = !playerData.isPaused;
+
+    const meta = playerData.item.metadata;
+    const name = playerData.item.name || meta?.title || "Unknown";
+    const artist = meta?.artist_name || "Unknown";
+    log("Now playing:", `${artist} - ${name}`);
   } else {
     currentTrackUri = null;
     playStartTime = null;
@@ -191,9 +162,15 @@ function handleSongChange(): void {
 }
 
 let previousTrackData: {
-  trackUri: string; trackName: string; artistName: string;
-  artistUri: string; albumName: string; albumUri: string;
-  albumArt?: string; durationMs: number; startedAt: number;
+  trackUri: string;
+  trackName: string;
+  artistName: string;
+  artistUri: string;
+  albumName: string;
+  albumUri: string;
+  albumArt?: string;
+  durationMs: number;
+  startedAt: number;
 } | null = null;
 
 function captureCurrentTrackData(): void {
@@ -211,7 +188,10 @@ function captureCurrentTrackData(): void {
     albumName: meta?.album_title || "Unknown Album",
     albumUri: meta?.album_uri || "",
     albumArt: meta?.image_url || meta?.image_xlarge_url,
-    durationMs: playerData.item.duration?.milliseconds || Spicetify.Player.getDuration() || 0,
+    durationMs:
+      playerData.item.duration?.milliseconds ||
+      Spicetify.Player.getDuration() ||
+      0,
     startedAt: Date.now(),
   };
 }
@@ -237,7 +217,9 @@ function writePlayEvent(totalPlayedMs: number): void {
     console.warn("[ListeningStats] Failed to write play event:", err);
   });
 
-  emitStatsUpdated();
+  if (activeProviderType === "local") {
+    emitStatsUpdated();
+  }
 }
 
 function handlePlayPause(): void {
@@ -248,8 +230,10 @@ function handlePlayPause(): void {
 
   if (wasPlaying && !isPlaying) {
     accumulatedPlayTime += Date.now() - playStartTime;
+    log("Paused");
   } else if (!wasPlaying && isPlaying) {
     playStartTime = Date.now();
+    log("Resumed");
   }
 }
 
@@ -257,36 +241,40 @@ let pollIntervalId: number | null = null;
 let activeSongChangeHandler: (() => void) | null = null;
 
 export function initPoller(providerType: ProviderType): void {
+  const win = window as any;
+
+  // Remove any existing handler from another bundle (app.tsx vs index.tsx)
+  if (win.__lsSongHandler) {
+    Spicetify.Player.removeEventListener("songchange", win.__lsSongHandler);
+  }
+  if (win.__lsPauseHandler) {
+    Spicetify.Player.removeEventListener("onplaypause", win.__lsPauseHandler);
+  }
+
   activeProviderType = providerType;
 
-  if (providerType === "local") {
+  captureCurrentTrackData();
+  activeSongChangeHandler = () => {
+    handleSongChange();
     captureCurrentTrackData();
-    activeSongChangeHandler = () => {
-      handleSongChange();
-      captureCurrentTrackData();
-    };
-  } else {
-    activeSongChangeHandler = handleSongChange;
-  }
+  };
 
   Spicetify.Player.addEventListener("songchange", activeSongChangeHandler);
   Spicetify.Player.addEventListener("onplaypause", handlePlayPause);
 
+  // Store globally so either bundle can clean up
+  win.__lsSongHandler = activeSongChangeHandler;
+  win.__lsPauseHandler = handlePlayPause;
+
   const playerData = Spicetify.Player.data;
   if (playerData?.item) {
     currentTrackUri = playerData.item.uri;
-    currentTrackDuration = playerData.item.duration?.milliseconds || Spicetify.Player.getDuration() || 0;
+    currentTrackDuration =
+      playerData.item.duration?.milliseconds ||
+      Spicetify.Player.getDuration() ||
+      0;
     playStartTime = Date.now();
     isPlaying = !playerData.isPaused;
-  }
-
-  if (providerType === "spotify") {
-    setTimeout(() => {
-      const data = getPollingData();
-      seedKnownArtists(data).then(() => pollRecentlyPlayed());
-    }, 5000);
-
-    pollIntervalId = window.setInterval(pollRecentlyPlayed, POLL_INTERVAL_MS);
   }
 }
 
@@ -296,6 +284,11 @@ export function destroyPoller(): void {
     activeSongChangeHandler = null;
   }
   Spicetify.Player.removeEventListener("onplaypause", handlePlayPause);
+
+  const win = window as any;
+  win.__lsSongHandler = null;
+  win.__lsPauseHandler = null;
+
   if (pollIntervalId !== null) {
     clearInterval(pollIntervalId);
     pollIntervalId = null;
