@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.2.41
+
+### Added
+
+- **stats.fm provider** (recommended) connect with just your username, no API key needed. Accurate play counts and listening duration from your Spotify history
+- **Setup guide links** for stats.fm and Last.fm shown in the update banner and setup screen
+- **Logging toggle** optional debug logging in settings for troubleshooting
+
+### Changed
+
+- **Share cards redesigned** story card (1080x1920) with blurred hero background, dominant color accent, stats grid, top tracks/albums/artists, hourly activity chart, genre pills, and username display. Landscape card (1200x675) with two panel layout
+- **Local tracking always active** play events are written locally regardless of selected provider
+- **Last.fm time estimation** recent tab uses scrobble timestamp gaps with session break detection instead of a fixed estimate
+
+### Fixed
+
+- Last.fm tracks no longer show "0s" when duration data is unavailable
+- Last.fm recent total time no longer stuck at 2h 55m
+
+### Removed
+
+- Spotify provider (relied on APIs that don't return per user play counts)
+- Genre timeline component
+
 ## 1.2.0
 
 ### Added
