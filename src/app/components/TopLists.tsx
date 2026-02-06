@@ -34,7 +34,11 @@ export function TopLists({
             <div
               key={t.trackUri || `track-${i}`}
               className="item-row"
-              onClick={() => t.trackUri ? navigateToUri(t.trackUri) : lazyNavigate("track", t.trackName, t.artistName)}
+              onClick={() =>
+                t.trackUri
+                  ? navigateToUri(t.trackUri)
+                  : lazyNavigate("track", t.trackName, t.artistName)
+              }
             >
               <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
               {t.albumArt ? (
@@ -50,7 +54,11 @@ export function TopLists({
                 {t.playCount ? (
                   <span className="item-plays">{t.playCount} plays</span>
                 ) : null}
-                <span className="item-time">{formatDuration(t.totalTimeMs)}</span>
+                {t.totalTimeMs > 0 && (
+                  <span className="item-time">
+                    {formatDuration(t.totalTimeMs)}
+                  </span>
+                )}
               </div>
               {showLikeButtons && t.trackUri && (
                 <button
@@ -81,7 +89,11 @@ export function TopLists({
               <div
                 key={a.artistUri || a.artistName}
                 className="item-row"
-                onClick={() => a.artistUri ? navigateToUri(a.artistUri) : lazyNavigate("artist", a.artistName)}
+                onClick={() =>
+                  a.artistUri
+                    ? navigateToUri(a.artistUri)
+                    : lazyNavigate("artist", a.artistName)
+                }
               >
                 <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
                 {a.artistImage ? (
@@ -118,7 +130,11 @@ export function TopLists({
             <div
               key={a.albumUri || `album-${i}`}
               className="item-row"
-              onClick={() => a.albumUri ? navigateToUri(a.albumUri) : lazyNavigate("album", a.albumName, a.artistName)}
+              onClick={() =>
+                a.albumUri
+                  ? navigateToUri(a.albumUri)
+                  : lazyNavigate("album", a.albumName, a.artistName)
+              }
             >
               <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
               {a.albumArt ? (

@@ -4,7 +4,15 @@ import { searchArtist } from "../spotify-api";
 import { initPoller, destroyPoller, getPollingData } from "../tracker";
 import type { TrackingProvider } from "./types";
 
-const PERIODS = ["recent", "7day", "1month", "3month", "6month", "12month", "overall"] as const;
+const PERIODS = [
+  "recent",
+  "7day",
+  "1month",
+  "3month",
+  "6month",
+  "12month",
+  "overall",
+] as const;
 
 const PERIOD_LABELS: Record<string, string> = {
   recent: "Recent",
@@ -41,7 +49,11 @@ export function createLastfmProvider(): TrackingProvider {
 }
 
 async function enrichArtistImages(
-  artists: Array<{ artistUri: string; artistName: string; artistImage?: string }>,
+  artists: Array<{
+    artistUri: string;
+    artistName: string;
+    artistImage?: string;
+  }>,
 ): Promise<void> {
   const needsImage = artists.filter((a) => !a.artistImage);
   if (needsImage.length === 0) return;
@@ -76,10 +88,15 @@ async function calculateRecentStats(): Promise<ListeningStats> {
       playedAt: t.playedAt,
     }));
 
-  const trackMap = new Map<string, {
-    trackName: string; artistName: string; albumArt?: string;
-    count: number;
-  }>();
+  const trackMap = new Map<
+    string,
+    {
+      trackName: string;
+      artistName: string;
+      albumArt?: string;
+      count: number;
+    }
+  >();
   for (const t of recentTracks) {
     const key = `${t.artistName}|||${t.trackName}`;
     const existing = trackMap.get(key);
@@ -87,8 +104,10 @@ async function calculateRecentStats(): Promise<ListeningStats> {
       existing.count++;
     } else {
       trackMap.set(key, {
-        trackName: t.trackName, artistName: t.artistName,
-        albumArt: t.albumArt, count: 1,
+        trackName: t.trackName,
+        artistName: t.artistName,
+        albumArt: t.albumArt,
+        count: 1,
       });
     }
   }
@@ -126,9 +145,15 @@ async function calculateRecentStats(): Promise<ListeningStats> {
       playCount: a.count,
     }));
 
-  const albumMap = new Map<string, {
-    albumName: string; artistName: string; albumArt?: string; count: number;
-  }>();
+  const albumMap = new Map<
+    string,
+    {
+      albumName: string;
+      artistName: string;
+      albumArt?: string;
+      count: number;
+    }
+  >();
   for (const t of recentTracks) {
     if (!t.albumName) continue;
     const key = `${t.artistName}|||${t.albumName}`;
@@ -137,8 +162,10 @@ async function calculateRecentStats(): Promise<ListeningStats> {
       existing.count++;
     } else {
       albumMap.set(key, {
-        albumName: t.albumName, artistName: t.artistName,
-        albumArt: t.albumArt, count: 1,
+        albumName: t.albumName,
+        artistName: t.artistName,
+        albumArt: t.albumArt,
+        count: 1,
       });
     }
   }
@@ -162,14 +189,37 @@ async function calculateRecentStats(): Promise<ListeningStats> {
     hourlyDistribution[hour]++;
   }
 
-  const uniqueTrackNames = new Set(recentTracks.map((t) => `${t.artistName}|||${t.trackName}`));
+  const uniqueTrackNames = new Set(
+    recentTracks.map((t) => `${t.artistName}|||${t.trackName}`),
+  );
   const uniqueArtistNames = new Set(recentTracks.map((t) => t.artistName));
 
-  const estimatedTimeMs = recentTracks.length * 210 * 1000;
+  // Estimate total time from scrobble timestamps.
+  // Use the gap between consecutive scrobbles as the track duration estimate,
+  // but only when the gap looks like a single track (≤ 6 min). Larger gaps
+  // indicate a session break — fall back to a 3.5 min average for those.
+  let estimatedTimeMs = 0;
+  const sorted = [...recentTracks].sort(
+    (a, b) => new Date(a.playedAt).getTime() - new Date(b.playedAt).getTime(),
+  );
+  const SESSION_GAP_MS = 6 * 60 * 1000;
+  const AVG_TRACK_MS = 210_000;
+  for (let i = 0; i < sorted.length; i++) {
+    if (i < sorted.length - 1) {
+      const gap =
+        new Date(sorted[i + 1].playedAt).getTime() -
+        new Date(sorted[i].playedAt).getTime();
+      estimatedTimeMs += gap > 0 && gap <= SESSION_GAP_MS ? gap : AVG_TRACK_MS;
+    } else {
+      estimatedTimeMs += AVG_TRACK_MS;
+    }
+  }
 
-  const activityDates = [...new Set(recentTracks.map(
-    (t) => new Date(t.playedAt).toISOString().split("T")[0],
-  ))];
+  const activityDates = [
+    ...new Set(
+      recentTracks.map((t) => new Date(t.playedAt).toISOString().split("T")[0]),
+    ),
+  ];
 
   return {
     totalTimeMs: estimatedTimeMs,
@@ -187,7 +237,10 @@ async function calculateRecentStats(): Promise<ListeningStats> {
     topGenres: [],
     streakDays: calculateStreak(activityDates),
     newArtistsCount: 0,
-    skipRate: pollingData.totalPlays > 0 ? pollingData.skipEvents / pollingData.totalPlays : 0,
+    skipRate:
+      pollingData.totalPlays > 0
+        ? pollingData.skipEvents / pollingData.totalPlays
+        : 0,
     listenedDays: activityDates.length,
     lastfmConnected: true,
     totalScrobbles: userInfo?.totalScrobbles,
@@ -195,7 +248,13 @@ async function calculateRecentStats(): Promise<ListeningStats> {
 }
 
 async function calculateRankedStats(period: string): Promise<ListeningStats> {
-  const [lfmTracksResult, lfmArtistsResult, lfmAlbumsResult, recentLfm, userInfo] = await Promise.all([
+  const [
+    lfmTracksResult,
+    lfmArtistsResult,
+    lfmAlbumsResult,
+    recentLfm,
+    userInfo,
+  ] = await Promise.all([
     LastFm.getTopTracks(period, 50),
     LastFm.getTopArtists(period, 50),
     LastFm.getTopAlbums(period, 50),
@@ -238,7 +297,9 @@ async function calculateRankedStats(period: string): Promise<ListeningStats> {
 
   await enrichArtistImages(topArtists);
 
-  const recentTracks: RecentTrack[] = (Array.isArray(recentLfm) ? recentLfm : [])
+  const recentTracks: RecentTrack[] = (
+    Array.isArray(recentLfm) ? recentLfm : []
+  )
     .filter((t) => !t.nowPlaying)
     .map((t) => ({
       trackUri: "",
@@ -256,12 +317,15 @@ async function calculateRankedStats(period: string): Promise<ListeningStats> {
 
   const totalPlays = lfmTracks.reduce((sum, t) => sum + t.playCount, 0);
   const totalTimeMs = lfmTracks.reduce(
-    (sum, t) => sum + (t.durationSecs || 210) * 1000 * t.playCount, 0,
+    (sum, t) => sum + (t.durationSecs || 210) * 1000 * t.playCount,
+    0,
   );
 
-  const activityDates = [...new Set(recentTracks.map(
-    (t) => new Date(t.playedAt).toISOString().split("T")[0],
-  ))];
+  const activityDates = [
+    ...new Set(
+      recentTracks.map((t) => new Date(t.playedAt).toISOString().split("T")[0]),
+    ),
+  ];
 
   return {
     totalTimeMs,
@@ -279,7 +343,10 @@ async function calculateRankedStats(period: string): Promise<ListeningStats> {
     topGenres: [],
     streakDays: calculateStreak(activityDates),
     newArtistsCount: 0,
-    skipRate: pollingData.totalPlays > 0 ? pollingData.skipEvents / pollingData.totalPlays : 0,
+    skipRate:
+      pollingData.totalPlays > 0
+        ? pollingData.skipEvents / pollingData.totalPlays
+        : 0,
     listenedDays: activityDates.length,
     lastfmConnected: true,
     totalScrobbles: userInfo?.totalScrobbles,
