@@ -1,4 +1,5 @@
 import { UpdateInfo } from "../../services/updater";
+import { Icons } from "../icons";
 
 interface UpdateBannerProps {
   updateInfo: UpdateInfo;
@@ -25,8 +26,30 @@ export function UpdateBanner({
             </div>
           </div>
           {updateInfo.changelog && (
-            <div className="update-banner-changelog">{updateInfo.changelog}</div>
+            <div className="update-banner-changelog">
+              {updateInfo.changelog}
+            </div>
           )}
+          <div className="update-banner-links">
+            <a
+              className="lastfm-help-link standalone"
+              href="https://github.com/Xndr2/listening-stats/wiki/stats.fm-Setup-Guide"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              stats.fm Setup Guide
+              <span dangerouslySetInnerHTML={{ __html: Icons.external }} />
+            </a>
+            <a
+              className="lastfm-help-link standalone"
+              href="https://github.com/Xndr2/listening-stats/wiki/Last.fm-Setup-Guide"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Last.fm Setup Guide
+              <span dangerouslySetInnerHTML={{ __html: Icons.external }} />
+            </a>
+          </div>
           <div className="update-banner-actions">
             <button className="update-banner-btn secondary" onClick={onDismiss}>
               I'll do this later
