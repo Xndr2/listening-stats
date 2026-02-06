@@ -10,19 +10,19 @@ A real-time listening statistics dashboard for Spotify, powered by Spicetify.
 
 ## Features
 
-- **Multiple data providers** — choose between Last.fm, local tracking, or Spotify's API
-- **Last.fm integration** — accurate play counts and listening history across all your devices with 7 time periods
-- **Local tracking** — on-device tracking via IndexedDB, no account needed
-- **Top tracks, artists & albums** — view your most played content with play counts and listening time
-- **Activity chart** — visualize your listening patterns by hour
-- **Genre timeline** — see how your genre preferences shift across time periods
-- **Share cards** — generate shareable stat images in story or landscape format
-- **Data export** — export your stats as JSON or CSV
-- **Artist payout estimate** — see how much you've contributed to artists
-- **Streak tracking** — track consecutive listening days
-- **Skip rate** — track how often you skip songs
-- **Animated dashboard** — smooth number animations and loading states
-- **Auto-update notifications** — get notified when updates are available
+- **Multiple data providers** choose between stats.fm (recommended), Last.fm, or local tracking
+- **stats.fm integration** connect with just your username for accurate play counts and listening duration
+- **Last.fm integration** accurate play counts and listening history across all your devices with 7 time periods
+- **Local tracking** on device tracking via IndexedDB, no account needed
+- **Top tracks, artists & albums** view your most played content with play counts and listening time
+- **Activity chart** visualize your listening patterns by hour
+- **Share cards** generate shareable stat images in story or landscape format with blurred art backgrounds and accent colors
+- **Data export** export your stats as JSON or CSV
+- **Artist payout estimate** see how much you've contributed to artists
+- **Streak tracking** track consecutive listening days
+- **Skip rate** track how often you skip songs
+- **Animated dashboard** smooth number animations and loading states
+- **Auto-update notifications** get notified when updates are available
 
 ## Installation
 
@@ -89,8 +89,9 @@ Alternatively, run the install command again - it handles updates automatically.
 
 After installation, you'll find "Listening Stats" in Spotify's sidebar. On first launch, you'll be asked to choose a data provider:
 
-- **Last.fm** — connect your Last.fm account for accurate play counts across all devices. Requires a Last.fm username and API key ([get one here](https://www.last.fm/api/account/create))
-- **Local Tracking** — tracks on this device only, no account needed
+- **stats.fm** (recommended) connect with just your username for accurate play counts and listening duration. No API key needed ([setup guide](https://github.com/Xndr2/listening-stats/wiki/stats.fm-Setup-Guide))
+- **Last.fm** connect your Last.fm account for accurate play counts across all devices. Requires a Last.fm username and API key ([setup guide](https://github.com/Xndr2/listening-stats/wiki/Last.fm-Setup-Guide))
+- **Local Tracking** tracks on this device only, no account needed
 
 Once set up, the dashboard shows:
 
@@ -98,7 +99,6 @@ Once set up, the dashboard shows:
 - Estimated artist payout
 - Listening streak and skip rate
 - Top tracks, artists, and albums
-- Genre timeline across periods
 - Hourly activity chart
 - Recently played tracks
 
@@ -110,7 +110,8 @@ Use the period tabs to switch between time ranges. Available periods depend on y
 - Export stats (JSON / CSV)
 - Refresh stats and clear cache
 - Check for updates
-- Manage Last.fm account (when using Last.fm)
+- Manage stats.fm or Last.fm account
+- Debug logging toggle
 
 **Share cards** (share icon in the header):
 
@@ -148,6 +149,7 @@ Use the period tabs to switch between time ranges. Available periods depend on y
 All data stored locally. Nothing sent to external servers beyond the APIs you choose to use:
 
 - **Local provider**: all data in IndexedDB, API calls go to `api.spotify.com` using your existing session
+- **stats.fm provider**: calls go to `api.stats.fm` (public API) and `api.spotify.com` for enrichment
 - **Last.fm provider**: calls go to `ws.audioscrobbler.com` (Last.fm API) and `api.spotify.com` for enrichment
 
 No proxy, no analytics, no data collection.
