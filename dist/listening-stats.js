@@ -1,9 +1,199 @@
 (() => {
+  // src/services/lastfm.ts
+  var LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/";
+  var STORAGE_KEY = "listening-stats:lastfm";
+  var CACHE_TTL_MS = 3e5;
+  var configCache = void 0;
+  function getConfig() {
+    if (configCache !== void 0) return configCache;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        configCache = JSON.parse(stored);
+        return configCache;
+      }
+    } catch {
+    }
+    configCache = null;
+    return null;
+  }
+  function clearConfig() {
+    configCache = null;
+    localStorage.removeItem(STORAGE_KEY);
+  }
+  var cache = /* @__PURE__ */ new Map();
+  function getCached(key) {
+    const entry = cache.get(key);
+    if (!entry || Date.now() >= entry.expiresAt) {
+      cache.delete(key);
+      return null;
+    }
+    return entry.data;
+  }
+  function setCache(key, data) {
+    cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+  }
+  var LASTFM_PLACEHOLDER_HASHES = [
+    "2a96cbd8b46e442fc41c2b86b821562f",
+    "c6f59c1e5e7240a4c0d427abd71f3dbb"
+  ];
+  function isPlaceholderImage(url) {
+    return LASTFM_PLACEHOLDER_HASHES.some((h) => url.includes(h));
+  }
+  async function lastfmFetch(params) {
+    const config = getConfig();
+    if (!config) throw new Error("Last.fm not configured");
+    const url = new URL(LASTFM_API_URL);
+    url.searchParams.set("api_key", config.apiKey);
+    url.searchParams.set("format", "json");
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, v);
+    }
+    const cacheKey = url.toString();
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      if (response.status === 403) throw new Error("Invalid Last.fm API key");
+      if (response.status === 429) throw new Error("Last.fm rate limited");
+      throw new Error(`Last.fm API error: ${response.status}`);
+    }
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.message || `Last.fm error ${data.error}`);
+    }
+    setCache(cacheKey, data);
+    return data;
+  }
+  async function validateUser(username, apiKey) {
+    const url = new URL(LASTFM_API_URL);
+    url.searchParams.set("method", "user.getinfo");
+    url.searchParams.set("user", username);
+    url.searchParams.set("api_key", apiKey);
+    url.searchParams.set("format", "json");
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      if (response.status === 403) throw new Error("Invalid API key");
+      throw new Error(`Validation failed: ${response.status}`);
+    }
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.message || "User not found");
+    }
+    const user = data.user;
+    return {
+      valid: true,
+      username: user.name,
+      totalScrobbles: parseInt(user.playcount, 10) || 0,
+      registered: user.registered?.["#text"] || "",
+      imageUrl: user.image?.find((i) => i.size === "medium")?.["#text"]
+    };
+  }
+  async function getTopTracks(period, limit = 200) {
+    const config = getConfig();
+    if (!config) return { tracks: [], total: 0 };
+    const data = await lastfmFetch({
+      method: "user.gettoptracks",
+      user: config.username,
+      period,
+      limit: String(limit)
+    });
+    const total = parseInt(data.toptracks?.["@attr"]?.total || "0", 10);
+    const tracks = (data.toptracks?.track || []).map((t) => {
+      const img = t.image?.find((i) => i.size === "large")?.["#text"]?.trim();
+      return {
+        name: t.name,
+        artist: t.artist?.name || "",
+        playCount: parseInt(t.playcount, 10) || 0,
+        mbid: t.mbid || void 0,
+        url: t.url,
+        imageUrl: img && !isPlaceholderImage(img) ? img : void 0,
+        durationSecs: parseInt(t.duration, 10) || void 0
+      };
+    });
+    return { tracks, total };
+  }
+  async function getTopArtists(period, limit = 100) {
+    const config = getConfig();
+    if (!config) return { artists: [], total: 0 };
+    const data = await lastfmFetch({
+      method: "user.gettopartists",
+      user: config.username,
+      period,
+      limit: String(limit)
+    });
+    const total = parseInt(data.topartists?.["@attr"]?.total || "0", 10);
+    const artists = (data.topartists?.artist || []).map((a) => {
+      const img = a.image?.find((i) => i.size === "large")?.["#text"]?.trim();
+      return {
+        name: a.name,
+        playCount: parseInt(a.playcount, 10) || 0,
+        mbid: a.mbid || void 0,
+        url: a.url,
+        imageUrl: img && !isPlaceholderImage(img) ? img : void 0
+      };
+    });
+    return { artists, total };
+  }
+  async function getTopAlbums(period, limit = 100) {
+    const config = getConfig();
+    if (!config) return { albums: [], total: 0 };
+    const data = await lastfmFetch({
+      method: "user.gettopalbums",
+      user: config.username,
+      period,
+      limit: String(limit)
+    });
+    const total = parseInt(data.topalbums?.["@attr"]?.total || "0", 10);
+    const albums = (data.topalbums?.album || []).map((a) => {
+      const img = a.image?.find((i) => i.size === "large")?.["#text"]?.trim();
+      return {
+        name: a.name,
+        artist: a.artist?.name || "",
+        playCount: parseInt(a.playcount, 10) || 0,
+        mbid: a.mbid || void 0,
+        url: a.url,
+        imageUrl: img && !isPlaceholderImage(img) ? img : void 0
+      };
+    });
+    return { albums, total };
+  }
+  async function getRecentTracks(limit = 50) {
+    const config = getConfig();
+    if (!config) return [];
+    const data = await lastfmFetch({
+      method: "user.getrecenttracks",
+      user: config.username,
+      limit: String(limit)
+    });
+    const tracks = data.recenttracks?.track || [];
+    return tracks.filter((t) => t.date || t["@attr"]?.nowplaying).map((t) => {
+      const img = t.image?.find((i) => i.size === "large")?.["#text"]?.trim();
+      return {
+        name: t.name,
+        artist: t.artist?.["#text"] || t.artist?.name || "",
+        album: t.album?.["#text"] || "",
+        albumArt: img && !isPlaceholderImage(img) ? img : void 0,
+        playedAt: t.date?.uts ? new Date(parseInt(t.date.uts, 10) * 1e3).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
+        nowPlaying: t["@attr"]?.nowplaying === "true"
+      };
+    });
+  }
+  async function getUserInfo() {
+    const config = getConfig();
+    if (!config) return null;
+    try {
+      return await validateUser(config.username, config.apiKey);
+    } catch {
+      return null;
+    }
+  }
+
   // src/services/spotify-api.ts
   var STORAGE_PREFIX = "listening-stats:";
   var QUEUE_DELAY_MS = 300;
   var MAX_BATCH = 50;
-  var CACHE_TTL_MS = 3e5;
+  var CACHE_TTL_MS2 = 3e5;
   var DEFAULT_BACKOFF_MS = 6e4;
   var MAX_BACKOFF_MS = 6e5;
   var rateLimitedUntil = 0;
@@ -31,20 +221,23 @@
       }
     }
     rateLimitedUntil = Date.now() + backoffMs;
-    localStorage.setItem(`${STORAGE_PREFIX}rateLimitedUntil`, rateLimitedUntil.toString());
+    localStorage.setItem(
+      `${STORAGE_PREFIX}rateLimitedUntil`,
+      rateLimitedUntil.toString()
+    );
   }
-  var cache = /* @__PURE__ */ new Map();
-  function getCached(key) {
-    const entry = cache.get(key);
+  var cache2 = /* @__PURE__ */ new Map();
+  function getCached2(key) {
+    const entry = cache2.get(key);
     if (!entry) return null;
     if (Date.now() >= entry.expiresAt) {
-      cache.delete(key);
+      cache2.delete(key);
       return null;
     }
     return entry.data;
   }
-  function setCache(key, data) {
-    cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+  function setCache2(key, data) {
+    cache2.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS2 });
   }
   var queue = [];
   var draining = false;
@@ -78,7 +271,7 @@
     draining = false;
   }
   async function apiFetch(url) {
-    const cached = getCached(url);
+    const cached = getCached2(url);
     if (cached) return cached;
     return enqueue(async () => {
       let response;
@@ -95,36 +288,15 @@
       }
       if (response.error) {
         const status = response.error.status;
-        const err = new Error(response.error.message || `Spotify API error ${status}`);
+        const err = new Error(
+          response.error.message || `Spotify API error ${status}`
+        );
         err.status = status;
         if (status === 429) setRateLimit(response);
         throw err;
       }
-      setCache(url, response);
+      setCache2(url, response);
       return response;
-    });
-  }
-  async function getTopTracks(timeRange) {
-    const response = await apiFetch(
-      `https://api.spotify.com/v1/me/top/tracks?time_range=${timeRange}&limit=50`
-    );
-    return response?.items || [];
-  }
-  async function getTopArtists(timeRange) {
-    const response = await apiFetch(
-      `https://api.spotify.com/v1/me/top/artists?time_range=${timeRange}&limit=50`
-    );
-    return response?.items || [];
-  }
-  async function getRecentlyPlayed() {
-    return apiFetch(
-      `https://api.spotify.com/v1/me/player/recently-played?limit=50`
-    );
-  }
-  function prefetchPeriod(period) {
-    getTopTracks(period).catch(() => {
-    });
-    getTopArtists(period).catch(() => {
     });
   }
   var SEARCH_CACHE_KEY = "listening-stats:searchCache";
@@ -509,11 +681,21 @@
   }
 
   // src/services/tracker.ts
-  var STORAGE_KEY = "listening-stats:pollingData";
-  var POLL_INTERVAL_MS = 15 * 60 * 1e3;
+  var STORAGE_KEY2 = "listening-stats:pollingData";
+  var LOGGING_KEY = "listening-stats:logging";
   var SKIP_THRESHOLD_MS = 3e4;
   var STATS_UPDATED_EVENT = "listening-stats:updated";
   var activeProviderType = null;
+  function isLoggingEnabled() {
+    try {
+      return localStorage.getItem(LOGGING_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+  function log(...args) {
+    if (isLoggingEnabled()) console.log("[ListeningStats]", ...args);
+  }
   function emitStatsUpdated() {
     window.dispatchEvent(new CustomEvent(STATS_UPDATED_EVENT));
     localStorage.setItem("listening-stats:lastUpdate", Date.now().toString());
@@ -533,7 +715,7 @@
   }
   function getPollingData() {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY2);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (!Array.isArray(parsed.hourlyDistribution) || parsed.hourlyDistribution.length !== 24) {
@@ -567,64 +749,9 @@
         const sorted = artistEntries.sort((a, b) => b[1] - a[1]).slice(0, 1e3);
         data.artistPlayCounts = Object.fromEntries(sorted);
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(STORAGE_KEY2, JSON.stringify(data));
     } catch (error) {
       console.warn("[ListeningStats] Failed to save polling data:", error);
-    }
-  }
-  async function seedKnownArtists(data) {
-    if (data.seeded) return;
-    try {
-      const artists = await getTopArtists("long_term");
-      if (!artists || !artists.length) return;
-      const knownSet = new Set(data.knownArtistUris);
-      for (const a of artists) {
-        const uri = `spotify:artist:${a.id}`;
-        knownSet.add(uri);
-      }
-      data.knownArtistUris = Array.from(knownSet);
-      data.seeded = true;
-      savePollingData(data);
-    } catch (error) {
-      console.warn("[ListeningStats] Failed to seed known artists:", error);
-    }
-  }
-  async function pollRecentlyPlayed() {
-    try {
-      const response = await getRecentlyPlayed();
-      if (!response?.items?.length) return;
-      const data = getPollingData();
-      const lastPoll = data.lastPollTimestamp;
-      const knownSet = new Set(data.knownArtistUris);
-      const dateSet = new Set(data.activityDates);
-      for (const item of response.items) {
-        const playedAt = new Date(item.played_at).getTime();
-        if (lastPoll > 0 && playedAt <= lastPoll) continue;
-        const track = item.track;
-        if (!track) continue;
-        const hour = new Date(item.played_at).getHours();
-        data.hourlyDistribution[hour] += track.duration_ms;
-        const dateKey = new Date(item.played_at).toISOString().split("T")[0];
-        dateSet.add(dateKey);
-        data.trackPlayCounts[track.uri] = (data.trackPlayCounts[track.uri] || 0) + 1;
-        const artistUri = track.artists?.[0]?.uri;
-        if (artistUri) {
-          data.artistPlayCounts[artistUri] = (data.artistPlayCounts[artistUri] || 0) + 1;
-          knownSet.add(artistUri);
-        }
-      }
-      data.activityDates = Array.from(dateSet);
-      data.knownArtistUris = Array.from(knownSet);
-      const latestTimestamp = Math.max(
-        ...response.items.map((item) => new Date(item.played_at).getTime())
-      );
-      if (latestTimestamp > data.lastPollTimestamp) {
-        data.lastPollTimestamp = latestTimestamp;
-      }
-      savePollingData(data);
-      emitStatsUpdated();
-    } catch (error) {
-      console.warn("[ListeningStats] Poll failed:", error);
     }
   }
   var currentTrackUri = null;
@@ -637,13 +764,19 @@
       const totalPlayedMs = accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
       const data = getPollingData();
       data.totalPlays++;
-      if (totalPlayedMs < SKIP_THRESHOLD_MS && currentTrackDuration > SKIP_THRESHOLD_MS) {
+      const skipped = totalPlayedMs < SKIP_THRESHOLD_MS && currentTrackDuration > SKIP_THRESHOLD_MS;
+      if (skipped) {
         data.skipEvents++;
       }
       savePollingData(data);
-      if (activeProviderType === "local") {
-        writePlayEvent(totalPlayedMs);
+      if (previousTrackData) {
+        log(
+          skipped ? "Skipped:" : "Tracked:",
+          `${previousTrackData.artistName} - ${previousTrackData.trackName}`,
+          `(${Math.round(totalPlayedMs / 1e3)}s / ${Math.round(currentTrackDuration / 1e3)}s)`
+        );
       }
+      writePlayEvent(totalPlayedMs);
     }
     const playerData = Spicetify.Player.data;
     if (playerData?.item) {
@@ -652,6 +785,10 @@
       playStartTime = Date.now();
       accumulatedPlayTime = 0;
       isPlaying = !playerData.isPaused;
+      const meta = playerData.item.metadata;
+      const name = playerData.item.name || meta?.title || "Unknown";
+      const artist = meta?.artist_name || "Unknown";
+      log("Now playing:", `${artist} - ${name}`);
     } else {
       currentTrackUri = null;
       playStartTime = null;
@@ -698,7 +835,9 @@
     addPlayEvent(event).catch((err) => {
       console.warn("[ListeningStats] Failed to write play event:", err);
     });
-    emitStatsUpdated();
+    if (activeProviderType === "local") {
+      emitStatsUpdated();
+    }
   }
   function handlePlayPause() {
     const wasPlaying = isPlaying;
@@ -706,38 +845,38 @@
     if (!currentTrackUri || playStartTime === null) return;
     if (wasPlaying && !isPlaying) {
       accumulatedPlayTime += Date.now() - playStartTime;
+      log("Paused");
     } else if (!wasPlaying && isPlaying) {
       playStartTime = Date.now();
+      log("Resumed");
     }
   }
   var pollIntervalId = null;
   var activeSongChangeHandler = null;
   function initPoller(providerType) {
-    activeProviderType = providerType;
-    if (providerType === "local") {
-      captureCurrentTrackData();
-      activeSongChangeHandler = () => {
-        handleSongChange();
-        captureCurrentTrackData();
-      };
-    } else {
-      activeSongChangeHandler = handleSongChange;
+    const win = window;
+    if (win.__lsSongHandler) {
+      Spicetify.Player.removeEventListener("songchange", win.__lsSongHandler);
     }
+    if (win.__lsPauseHandler) {
+      Spicetify.Player.removeEventListener("onplaypause", win.__lsPauseHandler);
+    }
+    activeProviderType = providerType;
+    captureCurrentTrackData();
+    activeSongChangeHandler = () => {
+      handleSongChange();
+      captureCurrentTrackData();
+    };
     Spicetify.Player.addEventListener("songchange", activeSongChangeHandler);
     Spicetify.Player.addEventListener("onplaypause", handlePlayPause);
+    win.__lsSongHandler = activeSongChangeHandler;
+    win.__lsPauseHandler = handlePlayPause;
     const playerData = Spicetify.Player.data;
     if (playerData?.item) {
       currentTrackUri = playerData.item.uri;
       currentTrackDuration = playerData.item.duration?.milliseconds || Spicetify.Player.getDuration() || 0;
       playStartTime = Date.now();
       isPlaying = !playerData.isPaused;
-    }
-    if (providerType === "spotify") {
-      setTimeout(() => {
-        const data = getPollingData();
-        seedKnownArtists(data).then(() => pollRecentlyPlayed());
-      }, 5e3);
-      pollIntervalId = window.setInterval(pollRecentlyPlayed, POLL_INTERVAL_MS);
     }
   }
   function destroyPoller() {
@@ -746,6 +885,9 @@
       activeSongChangeHandler = null;
     }
     Spicetify.Player.removeEventListener("onplaypause", handlePlayPause);
+    const win = window;
+    win.__lsSongHandler = null;
+    win.__lsPauseHandler = null;
     if (pollIntervalId !== null) {
       clearInterval(pollIntervalId);
       pollIntervalId = null;
@@ -754,558 +896,17 @@
     previousTrackData = null;
   }
 
-  // src/services/lastfm.ts
-  var LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/";
-  var STORAGE_KEY2 = "listening-stats:lastfm";
-  var CACHE_TTL_MS2 = 3e5;
-  var configCache = void 0;
-  function getConfig() {
-    if (configCache !== void 0) return configCache;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY2);
-      if (stored) {
-        configCache = JSON.parse(stored);
-        return configCache;
-      }
-    } catch {
-    }
-    configCache = null;
-    return null;
-  }
-  function isConnected() {
-    const config = getConfig();
-    return !!(config?.username && config?.apiKey);
-  }
-  var cache2 = /* @__PURE__ */ new Map();
-  function getCached2(key) {
-    const entry = cache2.get(key);
-    if (!entry || Date.now() >= entry.expiresAt) {
-      cache2.delete(key);
-      return null;
-    }
-    return entry.data;
-  }
-  function setCache2(key, data) {
-    cache2.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS2 });
-  }
-  var LASTFM_PLACEHOLDER_HASHES = [
-    "2a96cbd8b46e442fc41c2b86b821562f",
-    "c6f59c1e5e7240a4c0d427abd71f3dbb"
-  ];
-  function isPlaceholderImage(url) {
-    return LASTFM_PLACEHOLDER_HASHES.some((h) => url.includes(h));
-  }
-  async function lastfmFetch(params) {
-    const config = getConfig();
-    if (!config) throw new Error("Last.fm not configured");
-    const url = new URL(LASTFM_API_URL);
-    url.searchParams.set("api_key", config.apiKey);
-    url.searchParams.set("format", "json");
-    for (const [k, v] of Object.entries(params)) {
-      url.searchParams.set(k, v);
-    }
-    const cacheKey = url.toString();
-    const cached = getCached2(cacheKey);
-    if (cached) return cached;
-    const response = await fetch(url.toString());
-    if (!response.ok) {
-      if (response.status === 403) throw new Error("Invalid Last.fm API key");
-      if (response.status === 429) throw new Error("Last.fm rate limited");
-      throw new Error(`Last.fm API error: ${response.status}`);
-    }
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(data.message || `Last.fm error ${data.error}`);
-    }
-    setCache2(cacheKey, data);
-    return data;
-  }
-  async function validateUser(username, apiKey) {
-    const url = new URL(LASTFM_API_URL);
-    url.searchParams.set("method", "user.getinfo");
-    url.searchParams.set("user", username);
-    url.searchParams.set("api_key", apiKey);
-    url.searchParams.set("format", "json");
-    const response = await fetch(url.toString());
-    if (!response.ok) {
-      if (response.status === 403) throw new Error("Invalid API key");
-      throw new Error(`Validation failed: ${response.status}`);
-    }
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(data.message || "User not found");
-    }
-    const user = data.user;
-    return {
-      valid: true,
-      username: user.name,
-      totalScrobbles: parseInt(user.playcount, 10) || 0,
-      registered: user.registered?.["#text"] || "",
-      imageUrl: user.image?.find((i) => i.size === "medium")?.["#text"]
-    };
-  }
-  function mapPeriod(period) {
-    switch (period) {
-      case "short_term":
-        return "1month";
-      case "medium_term":
-        return "6month";
-      case "long_term":
-        return "overall";
-    }
-  }
-  async function getTopTracks2(period, limit = 200) {
-    const config = getConfig();
-    if (!config) return { tracks: [], total: 0 };
-    const data = await lastfmFetch({
-      method: "user.gettoptracks",
-      user: config.username,
-      period,
-      limit: String(limit)
-    });
-    const total = parseInt(data.toptracks?.["@attr"]?.total || "0", 10);
-    const tracks = (data.toptracks?.track || []).map((t) => {
-      const img = t.image?.find((i) => i.size === "large")?.["#text"]?.trim();
-      return {
-        name: t.name,
-        artist: t.artist?.name || "",
-        playCount: parseInt(t.playcount, 10) || 0,
-        mbid: t.mbid || void 0,
-        url: t.url,
-        imageUrl: img && !isPlaceholderImage(img) ? img : void 0,
-        durationSecs: parseInt(t.duration, 10) || void 0
-      };
-    });
-    return { tracks, total };
-  }
-  async function getTopArtists2(period, limit = 100) {
-    const config = getConfig();
-    if (!config) return { artists: [], total: 0 };
-    const data = await lastfmFetch({
-      method: "user.gettopartists",
-      user: config.username,
-      period,
-      limit: String(limit)
-    });
-    const total = parseInt(data.topartists?.["@attr"]?.total || "0", 10);
-    const artists = (data.topartists?.artist || []).map((a) => {
-      const img = a.image?.find((i) => i.size === "large")?.["#text"]?.trim();
-      return {
-        name: a.name,
-        playCount: parseInt(a.playcount, 10) || 0,
-        mbid: a.mbid || void 0,
-        url: a.url,
-        imageUrl: img && !isPlaceholderImage(img) ? img : void 0
-      };
-    });
-    return { artists, total };
-  }
-  async function getTopAlbums(period, limit = 100) {
-    const config = getConfig();
-    if (!config) return { albums: [], total: 0 };
-    const data = await lastfmFetch({
-      method: "user.gettopalbums",
-      user: config.username,
-      period,
-      limit: String(limit)
-    });
-    const total = parseInt(data.topalbums?.["@attr"]?.total || "0", 10);
-    const albums = (data.topalbums?.album || []).map((a) => {
-      const img = a.image?.find((i) => i.size === "large")?.["#text"]?.trim();
-      return {
-        name: a.name,
-        artist: a.artist?.name || "",
-        playCount: parseInt(a.playcount, 10) || 0,
-        mbid: a.mbid || void 0,
-        url: a.url,
-        imageUrl: img && !isPlaceholderImage(img) ? img : void 0
-      };
-    });
-    return { albums, total };
-  }
-  async function getRecentTracks(limit = 50) {
-    const config = getConfig();
-    if (!config) return [];
-    const data = await lastfmFetch({
-      method: "user.getrecenttracks",
-      user: config.username,
-      limit: String(limit)
-    });
-    const tracks = data.recenttracks?.track || [];
-    return tracks.filter((t) => t.date || t["@attr"]?.nowplaying).map((t) => {
-      const img = t.image?.find((i) => i.size === "large")?.["#text"]?.trim();
-      return {
-        name: t.name,
-        artist: t.artist?.["#text"] || t.artist?.name || "",
-        album: t.album?.["#text"] || "",
-        albumArt: img && !isPlaceholderImage(img) ? img : void 0,
-        playedAt: t.date?.uts ? new Date(parseInt(t.date.uts, 10) * 1e3).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
-        nowPlaying: t["@attr"]?.nowplaying === "true"
-      };
-    });
-  }
-  async function getUserInfo() {
-    const config = getConfig();
-    if (!config) return null;
-    try {
-      return await validateUser(config.username, config.apiKey);
-    } catch {
-      return null;
-    }
-  }
-  function normalize(s) {
-    return s.toLowerCase().trim().replace(/\s*\(feat\.?.*?\)/gi, "").replace(/\s*\[.*?\]/g, "").replace(/['']/g, "'").replace(/[^\w\s']/g, "").replace(/\s+/g, " ");
-  }
-  function makeTrackKey(artist, track) {
-    return `${normalize(artist)}|||${normalize(track)}`;
-  }
-  function buildTrackPlayCountMap(input) {
-    const tracks = Array.isArray(input) ? input : input.tracks;
-    const map = /* @__PURE__ */ new Map();
-    for (const t of tracks) {
-      map.set(makeTrackKey(t.artist, t.name), t.playCount);
-    }
-    return map;
-  }
-  function buildArtistPlayCountMap(input) {
-    const artists = Array.isArray(input) ? input : input.artists;
-    const map = /* @__PURE__ */ new Map();
-    for (const a of artists) {
-      map.set(normalize(a.name), a.playCount);
-    }
-    return map;
-  }
-  function buildAlbumPlayCountMap(input) {
-    const albums = Array.isArray(input) ? input : input.albums;
-    const map = /* @__PURE__ */ new Map();
-    for (const a of albums) {
-      map.set(`${normalize(a.artist)}|||${normalize(a.name)}`, a.playCount);
-    }
-    return map;
-  }
-
-  // src/services/providers/spotify.ts
-  var PERIODS = ["recent", "short_term", "medium_term", "long_term"];
-  var PERIOD_LABELS = {
-    recent: "Recent",
-    short_term: "4 Weeks",
-    medium_term: "6 Months",
-    long_term: "All Time"
-  };
-  function createSpotifyProvider() {
-    return {
-      type: "spotify",
-      periods: [...PERIODS],
-      periodLabels: PERIOD_LABELS,
-      defaultPeriod: "recent",
-      init() {
-        initPoller("spotify");
-      },
-      destroy() {
-        destroyPoller();
-      },
-      async calculateStats(period) {
-        if (period === "recent") {
-          return calculateRecentStats();
-        }
-        return calculateRankedStats(period);
-      },
-      prefetchPeriod(period) {
-        if (period !== "recent") {
-          prefetchPeriod(period);
-        }
-      }
-    };
-  }
-  async function calculateRecentStats() {
-    const lastfmConnected = isConnected();
-    const recentFetch = getRecentlyPlayed();
-    const lfmInfoFetch = lastfmConnected ? getUserInfo().catch(() => null) : Promise.resolve(null);
-    const [response, lfmUserInfo] = await Promise.all([recentFetch, lfmInfoFetch]);
-    const items = response?.items || [];
-    const pollingData = getPollingData();
-    const recentTracks = items.filter((item) => item.track).map((item) => ({
-      trackUri: item.track.uri,
-      trackName: item.track.name,
-      artistName: item.track.artists?.[0]?.name || "Unknown Artist",
-      artistUri: item.track.artists?.[0]?.uri || "",
-      albumName: item.track.album?.name || "Unknown Album",
-      albumUri: item.track.album?.uri || "",
-      albumArt: item.track.album?.images?.[0]?.url,
-      durationMs: item.track.duration_ms,
-      playedAt: item.played_at
-    }));
-    const trackMap = /* @__PURE__ */ new Map();
-    for (const t of recentTracks) {
-      const existing = trackMap.get(t.trackUri);
-      if (existing) {
-        existing.count++;
-      } else {
-        trackMap.set(t.trackUri, {
-          trackUri: t.trackUri,
-          trackName: t.trackName,
-          artistName: t.artistName,
-          albumArt: t.albumArt,
-          count: 1,
-          durationMs: t.durationMs
-        });
-      }
-    }
-    const topTracks = Array.from(trackMap.values()).sort((a, b) => b.count - a.count).slice(0, 10).map((t, i) => ({
-      trackUri: t.trackUri,
-      trackName: t.trackName,
-      artistName: t.artistName,
-      albumArt: t.albumArt,
-      rank: i + 1,
-      totalTimeMs: t.durationMs,
-      playCount: pollingData.trackPlayCounts[t.trackUri] || void 0
-    }));
-    const artistMap = /* @__PURE__ */ new Map();
-    for (const t of recentTracks) {
-      const key = t.artistUri || t.artistName;
-      const existing = artistMap.get(key);
-      if (existing) {
-        existing.count++;
-      } else {
-        artistMap.set(key, {
-          artistUri: t.artistUri,
-          artistName: t.artistName,
-          count: 1
-        });
-      }
-    }
-    const topArtistAggregated = Array.from(artistMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
-    const artistIds = topArtistAggregated.map((a) => a.artistUri?.split(":")[2]).filter(Boolean);
-    const artistDetails = await getArtistsBatch(artistIds);
-    const artistDetailMap = new Map(
-      artistDetails.map((a) => [`spotify:artist:${a.id}`, a])
-    );
-    const topArtists = topArtistAggregated.map((a, i) => {
-      const detail = artistDetailMap.get(a.artistUri);
-      return {
-        artistUri: a.artistUri,
-        artistName: a.artistName,
-        artistImage: detail?.images?.[0]?.url,
-        rank: i + 1,
-        genres: detail?.genres || [],
-        playCount: pollingData.artistPlayCounts[a.artistUri] || void 0
-      };
-    });
-    const albumMap = /* @__PURE__ */ new Map();
-    for (const t of recentTracks) {
-      const existing = albumMap.get(t.albumUri);
-      if (existing) {
-        existing.trackCount++;
-      } else {
-        albumMap.set(t.albumUri, {
-          albumUri: t.albumUri,
-          albumName: t.albumName,
-          artistName: t.artistName,
-          albumArt: t.albumArt,
-          trackCount: 1
-        });
-      }
-    }
-    const topAlbums = Array.from(albumMap.values()).sort((a, b) => b.trackCount - a.trackCount).slice(0, 10);
-    const hourlyDistribution = new Array(24).fill(0);
-    for (const t of recentTracks) {
-      const hour = new Date(t.playedAt).getHours();
-      hourlyDistribution[hour] += t.durationMs;
-    }
-    for (let h = 0; h < 24; h++) {
-      hourlyDistribution[h] += pollingData.hourlyDistribution[h];
-    }
-    const { genres, topGenres } = aggregateGenres(topArtists);
-    const uniqueTrackUris = new Set(recentTracks.map((t) => t.trackUri));
-    const uniqueArtistUris = new Set(recentTracks.map((t) => t.artistUri).filter(Boolean));
-    const knownSet = new Set(pollingData.knownArtistUris);
-    let newArtistsCount = 0;
-    for (const uri of uniqueArtistUris) {
-      if (!knownSet.has(uri)) newArtistsCount++;
-    }
-    return {
-      totalTimeMs: recentTracks.reduce((sum, t) => sum + t.durationMs, 0),
-      trackCount: recentTracks.length,
-      uniqueTrackCount: uniqueTrackUris.size,
-      uniqueArtistCount: uniqueArtistUris.size,
-      topTracks,
-      topArtists,
-      topAlbums,
-      hourlyDistribution,
-      peakHour: hourlyDistribution.indexOf(Math.max(...hourlyDistribution)),
-      recentTracks,
-      genres,
-      topGenres,
-      streakDays: calculateStreak(pollingData.activityDates),
-      newArtistsCount,
-      skipRate: pollingData.totalPlays > 0 ? pollingData.skipEvents / pollingData.totalPlays : 0,
-      listenedDays: new Set(pollingData.activityDates).size,
-      lastfmConnected: isConnected(),
-      totalScrobbles: lfmUserInfo?.totalScrobbles
-    };
-  }
-  async function calculateRankedStats(period) {
-    const lastfmConnected = isConnected();
-    const lastfmPeriod = mapPeriod(period);
-    const spotifyFetch = Promise.all([
-      getTopTracks(period),
-      getTopArtists(period),
-      getRecentlyPlayed()
-    ]);
-    const lastfmFetch2 = lastfmConnected ? Promise.all([
-      getTopTracks2(lastfmPeriod, 200).catch(() => ({ tracks: [], total: 0 })),
-      getTopArtists2(lastfmPeriod, 100).catch(() => ({ artists: [], total: 0 })),
-      getTopAlbums(lastfmPeriod, 100).catch(() => ({ albums: [], total: 0 })),
-      getUserInfo().catch(() => null)
-    ]) : null;
-    const [spotify, lastfm] = await Promise.all([spotifyFetch, lastfmFetch2]);
-    const [tracks, artists, recentResponse] = spotify;
-    const lfmTracks = lastfm?.[0]?.tracks ?? [];
-    const lfmArtists = lastfm?.[1]?.artists ?? [];
-    const lfmAlbums = lastfm?.[2]?.albums ?? [];
-    const lfmUserInfo = lastfm?.[3] ?? null;
-    const trackPlayCountMap = buildTrackPlayCountMap(lfmTracks);
-    const artistPlayCountMap = buildArtistPlayCountMap(lfmArtists);
-    const albumPlayCountMap = buildAlbumPlayCountMap(lfmAlbums);
-    const pollingData = getPollingData();
-    const topTracks = (tracks || []).slice(0, 10).map((t, i) => {
-      const artistName = t.artists?.[0]?.name || "Unknown Artist";
-      let playCount;
-      if (lastfmConnected && lfmTracks.length > 0) {
-        playCount = trackPlayCountMap.get(makeTrackKey(artistName, t.name));
-      }
-      if (playCount === void 0) {
-        playCount = pollingData.trackPlayCounts[t.uri] || void 0;
-      }
-      return {
-        trackUri: t.uri,
-        trackName: t.name,
-        artistName,
-        albumArt: t.album?.images?.[0]?.url,
-        rank: i + 1,
-        totalTimeMs: t.duration_ms,
-        playCount
-      };
-    });
-    const topArtists = (artists || []).slice(0, 10).map((a, i) => {
-      let playCount;
-      if (lastfmConnected && lfmArtists.length > 0) {
-        playCount = artistPlayCountMap.get(normalize(a.name));
-      }
-      if (playCount === void 0) {
-        const uri = `spotify:artist:${a.id}`;
-        playCount = pollingData.artistPlayCounts[uri] || void 0;
-      }
-      return {
-        artistUri: `spotify:artist:${a.id}`,
-        artistName: a.name,
-        artistImage: a.images?.[0]?.url,
-        rank: i + 1,
-        genres: a.genres || [],
-        playCount
-      };
-    });
-    const albumMap = /* @__PURE__ */ new Map();
-    for (const t of tracks || []) {
-      const albumUri = t.album?.uri;
-      if (!albumUri) continue;
-      const existing = albumMap.get(albumUri);
-      if (existing) {
-        existing.trackCount++;
-      } else {
-        const artistName = t.album.artists?.[0]?.name || "Unknown Artist";
-        let playCount;
-        if (lastfmConnected && lfmAlbums.length > 0) {
-          const key = `${normalize(artistName)}|||${normalize(t.album.name)}`;
-          playCount = albumPlayCountMap.get(key);
-        }
-        albumMap.set(albumUri, {
-          albumUri,
-          albumName: t.album.name,
-          artistName,
-          albumArt: t.album.images?.[0]?.url,
-          trackCount: 1,
-          playCount
-        });
-      }
-    }
-    const topAlbums = Array.from(albumMap.values()).sort((a, b) => b.trackCount - a.trackCount).slice(0, 10);
-    const recentItems = recentResponse?.items || [];
-    const recentTracks = recentItems.filter((item) => item.track).map((item) => ({
-      trackUri: item.track.uri,
-      trackName: item.track.name,
-      artistName: item.track.artists?.[0]?.name || "Unknown Artist",
-      artistUri: item.track.artists?.[0]?.uri || "",
-      albumName: item.track.album?.name || "Unknown Album",
-      albumUri: item.track.album?.uri || "",
-      albumArt: item.track.album?.images?.[0]?.url,
-      durationMs: item.track.duration_ms,
-      playedAt: item.played_at
-    }));
-    const hourlyDistribution = [...pollingData.hourlyDistribution];
-    const { genres, topGenres } = aggregateGenres(topArtists);
-    const uniqueArtistUris = new Set(
-      (tracks || []).flatMap((t) => t.artists?.map((a) => a.uri) || [])
-    );
-    const knownSet = new Set(pollingData.knownArtistUris);
-    let newArtistsCount = 0;
-    for (const a of artists || []) {
-      const uri = `spotify:artist:${a.id}`;
-      if (!knownSet.has(uri)) newArtistsCount++;
-    }
-    return {
-      totalTimeMs: (tracks || []).reduce((sum, t) => sum + t.duration_ms, 0),
-      trackCount: (tracks || []).length,
-      uniqueTrackCount: (tracks || []).length,
-      uniqueArtistCount: uniqueArtistUris.size,
-      topTracks,
-      topArtists,
-      topAlbums,
-      hourlyDistribution,
-      peakHour: hourlyDistribution.indexOf(Math.max(...hourlyDistribution)),
-      recentTracks,
-      genres,
-      topGenres,
-      streakDays: calculateStreak(pollingData.activityDates),
-      newArtistsCount,
-      skipRate: pollingData.totalPlays > 0 ? pollingData.skipEvents / pollingData.totalPlays : 0,
-      listenedDays: new Set(pollingData.activityDates).size,
-      lastfmConnected,
-      totalScrobbles: lfmUserInfo?.totalScrobbles
-    };
-  }
-  function aggregateGenres(topArtists) {
-    const genreMap = /* @__PURE__ */ new Map();
-    for (const a of topArtists) {
-      for (const genre of a.genres) {
-        genreMap.set(genre, (genreMap.get(genre) || 0) + 1);
-      }
-    }
-    const genres = {};
-    for (const [g, c] of genreMap) genres[g] = c;
-    const topGenres = Array.from(genreMap.entries()).map(([genre, count]) => ({ genre, count })).sort((a, b) => b.count - a.count).slice(0, 10);
-    return { genres, topGenres };
-  }
-  function calculateStreak(activityDates) {
-    const dateSet = new Set(activityDates);
-    const today = /* @__PURE__ */ new Date();
-    let streak = 0;
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const key = d.toISOString().split("T")[0];
-      if (dateSet.has(key)) {
-        streak++;
-      } else if (i > 0) {
-        break;
-      }
-    }
-    return streak;
-  }
-
   // src/services/providers/lastfm.ts
-  var PERIODS2 = ["recent", "7day", "1month", "3month", "6month", "12month", "overall"];
-  var PERIOD_LABELS2 = {
+  var PERIODS = [
+    "recent",
+    "7day",
+    "1month",
+    "3month",
+    "6month",
+    "12month",
+    "overall"
+  ];
+  var PERIOD_LABELS = {
     recent: "Recent",
     "7day": "7 Days",
     "1month": "1 Month",
@@ -1317,8 +918,8 @@
   function createLastfmProvider() {
     return {
       type: "lastfm",
-      periods: [...PERIODS2],
-      periodLabels: PERIOD_LABELS2,
+      periods: [...PERIODS],
+      periodLabels: PERIOD_LABELS,
       defaultPeriod: "recent",
       init() {
         initPoller("lastfm");
@@ -1328,9 +929,9 @@
       },
       async calculateStats(period) {
         if (period === "recent") {
-          return calculateRecentStats2();
+          return calculateRecentStats();
         }
-        return calculateRankedStats2(period);
+        return calculateRankedStats(period);
       }
     };
   }
@@ -1345,7 +946,7 @@
       if (results[i].imageUrl) a.artistImage = results[i].imageUrl;
     });
   }
-  async function calculateRecentStats2() {
+  async function calculateRecentStats() {
     const [recentLfm, userInfo] = await Promise.all([
       getRecentTracks(50),
       getUserInfo().catch(() => null)
@@ -1433,12 +1034,29 @@
       const hour = new Date(t.playedAt).getHours();
       hourlyDistribution[hour]++;
     }
-    const uniqueTrackNames = new Set(recentTracks.map((t) => `${t.artistName}|||${t.trackName}`));
+    const uniqueTrackNames = new Set(
+      recentTracks.map((t) => `${t.artistName}|||${t.trackName}`)
+    );
     const uniqueArtistNames = new Set(recentTracks.map((t) => t.artistName));
-    const estimatedTimeMs = recentTracks.length * 210 * 1e3;
-    const activityDates = [...new Set(recentTracks.map(
-      (t) => new Date(t.playedAt).toISOString().split("T")[0]
-    ))];
+    let estimatedTimeMs = 0;
+    const sorted = [...recentTracks].sort(
+      (a, b) => new Date(a.playedAt).getTime() - new Date(b.playedAt).getTime()
+    );
+    const SESSION_GAP_MS = 6 * 60 * 1e3;
+    const AVG_TRACK_MS = 21e4;
+    for (let i = 0; i < sorted.length; i++) {
+      if (i < sorted.length - 1) {
+        const gap = new Date(sorted[i + 1].playedAt).getTime() - new Date(sorted[i].playedAt).getTime();
+        estimatedTimeMs += gap > 0 && gap <= SESSION_GAP_MS ? gap : AVG_TRACK_MS;
+      } else {
+        estimatedTimeMs += AVG_TRACK_MS;
+      }
+    }
+    const activityDates = [
+      ...new Set(
+        recentTracks.map((t) => new Date(t.playedAt).toISOString().split("T")[0])
+      )
+    ];
     return {
       totalTimeMs: estimatedTimeMs,
       trackCount: recentTracks.length,
@@ -1453,7 +1071,7 @@
       recentTracks,
       genres: {},
       topGenres: [],
-      streakDays: calculateStreak2(activityDates),
+      streakDays: calculateStreak(activityDates),
       newArtistsCount: 0,
       skipRate: pollingData.totalPlays > 0 ? pollingData.skipEvents / pollingData.totalPlays : 0,
       listenedDays: activityDates.length,
@@ -1461,10 +1079,16 @@
       totalScrobbles: userInfo?.totalScrobbles
     };
   }
-  async function calculateRankedStats2(period) {
-    const [lfmTracksResult, lfmArtistsResult, lfmAlbumsResult, recentLfm, userInfo] = await Promise.all([
-      getTopTracks2(period, 50),
-      getTopArtists2(period, 50),
+  async function calculateRankedStats(period) {
+    const [
+      lfmTracksResult,
+      lfmArtistsResult,
+      lfmAlbumsResult,
+      recentLfm,
+      userInfo
+    ] = await Promise.all([
+      getTopTracks(period, 50),
+      getTopArtists(period, 50),
       getTopAlbums(period, 50),
       getRecentTracks(50).catch(() => []),
       getUserInfo().catch(() => null)
@@ -1516,9 +1140,11 @@
       (sum, t) => sum + (t.durationSecs || 210) * 1e3 * t.playCount,
       0
     );
-    const activityDates = [...new Set(recentTracks.map(
-      (t) => new Date(t.playedAt).toISOString().split("T")[0]
-    ))];
+    const activityDates = [
+      ...new Set(
+        recentTracks.map((t) => new Date(t.playedAt).toISOString().split("T")[0])
+      )
+    ];
     return {
       totalTimeMs,
       trackCount: totalPlays,
@@ -1533,7 +1159,7 @@
       recentTracks,
       genres: {},
       topGenres: [],
-      streakDays: calculateStreak2(activityDates),
+      streakDays: calculateStreak(activityDates),
       newArtistsCount: 0,
       skipRate: pollingData.totalPlays > 0 ? pollingData.skipEvents / pollingData.totalPlays : 0,
       listenedDays: activityDates.length,
@@ -1541,7 +1167,7 @@
       totalScrobbles: userInfo?.totalScrobbles
     };
   }
-  function calculateStreak2(activityDates) {
+  function calculateStreak(activityDates) {
     const dateSet = new Set(activityDates);
     const today = /* @__PURE__ */ new Date();
     let streak = 0;
@@ -1559,8 +1185,8 @@
   }
 
   // src/services/providers/local.ts
-  var PERIODS3 = ["today", "this_week", "this_month", "all_time"];
-  var PERIOD_LABELS3 = {
+  var PERIODS2 = ["today", "this_week", "this_month", "all_time"];
+  var PERIOD_LABELS2 = {
     today: "Today",
     this_week: "This Week",
     this_month: "This Month",
@@ -1569,8 +1195,8 @@
   function createLocalProvider() {
     return {
       type: "local",
-      periods: [...PERIODS3],
-      periodLabels: PERIOD_LABELS3,
+      periods: [...PERIODS2],
+      periodLabels: PERIOD_LABELS2,
       defaultPeriod: "today",
       init() {
         initPoller("local");
@@ -1731,10 +1357,12 @@
       playedAt: new Date(e.startedAt).toISOString()
     }));
     const uniqueTrackUris = new Set(events.map((e) => e.trackUri));
-    const uniqueArtistUris = new Set(events.map((e) => e.artistUri).filter(Boolean));
-    const dateSet = new Set(events.map(
-      (e) => new Date(e.startedAt).toISOString().split("T")[0]
-    ));
+    const uniqueArtistUris = new Set(
+      events.map((e) => e.artistUri).filter(Boolean)
+    );
+    const dateSet = new Set(
+      events.map((e) => new Date(e.startedAt).toISOString().split("T")[0])
+    );
     const totalTimeMs = events.reduce((sum, e) => sum + e.playedMs, 0);
     let skipEvents = 0;
     for (const e of events) {
@@ -1755,10 +1383,284 @@
       recentTracks,
       genres,
       topGenres,
-      streakDays: calculateStreak3(Array.from(dateSet)),
+      streakDays: calculateStreak2(Array.from(dateSet)),
       newArtistsCount: 0,
       skipRate: events.length > 0 ? skipEvents / events.length : 0,
       listenedDays: dateSet.size,
+      lastfmConnected: false
+    };
+  }
+  function calculateStreak2(activityDates) {
+    const dateSet = new Set(activityDates);
+    const today = /* @__PURE__ */ new Date();
+    let streak = 0;
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = d.toISOString().split("T")[0];
+      if (dateSet.has(key)) {
+        streak++;
+      } else if (i > 0) {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  // src/services/statsfm.ts
+  var API_BASE = "https://api.stats.fm/api/v1";
+  var STORAGE_KEY3 = "listening-stats:statsfm";
+  var CACHE_TTL_MS3 = 12e4;
+  var configCache2 = void 0;
+  function getConfig2() {
+    if (configCache2 !== void 0) return configCache2;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY3);
+      if (stored) {
+        configCache2 = JSON.parse(stored);
+        return configCache2;
+      }
+    } catch {
+    }
+    configCache2 = null;
+    return null;
+  }
+  var cache3 = /* @__PURE__ */ new Map();
+  function getCached3(key) {
+    const entry = cache3.get(key);
+    if (!entry || Date.now() >= entry.expiresAt) {
+      cache3.delete(key);
+      return null;
+    }
+    return entry.data;
+  }
+  function setCache3(key, data) {
+    cache3.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS3 });
+  }
+  async function statsfmFetch(path) {
+    const url = `${API_BASE}${path}`;
+    const cached = getCached3(url);
+    if (cached) return cached;
+    const response = await fetch(url);
+    if (!response.ok) {
+      if (response.status === 404) throw new Error("User not found");
+      if (response.status === 403) throw new Error("Profile is private");
+      if (response.status === 429)
+        throw new Error("Rate limited. Try again later");
+      throw new Error(`stats.fm API error: ${response.status}`);
+    }
+    const data = await response.json();
+    setCache3(url, data);
+    return data;
+  }
+  function getUsername() {
+    const config = getConfig2();
+    if (!config?.username) throw new Error("stats.fm not configured");
+    return encodeURIComponent(config.username);
+  }
+  async function getTopTracks2(range, limit = 50) {
+    const data = await statsfmFetch(
+      `/users/${getUsername()}/top/tracks?range=${range}&limit=${limit}&orderBy=COUNT`
+    );
+    return data.items || [];
+  }
+  async function getTopArtists2(range, limit = 50) {
+    const data = await statsfmFetch(
+      `/users/${getUsername()}/top/artists?range=${range}&limit=${limit}&orderBy=COUNT`
+    );
+    return data.items || [];
+  }
+  async function getTopAlbums2(range, limit = 50) {
+    try {
+      const data = await statsfmFetch(
+        `/users/${getUsername()}/top/albums?range=${range}&limit=${limit}&orderBy=COUNT`
+      );
+      return data.items || [];
+    } catch {
+      return [];
+    }
+  }
+  async function getTopGenres(range, limit = 20) {
+    const data = await statsfmFetch(
+      `/users/${getUsername()}/top/genres?range=${range}&limit=${limit}`
+    );
+    return data.items || [];
+  }
+  async function getRecentStreams(limit = 50) {
+    const data = await statsfmFetch(
+      `/users/${getUsername()}/streams/recent?limit=${limit}`
+    );
+    return data.items || [];
+  }
+  async function getStreamStats() {
+    const data = await statsfmFetch(`/users/${getUsername()}/streams/stats`);
+    const item = data.items || data;
+    return {
+      durationMs: item.durationMs || 0,
+      count: item.count || 0,
+      cardinality: item.cardinality || { tracks: 0, artists: 0, albums: 0 }
+    };
+  }
+  function extractSpotifyUri(externalIds, type) {
+    const ids = externalIds?.spotify;
+    if (!ids || ids.length === 0) return "";
+    const id = ids[0];
+    if (id.startsWith("spotify:")) return id;
+    return `spotify:${type}:${id}`;
+  }
+
+  // src/services/providers/statsfm.ts
+  var PERIODS3 = ["weeks", "months", "lifetime"];
+  var PERIOD_LABELS3 = {
+    weeks: "4 Weeks",
+    months: "6 Months",
+    lifetime: "Lifetime"
+  };
+  function createStatsfmProvider() {
+    return {
+      type: "statsfm",
+      periods: [...PERIODS3],
+      periodLabels: PERIOD_LABELS3,
+      defaultPeriod: "weeks",
+      init() {
+        initPoller("statsfm");
+      },
+      destroy() {
+        destroyPoller();
+      },
+      async calculateStats(period) {
+        return calculateStatsfmStats(period);
+      }
+    };
+  }
+  async function calculateStatsfmStats(range) {
+    const [
+      topTracksRaw,
+      topArtistsRaw,
+      topAlbumsRaw,
+      topGenresRaw,
+      recentRaw,
+      streamStats
+    ] = await Promise.all([
+      getTopTracks2(range, 50),
+      getTopArtists2(range, 50),
+      getTopAlbums2(range, 50),
+      getTopGenres(range, 20),
+      getRecentStreams(50).catch(() => []),
+      getStreamStats().catch(() => ({
+        durationMs: 0,
+        count: 0,
+        cardinality: { tracks: 0, artists: 0, albums: 0 }
+      }))
+    ]);
+    const pollingData = getPollingData();
+    const topTracks = topTracksRaw.slice(0, 10).map((item, i) => ({
+      trackUri: extractSpotifyUri(item.track.externalIds, "track"),
+      trackName: item.track.name,
+      artistName: item.track.artists?.[0]?.name || "Unknown Artist",
+      albumArt: item.track.albums?.[0]?.image || void 0,
+      rank: i + 1,
+      totalTimeMs: item.playedMs || (item.streams ? item.track.durationMs * item.streams : item.track.durationMs),
+      playCount: item.streams ?? void 0
+    }));
+    const topArtists = topArtistsRaw.slice(0, 10).map((item, i) => ({
+      artistUri: extractSpotifyUri(item.artist.externalIds, "artist"),
+      artistName: item.artist.name,
+      artistImage: item.artist.image || void 0,
+      rank: i + 1,
+      genres: item.artist.genres || [],
+      playCount: item.streams ?? void 0
+    }));
+    let topAlbums = topAlbumsRaw.slice(0, 10).map((item) => ({
+      albumUri: extractSpotifyUri(item.album.externalIds, "album"),
+      albumName: item.album.name,
+      artistName: item.album.artists?.[0]?.name || "Unknown Artist",
+      albumArt: item.album.image || void 0,
+      trackCount: 0,
+      playCount: item.streams ?? void 0
+    }));
+    if (topAlbums.length === 0 && recentRaw.length > 0) {
+      const albumMap = /* @__PURE__ */ new Map();
+      for (const item of recentRaw) {
+        const album = item.track.albums?.[0];
+        if (!album?.name) continue;
+        const key = `${item.track.artists?.[0]?.name}|||${album.name}`;
+        const existing = albumMap.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          albumMap.set(key, {
+            albumName: album.name,
+            artistName: item.track.artists?.[0]?.name || "Unknown Artist",
+            albumArt: album.image || void 0,
+            count: 1
+          });
+        }
+      }
+      topAlbums = Array.from(albumMap.values()).sort((a, b) => b.count - a.count).slice(0, 10).map((a) => ({
+        albumUri: "",
+        albumName: a.albumName,
+        artistName: a.artistName,
+        albumArt: a.albumArt,
+        trackCount: a.count,
+        playCount: a.count
+      }));
+    }
+    const recentTracks = recentRaw.map((item) => ({
+      trackUri: extractSpotifyUri(item.track.externalIds, "track"),
+      trackName: item.track.name,
+      artistName: item.track.artists?.[0]?.name || "Unknown Artist",
+      artistUri: item.track.artists?.[0]?.externalIds?.spotify?.[0] ? extractSpotifyUri(item.track.artists[0].externalIds, "artist") : "",
+      albumName: item.track.albums?.[0]?.name || "",
+      albumUri: "",
+      albumArt: item.track.albums?.[0]?.image || void 0,
+      durationMs: item.durationMs || item.track.durationMs,
+      playedAt: new Date(item.endTime).toISOString()
+    }));
+    const genres = {};
+    for (const g of topGenresRaw) {
+      genres[g.genre.tag] = g.streams ?? g.position;
+    }
+    const topGenres = topGenresRaw.slice(0, 10).map((g) => ({ genre: g.genre.tag, count: g.streams ?? g.position }));
+    const hourlyDistribution = new Array(24).fill(0);
+    for (const t of recentTracks) {
+      const hour = new Date(t.playedAt).getHours();
+      hourlyDistribution[hour]++;
+    }
+    const uniqueTrackCount = streamStats.cardinality?.tracks || new Set(
+      topTracksRaw.map(
+        (t) => `${t.track.artists?.[0]?.name}|||${t.track.name}`
+      )
+    ).size;
+    const uniqueArtistCount = streamStats.cardinality?.artists || new Set(topArtistsRaw.map((a) => a.artist.name)).size;
+    const totalPlays = topTracksRaw.reduce((sum, t) => sum + (t.streams || 0), 0);
+    const totalTimeMs = topTracksRaw.reduce(
+      (sum, t) => sum + (t.playedMs || (t.streams ? t.track.durationMs * t.streams : 0)),
+      0
+    );
+    const activityDates = [
+      ...new Set(
+        recentTracks.map((t) => new Date(t.playedAt).toISOString().split("T")[0])
+      )
+    ];
+    return {
+      totalTimeMs: streamStats.durationMs || totalTimeMs,
+      trackCount: streamStats.count || totalPlays,
+      uniqueTrackCount,
+      uniqueArtistCount,
+      topTracks,
+      topArtists,
+      topAlbums,
+      hourlyDistribution,
+      hourlyUnit: "plays",
+      peakHour: hourlyDistribution.indexOf(Math.max(...hourlyDistribution)),
+      recentTracks,
+      genres,
+      topGenres,
+      streakDays: calculateStreak3(activityDates),
+      newArtistsCount: 0,
+      skipRate: pollingData.totalPlays > 0 ? pollingData.skipEvents / pollingData.totalPlays : 0,
+      listenedDays: activityDates.length,
       lastfmConnected: false
     };
   }
@@ -1780,12 +1682,12 @@
   }
 
   // src/services/providers/index.ts
-  var STORAGE_KEY3 = "listening-stats:provider";
+  var STORAGE_KEY4 = "listening-stats:provider";
   var activeProvider = null;
   function getSelectedProviderType() {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY3);
-      if (stored === "local" || stored === "spotify" || stored === "lastfm") {
+      const stored = localStorage.getItem(STORAGE_KEY4);
+      if (stored === "local" || stored === "lastfm" || stored === "statsfm") {
         return stored;
       }
     } catch {
@@ -1793,7 +1695,7 @@
     return null;
   }
   function setSelectedProviderType(type) {
-    localStorage.setItem(STORAGE_KEY3, type);
+    localStorage.setItem(STORAGE_KEY4, type);
   }
   function hasExistingData() {
     return localStorage.getItem("listening-stats:pollingData") !== null;
@@ -1805,14 +1707,14 @@
     }
     setSelectedProviderType(type);
     switch (type) {
-      case "spotify":
-        activeProvider = createSpotifyProvider();
-        break;
       case "lastfm":
         activeProvider = createLastfmProvider();
         break;
       case "local":
         activeProvider = createLocalProvider();
+        break;
+      case "statsfm":
+        activeProvider = createStatsfmProvider();
         break;
     }
     if (!skipInit) {
@@ -1821,11 +1723,19 @@
   }
 
   // src/app.tsx
+  window.ListeningStats = {
+    resetLastfmKey: () => {
+      clearConfig();
+      console.log(
+        "[Listening Stats] Last.fm API key cleared. Reload the app to reconfigure."
+      );
+    }
+  };
   async function main() {
     let providerType = getSelectedProviderType();
     if (!providerType && hasExistingData()) {
-      providerType = "spotify";
-      setSelectedProviderType("spotify");
+      providerType = "local";
+      setSelectedProviderType("local");
     }
     if (providerType) {
       activateProvider(providerType);
