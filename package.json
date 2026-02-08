@@ -1,6 +1,6 @@
 {
   "name": "listening-stats",
-  "version": "1.2.40",
+  "version": "1.2.41",
   "description": "Real-time listening statistics dashboard for Spotify",
   "main": "dist/listening-stats.js",
   "scripts": {
