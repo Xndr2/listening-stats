@@ -1,4 +1,9 @@
-# Listening Stats - Spicetify CustomApp Installer for Windows
+<#
+Listening Stats – Spicetify Custom App Installer
+Author: Xndr2
+Source: https://github.com/Xndr2/listening-stats
+This script installs the Listening Stats Spicetify app.
+#>
 # Usage: iwr -useb 'https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1' | iex
 
 $ErrorActionPreference = 'Stop'
