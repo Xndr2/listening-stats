@@ -1919,7 +1919,7 @@ var ListeningStatsApp = (() => {
   var INSTALL_CMD_WINDOWS = `iwr -useb 'https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.ps1' | iex`;
   function getCurrentVersion() {
     try {
-      return "1.2.40";
+      return "1.2.47";
     } catch {
       return "0.0.0";
     }
@@ -2949,7 +2949,14 @@ var ListeningStatsApp = (() => {
     onToggleSettings,
     providerType
   }) {
-    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-header" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-header-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("h1", { className: "stats-title" }, "Listening Stats"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "stats-subtitle" }, "Your personal music analytics", providerType && /* @__PURE__ */ Spicetify.React.createElement("span", { className: "provider-badge" }, "via ", PROVIDER_NAMES2[providerType])), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "stats-dev-note" }, "Dev note: I just added Stats.fm tracking. This works way better then Last.fm so if you can, please change to this for a better experience.", /* @__PURE__ */ Spicetify.React.createElement("br", null), "You can change using the setting icon on the right. Bugs are expected, please report them on", " ", /* @__PURE__ */ Spicetify.React.createElement("a", { href: "https://github.com/Xndr2/listening-stats/issues/new?template=bug_report.md" }, "github"), ".")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "header-actions" }, onToggleSettings && /* @__PURE__ */ Spicetify.React.createElement(
+    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-header" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-header-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("h1", { className: "stats-title" }, "Listening Stats"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "stats-subtitle" }, "Your personal music analytics", providerType && /* @__PURE__ */ Spicetify.React.createElement("span", { className: "provider-badge" }, "via ", PROVIDER_NAMES2[providerType])), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-dev-note" }, /* @__PURE__ */ Spicetify.React.createElement("p", { className: "stats-dev-note-main" }, "Important!"), /* @__PURE__ */ Spicetify.React.createElement(
+      "a",
+      {
+        className: "stats-dev-note-sub",
+        href: "https://techcrunch.com/2026/02/06/spotify-changes-developer-mode-api-to-require-premium-accounts-limits-test-users/"
+      },
+      "Spotify is shutting down it's API to access the Spotify music catalog."
+    ), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "stats-dev-note-sub" }, "I have no idea if Listening-Stats will be affected or not. We will have to wait and see. I'll keep you all updated.", /* @__PURE__ */ Spicetify.React.createElement("br", null), "I'm still working on fixing small bugs so I'll push those soon. Thanks for 1K downloads! Y'all are amazing \u2764\uFE0F"))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "header-actions" }, onToggleSettings && /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: "header-btn",
@@ -4122,7 +4129,20 @@ var ListeningStatsApp = (() => {
   font-size: 12px;
   color: var(--text-subdued);
   margin: 0;
-  margin-top: 2px;
+  margin-top: 8px;
+}
+
+.stats-dev-note-main {
+  font-size: 12px;
+  color: var(--text-subdued);
+  margin: 0;
+  font-weight: bold;
+}
+
+.stats-dev-note-sub {
+  font-size: 12px;
+  color: var(--text-subdued);
+  margin: 0;
 }
 
 /* Header Actions */
