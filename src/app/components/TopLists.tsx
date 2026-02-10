@@ -1,5 +1,6 @@
 import { formatDuration } from "../../services/stats";
 import { ListeningStats } from "../../types";
+import { formatNumber } from "../format";
 import { Icons } from "../icons";
 import { getRankClass, lazyNavigate, navigateToUri } from "../utils";
 
@@ -52,7 +53,7 @@ export function TopLists({
               </div>
               <div className="item-stats">
                 {t.playCount ? (
-                  <span className="item-plays">{t.playCount} plays</span>
+                  <span className="item-plays">{formatNumber(t.playCount)} plays</span>
                 ) : null}
                 {t.totalTimeMs > 0 && (
                   <span className="item-time">
@@ -109,7 +110,7 @@ export function TopLists({
                 </div>
                 {a.playCount ? (
                   <div className="item-stats">
-                    <span className="item-plays">{a.playCount} plays</span>
+                    <span className="item-plays">{formatNumber(a.playCount)} plays</span>
                   </div>
                 ) : null}
               </div>
@@ -148,9 +149,9 @@ export function TopLists({
               </div>
               <div className="item-stats">
                 {a.playCount ? (
-                  <span className="item-plays">{a.playCount} plays</span>
+                  <span className="item-plays">{formatNumber(a.playCount)} plays</span>
                 ) : null}
-                <span className="item-time">{a.trackCount} tracks</span>
+                <span className="item-time">{formatNumber(a.trackCount)} tracks</span>
               </div>
             </div>
           ))}
