@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Accurate, reliable listening statistics that match what the source services report
-**Current focus:** Phase 4 - Drag-and-Drop Layout
+**Current focus:** Phase 5 - Onboarding and Tour
 
 ## Current Position
 
-Phase: 4 of 6 (Drag-and-Drop Layout)
-Plan: 1 of 2 in current phase
+Phase: 5 of 6 (Onboarding and Tour)
+Plan: 2 of 3 in current phase
 Status: Executing
-Last activity: 2026-02-10 -- Completed 04-01 (DnD primitives: hook + component + CSS)
+Last activity: 2026-02-10 -- Completed 05-01 (setup wizard)
 
-Progress: [█████░░░░░] 50%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
+- Total plans completed: 12
 - Average duration: 2min
-- Total execution time: 0.30 hours
+- Total execution time: 0.40 hours
 
 **By Phase:**
 
@@ -30,10 +30,11 @@ Progress: [█████░░░░░] 50%
 | 01-data-integrity | 2 | 4min | 2min |
 | 02-settings-and-display | 3 | 6min | 2min |
 | 03-data-accuracy-and-api-resilience | 3 | 6min | 2min |
-| 04-drag-and-drop-layout | 1 | 1min | 1min |
+| 04-drag-and-drop-layout | 2 | 4min | 2min |
+| 05-onboarding-and-tour | 2 | 3min | 1.5min |
 
 **Recent Trend:**
-- Last 5 plans: 02-03 (3min), 03-01 (1min), 03-02 (3min), 03-03 (2min), 04-01 (1min)
+- Last 5 plans: 03-03 (2min), 04-01 (1min), 04-02 (3min), 05-02 (1min), 05-01 (2min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -71,6 +72,17 @@ Recent decisions affecting current work:
 - [04-01]: Drag handle positioned absolutely at left edge (-32px) for clean separation from section content
 - [04-01]: Only drag handle is draggable (not wrapper div) to preserve child click interactions
 - [04-01]: useSectionOrder validates stored order on init: removes stale IDs, appends missing for forward compat
+- [04-02]: DashboardSections extracted as functional component from class StatsPage to enable hooks
+- [04-02]: Custom event (listening-stats:reset-layout) bridges Settings and hook without prop-drilling
+- [04-02]: Container-level drag detection via querySelectorAll — no dead zones in gaps between sections
+- [04-02]: Auto-scroll at 80px viewport edge zone during drag for long-distance reordering
+- [05-02]: TourProvider renders overlay via createPortal to document.body (avoids ancestor transform breaking fixed positioning)
+- [05-02]: Spotlight uses box-shadow 9999px rgba(0,0,0,0.6) technique for full-viewport dimming
+- [05-02]: Tooltip auto-flips placement when it would overflow viewport bounds
+- [05-02]: 300ms delay after scrollIntoView before measuring target rect (scroll settle time)
+- [05-01]: Wizard uses separate function components per step (ChooseStep, ConfigureStep, ValidateStep, SuccessStep)
+- [05-01]: Validation runs automatically on mount via useEffect, not on button click
+- [05-01]: Local tracking bypasses wizard entirely (single click activateProvider + onComplete)
 
 ### Pending Todos
 
@@ -85,5 +97,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-10
-Stopped at: Completed 04-01-PLAN.md (DnD primitives)
+Stopped at: Completed 05-01-PLAN.md (setup wizard)
 Resume file: None
