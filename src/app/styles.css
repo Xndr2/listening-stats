@@ -2117,3 +2117,102 @@
 .settings-category-body {
   padding-bottom: 16px;
 }
+
+/* ===== Tour Overlay ===== */
+.tour-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  cursor: default;
+}
+
+.tour-spotlight {
+  position: fixed;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+  z-index: 9998;
+  pointer-events: none;
+  transition:
+    top 0.3s ease,
+    left 0.3s ease,
+    width 0.3s ease,
+    height 0.3s ease;
+}
+
+.tour-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--spice-card, #282828);
+  border-radius: 12px;
+  padding: 20px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: tour-fade-in 0.2s ease;
+}
+
+.tour-tooltip-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--spice-text, #fff);
+  margin: 0 0 8px 0;
+}
+
+.tour-tooltip-content {
+  font-size: 14px;
+  color: var(--spice-subtext, #b3b3b3);
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.tour-tooltip-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tour-tooltip-counter {
+  font-size: 12px;
+  color: var(--spice-subtext, #b3b3b3);
+}
+
+.tour-tooltip-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tour-btn {
+  background: none;
+  border: 1px solid var(--spice-button-disabled, #555);
+  color: var(--spice-text, #fff);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tour-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tour-btn--primary {
+  background: var(--ls-accent, #1db954);
+  border-color: var(--ls-accent, #1db954);
+  color: #fff;
+}
+
+.tour-btn--primary:hover {
+  background: var(--ls-accent-hover, #1ed760);
+}
+
+@keyframes tour-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

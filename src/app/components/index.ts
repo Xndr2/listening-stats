@@ -9,6 +9,8 @@ export { EmptyState } from "./EmptyState";
 export { LoadingSkeleton } from "./LoadingSkeleton";
 export { LastfmBanner } from "./LastfmBanner";
 export { SetupScreen } from "./SetupScreen";
+export { SetupWizard } from "./SetupWizard";
 export { ActivityChart } from "./ActivityChart";
 export { ImageWithRetry } from "./ImageWithRetry";
 export { DraggableSection } from "./DraggableSection";
+export { TourOverlay } from "./TourOverlay";
