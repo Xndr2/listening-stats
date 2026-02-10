@@ -18,6 +18,7 @@ import {
 import { ListeningStats, ProviderType } from "../types/listeningstats";
 import {
   ActivityChart,
+  DraggableSection,
   EmptyState,
   Footer,
   LoadingSkeleton,
@@ -30,12 +31,157 @@ import {
 } from "./components";
 import { Header } from "./components/Header";
 import { ShareCardModal } from "./components/ShareCardModal";
+import { useSectionOrder } from "./hooks/useSectionOrder";
 import { injectStyles } from "./styles";
 import { checkLikedTracks, toggleLike } from "./utils";
+
+const { useRef, useState, useCallback } = Spicetify.React;
 
 const SFM_PROMO_KEY = "listening-stats:sfm-promo-dismissed";
 
 const VERSION = getCurrentVersion();
+
+interface DashboardSectionsProps {
+  stats: ListeningStats;
+  period: string;
+  periods: string[];
+  periodLabels: Record<string, string>;
+  onPeriodChange: (period: string) => void;
+  likedTracks: Map<string, boolean>;
+  onLikeToggle: (uri: string, e: React.MouseEvent) => void;
+  showLikeButtons: boolean;
+}
+
+const SECTION_REGISTRY: Record<
+  string,
+  (props: DashboardSectionsProps) => React.ReactElement
+> = {
+  overview: (p) => (
+    <OverviewCards
+      stats={p.stats}
+      period={p.period}
+      periods={p.periods}
+      periodLabels={p.periodLabels}
+      onPeriodChange={p.onPeriodChange}
+    />
+  ),
+  toplists: (p) => (
+    <TopLists
+      stats={p.stats}
+      likedTracks={p.likedTracks}
+      onLikeToggle={p.onLikeToggle}
+      showLikeButtons={p.showLikeButtons}
+      period={p.period}
+    />
+  ),
+  activity: (p) => (
+    <ActivityChart
+      hourlyDistribution={p.stats.hourlyDistribution}
+      peakHour={p.stats.peakHour}
+      hourlyUnit={p.stats.hourlyUnit}
+    />
+  ),
+  recent: (p) => <RecentlyPlayed recentTracks={p.stats.recentTracks} />,
+};
+
+function DashboardSections(props: DashboardSectionsProps) {
+  const { order, reorder } = useSectionOrder();
+
+  // Drag state tracked via refs (Pattern 2 from research: avoid re-renders during drag)
+  const dragItemRef = useRef<string | null>(null);
+  const dragOverRef = useRef<string | null>(null);
+  const insertBeforeRef = useRef<boolean>(true);
+
+  // Visual state only -- triggers re-render for drop indicator and opacity
+  const [dropTarget, setDropTarget] = useState<{
+    id: string;
+    position: "before" | "after";
+  } | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  const handleDragStart = useCallback((id: string) => {
+    dragItemRef.current = id;
+    setDraggingId(id);
+  }, []);
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
+      e.preventDefault();
+      if (targetId === dragItemRef.current) {
+        if (dropTarget) setDropTarget(null);
+        return;
+      }
+      const rect = e.currentTarget.getBoundingClientRect();
+      const midpoint = rect.top + rect.height / 2;
+      const before = e.clientY < midpoint;
+      insertBeforeRef.current = before;
+      dragOverRef.current = targetId;
+      setDropTarget({ id: targetId, position: before ? "before" : "after" });
+    },
+    [dropTarget],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, _targetId: string) => {
+      e.preventDefault();
+      const draggedId = dragItemRef.current;
+      const overId = dragOverRef.current;
+      const before = insertBeforeRef.current;
+
+      if (draggedId && overId && draggedId !== overId) {
+        const newOrder = order.filter((id) => id !== draggedId);
+        const targetIdx = newOrder.indexOf(overId);
+        if (targetIdx !== -1) {
+          const insertIdx = before ? targetIdx : targetIdx + 1;
+          newOrder.splice(insertIdx, 0, draggedId);
+          reorder(newOrder);
+        }
+      }
+
+      dragItemRef.current = null;
+      dragOverRef.current = null;
+      insertBeforeRef.current = true;
+      setDropTarget(null);
+      setDraggingId(null);
+    },
+    [order, reorder],
+  );
+
+  const handleDragEnd = useCallback(() => {
+    dragItemRef.current = null;
+    dragOverRef.current = null;
+    insertBeforeRef.current = true;
+    setDropTarget(null);
+    setDraggingId(null);
+  }, []);
+
+  return (
+    <>
+      {order.map((sectionId) => {
+        const renderFn = SECTION_REGISTRY[sectionId];
+        if (!renderFn) return null;
+        const sectionDropPosition =
+          dropTarget && dropTarget.id === sectionId
+            ? dropTarget.position
+            : null;
+        return (
+          <DraggableSection
+            key={sectionId}
+            id={sectionId}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
+            isDragging={draggingId === sectionId}
+            dropPosition={sectionDropPosition}
+          >
+            {renderFn(props)}
+          </DraggableSection>
+        );
+      })}
+    </>
+  );
+}
 
 interface State {
   period: string;
@@ -470,29 +616,16 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
           providerType={providerType}
         />
 
-        <OverviewCards
+        <DashboardSections
           stats={stats}
           period={period}
           periods={periods}
           periodLabels={periodLabels}
           onPeriodChange={this.handlePeriodChange}
-        />
-
-        <TopLists
-          stats={stats}
           likedTracks={likedTracks}
           onLikeToggle={this.handleLikeToggle}
           showLikeButtons={showLikeButtons}
-          period={period}
         />
-
-        <ActivityChart
-          hourlyDistribution={stats.hourlyDistribution}
-          peakHour={stats.peakHour}
-          hourlyUnit={stats.hourlyUnit}
-        />
-
-        <RecentlyPlayed recentTracks={stats.recentTracks} />
 
         <Footer
           version={VERSION}

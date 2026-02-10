@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Accurate, reliable listening statistics that match what the source services report
-**Current focus:** Phase 3 - Data Accuracy and API Resilience
+**Current focus:** Phase 4 - Drag-and-Drop Layout
 
 ## Current Position
 
-Phase: 3 of 6 (Data Accuracy and API Resilience) -- COMPLETE
-Plan: 3 of 3 in current phase
-Status: Phase Complete
-Last activity: 2026-02-10 -- Completed 03-03 (Cover art retry and error state discrimination, 2 tasks, 2 commits)
+Phase: 4 of 6 (Drag-and-Drop Layout)
+Plan: 1 of 2 in current phase
+Status: Executing
+Last activity: 2026-02-10 -- Completed 04-01 (DnD primitives: hook + component + CSS)
 
 Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: 2min
-- Total execution time: 0.28 hours
+- Total execution time: 0.30 hours
 
 **By Phase:**
 
@@ -30,9 +30,10 @@ Progress: [█████░░░░░] 50%
 | 01-data-integrity | 2 | 4min | 2min |
 | 02-settings-and-display | 3 | 6min | 2min |
 | 03-data-accuracy-and-api-resilience | 3 | 6min | 2min |
+| 04-drag-and-drop-layout | 1 | 1min | 1min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (2min), 02-03 (3min), 03-01 (1min), 03-02 (3min), 03-03 (2min)
+- Last 5 plans: 02-03 (3min), 03-01 (1min), 03-02 (3min), 03-03 (2min), 04-01 (1min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -67,6 +68,9 @@ Recent decisions affecting current work:
 - [03-02]: ApiError marks 429+5xx retryable, 4xx non-retryable to avoid hammering permanent failures
 - [03-03]: ImageWithRetry uses 3 retries with 1s/2s/4s backoff and ?retry=N cache-busting
 - [03-03]: Error discrimination uses instanceof ApiError + name fallback for cross-bundle safety
+- [04-01]: Drag handle positioned absolutely at left edge (-32px) for clean separation from section content
+- [04-01]: Only drag handle is draggable (not wrapper div) to preserve child click interactions
+- [04-01]: useSectionOrder validates stored order on init: removes stale IDs, appends missing for forward compat
 
 ### Pending Todos
 
@@ -81,5 +85,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-10
-Stopped at: Completed 03-03-PLAN.md (Phase 03 complete)
+Stopped at: Completed 04-01-PLAN.md (DnD primitives)
 Resume file: None

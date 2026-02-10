@@ -1,4 +1,4 @@
-const { useState, useCallback } = Spicetify.React;
+const { useState, useCallback, useEffect } = Spicetify.React;
 
 const LAYOUT_KEY = "listening-stats:card-order";
 
@@ -13,6 +13,8 @@ export const DEFAULT_ORDER: string[] = [
  * Hook to manage the order of dashboard sections with localStorage persistence.
  * Validates stored order on load: removes stale IDs and appends missing IDs
  * so that new sections added in future updates appear at the end.
+ * Listens for "listening-stats:reset-layout" custom event to reset order
+ * (dispatched by Settings panel Reset button).
  */
 export function useSectionOrder() {
   const [order, setOrder] = useState<string[]>(() => {
@@ -56,6 +58,15 @@ export function useSectionOrder() {
       // Ignore quota errors
     }
   }, []);
+
+  // Listen for reset-layout custom event from Settings panel
+  useEffect(() => {
+    const handler = () => resetOrder();
+    window.addEventListener("listening-stats:reset-layout", handler);
+    return () => {
+      window.removeEventListener("listening-stats:reset-layout", handler);
+    };
+  }, [resetOrder]);
 
   return { order, reorder, resetOrder };
 }
