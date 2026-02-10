@@ -92,4 +92,5 @@ export interface PlayEvent {
   playedMs: number;
   startedAt: number;
   endedAt: number;
+  type?: "play" | "skip";
 }
