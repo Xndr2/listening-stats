@@ -32,14 +32,48 @@ import {
 import { Header } from "./components/Header";
 import { ShareCardModal } from "./components/ShareCardModal";
 import { useSectionOrder } from "./hooks/useSectionOrder";
+import { TourProvider, useTour, TourStep } from "./hooks/useTour";
 import { injectStyles } from "./styles";
 import { checkLikedTracks, toggleLike } from "./utils";
 
-const { useRef, useState, useCallback } = Spicetify.React;
+const { useRef, useState, useCallback, useEffect } = Spicetify.React;
 
 const SFM_PROMO_KEY = "listening-stats:sfm-promo-dismissed";
 
 const VERSION = getCurrentVersion();
+
+const TOUR_SEEN_KEY = 'listening-stats:tour-seen';
+const TOUR_VERSION_KEY = 'listening-stats:tour-version';
+
+const FULL_TOUR_STEPS: TourStep[] = [
+  { target: '.overview-row', title: 'Overview', content: 'Your key stats at a glance — total listening time, track count, and more. Use the period tabs above to switch time ranges.', placement: 'bottom' },
+  { target: '.top-lists-section', title: 'Top Lists', content: 'Your most played tracks, artists, albums, and genres ranked by play count.', placement: 'bottom' },
+  { target: '.activity-section', title: 'Activity', content: 'Your listening patterns by hour of day. Find when you listen the most.', placement: 'top' },
+  { target: '.recent-section', title: 'Recently Played', content: 'Your most recent tracks. Click any card to open it in Spotify.', placement: 'top' },
+  { target: '.section-drag-handle', title: 'Reorder Sections', content: 'Drag these handles to rearrange your dashboard layout to your liking.', placement: 'right' },
+  { target: '.header-actions', title: 'Share & Settings', content: 'Share your stats as an image or open settings to customize your experience.', placement: 'bottom' },
+];
+
+const UPDATE_TOUR_STEPS: TourStep[] = [
+  { target: '.section-drag-handle', title: 'New: Drag to Reorder', content: 'You can now drag sections to customize your dashboard layout. Grab these handles to rearrange.', placement: 'right' },
+];
+
+function shouldShowTour(): 'full' | 'update' | 'none' {
+  try {
+    const seen = localStorage.getItem(TOUR_SEEN_KEY);
+    if (!seen) return 'full';
+    const lastVersion = localStorage.getItem(TOUR_VERSION_KEY);
+    if (lastVersion !== VERSION) return 'update';
+    return 'none';
+  } catch { return 'none'; }
+}
+
+function markTourComplete(): void {
+  try {
+    localStorage.setItem(TOUR_SEEN_KEY, '1');
+    localStorage.setItem(TOUR_VERSION_KEY, VERSION);
+  } catch { /* ignore */ }
+}
 
 interface DashboardSectionsProps {
   stats: ListeningStats;
@@ -86,6 +120,31 @@ const SECTION_REGISTRY: Record<
 
 function DashboardSections(props: DashboardSectionsProps) {
   const { order, reorder } = useSectionOrder();
+  const { startTour } = useTour();
+
+  // Auto-trigger tour on first mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const tourType = shouldShowTour();
+      if (tourType === 'full') {
+        startTour(FULL_TOUR_STEPS);
+        markTourComplete();
+      } else if (tourType === 'update') {
+        startTour(UPDATE_TOUR_STEPS);
+        markTourComplete();
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Listen for restart-tour event from Settings
+  useEffect(() => {
+    const handler = () => {
+      startTour(FULL_TOUR_STEPS);
+    };
+    window.addEventListener('listening-stats:start-tour', handler);
+    return () => window.removeEventListener('listening-stats:start-tour', handler);
+  }, [startTour]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragItemRef = useRef<string | null>(null);
@@ -685,48 +744,50 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
 
     return (
       <div className="stats-page">
-        <Header
-          onShare={this.handleShare}
-          onToggleSettings={() =>
-            this.setState({ showSettings: !showSettings })
-          }
-          providerType={providerType}
-        />
+        <TourProvider>
+          <Header
+            onShare={this.handleShare}
+            onToggleSettings={() =>
+              this.setState({ showSettings: !showSettings })
+            }
+            providerType={providerType}
+          />
 
-        <DashboardSections
-          stats={stats}
-          period={period}
-          periods={periods}
-          periodLabels={periodLabels}
-          onPeriodChange={this.handlePeriodChange}
-          likedTracks={likedTracks}
-          onLikeToggle={this.handleLikeToggle}
-          showLikeButtons={showLikeButtons}
-        />
+          <DashboardSections
+            stats={stats}
+            period={period}
+            periods={periods}
+            periodLabels={periodLabels}
+            onPeriodChange={this.handlePeriodChange}
+            likedTracks={likedTracks}
+            onLikeToggle={this.handleLikeToggle}
+            showLikeButtons={showLikeButtons}
+          />
 
-        <Footer
-          version={VERSION}
-          updateInfo={updateInfo}
-          onShowUpdate={() =>
-            this.setState({ showUpdateBanner: true, commandCopied: false })
-          }
-        />
+          <Footer
+            version={VERSION}
+            updateInfo={updateInfo}
+            onShowUpdate={() =>
+              this.setState({ showUpdateBanner: true, commandCopied: false })
+            }
+          />
 
-        {settingsModal}
+          {settingsModal}
 
-        {showShareModal &&
-          stats &&
-          Spicetify.ReactDOM.createPortal(
-            <ShareCardModal
-              stats={stats}
-              period={period}
-              providerType={providerType}
-              onClose={() => this.setState({ showShareModal: false })}
-            />,
-            document.body,
-          )}
+          {showShareModal &&
+            stats &&
+            Spicetify.ReactDOM.createPortal(
+              <ShareCardModal
+                stats={stats}
+                period={period}
+                providerType={providerType}
+                onClose={() => this.setState({ showShareModal: false })}
+              />,
+              document.body,
+            )}
 
-        {sfmPromoPortal}
+          {sfmPromoPortal}
+        </TourProvider>
       </div>
     );
   }
