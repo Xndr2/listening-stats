@@ -126,6 +126,8 @@ let playStartTime: number | null = null;
 let accumulatedPlayTime = 0;
 let isPlaying = false;
 let currentTrackDuration = 0;
+let lastProgressMs = 0;
+let progressHandler: (() => void) | null = null;
 
 function handleSongChange(): void {
   if (currentTrackUri && playStartTime !== null) {
@@ -262,6 +264,28 @@ function handlePlayPause(): void {
   }
 }
 
+function handleProgress(): void {
+  const progress = Spicetify.Player.getProgress(); // current position in ms
+  const duration = Spicetify.Player.getDuration(); // total duration in ms
+  const repeat = Spicetify.Player.getRepeat(); // 0=off, 1=all, 2=one
+
+  // Only detect loops when repeat-one is active
+  if (repeat === 2 && duration > 0) {
+    // Detect position reset: was near end (>90%), now near start (<10%)
+    const wasNearEnd = lastProgressMs > duration * 0.9;
+    const nowNearStart = progress < duration * 0.1;
+
+    if (wasNearEnd && nowNearStart && currentTrackUri) {
+      // Song just looped -- record completed play
+      log("Repeat-one loop detected, recording play");
+      handleSongChange(); // Records the completed play
+      captureCurrentTrackData(); // Reset for new loop tracking
+    }
+  }
+
+  lastProgressMs = progress;
+}
+
 let pollIntervalId: number | null = null;
 let activeSongChangeHandler: (() => void) | null = null;
 
@@ -275,11 +299,15 @@ export function initPoller(providerType: ProviderType): void {
   if (win.__lsPauseHandler) {
     Spicetify.Player.removeEventListener("onplaypause", win.__lsPauseHandler);
   }
+  if (win.__lsProgressHandler) {
+    Spicetify.Player.removeEventListener("onprogress", win.__lsProgressHandler);
+  }
 
   activeProviderType = providerType;
 
   captureCurrentTrackData();
   activeSongChangeHandler = () => {
+    lastProgressMs = 0; // Reset progress tracker to prevent false loop detection after real track change
     handleSongChange();
     captureCurrentTrackData();
   };
@@ -287,9 +315,14 @@ export function initPoller(providerType: ProviderType): void {
   Spicetify.Player.addEventListener("songchange", activeSongChangeHandler);
   Spicetify.Player.addEventListener("onplaypause", handlePlayPause);
 
+  // Register progress handler for repeat-one loop detection
+  progressHandler = handleProgress;
+  Spicetify.Player.addEventListener("onprogress", progressHandler);
+
   // Store globally so either bundle can clean up
   win.__lsSongHandler = activeSongChangeHandler;
   win.__lsPauseHandler = handlePlayPause;
+  win.__lsProgressHandler = progressHandler;
 
   const playerData = Spicetify.Player.data;
   if (playerData?.item) {
@@ -309,10 +342,16 @@ export function destroyPoller(): void {
     activeSongChangeHandler = null;
   }
   Spicetify.Player.removeEventListener("onplaypause", handlePlayPause);
+  if (progressHandler) {
+    Spicetify.Player.removeEventListener("onprogress", progressHandler);
+    progressHandler = null;
+  }
 
   const win = window as any;
   win.__lsSongHandler = null;
   win.__lsPauseHandler = null;
+  win.__lsProgressHandler = null;
+  lastProgressMs = 0;
 
   if (pollIntervalId !== null) {
     clearInterval(pollIntervalId);
