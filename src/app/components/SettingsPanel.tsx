@@ -358,6 +358,25 @@ export function SettingsPanel({
             Reset to Default
           </button>
         </div>
+        <div className="settings-toggle-row">
+          <div className="settings-toggle-info">
+            <h4 className="settings-section-title">Feature Tour</h4>
+            <p className="settings-toggle-desc">
+              Walk through the app's features with a guided tooltip tour.
+            </p>
+          </div>
+          <button
+            className="footer-btn"
+            onClick={() => {
+              onClose?.();
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('listening-stats:start-tour'));
+              }, 300);
+            }}
+          >
+            Restart Tour
+          </button>
+        </div>
       </SettingsCategory>
 
       {/* --- Advanced --- */}
@@ -513,6 +532,8 @@ export function SettingsPanel({
                   localStorage.removeItem("listening-stats:searchCache");
                   localStorage.removeItem("listening-stats:logging");
                   localStorage.removeItem("listening-stats:preferences");
+                  localStorage.removeItem("listening-stats:tour-seen");
+                  localStorage.removeItem("listening-stats:tour-version");
                 } catch {
                   /* ignore */
                 }
