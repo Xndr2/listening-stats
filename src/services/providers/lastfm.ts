@@ -1,6 +1,6 @@
 import { ListeningStats, RecentTrack } from "../../types/listeningstats";
 import * as LastFm from "../lastfm";
-import { searchArtist } from "../spotify-api";
+import { searchAlbum, searchArtist, searchTrack } from "../spotify-api";
 import { initPoller, destroyPoller, getPollingData } from "../tracker";
 import type { TrackingProvider } from "./types";
 
@@ -63,6 +63,32 @@ async function enrichArtistImages(
   needsImage.forEach((a, i) => {
     if (results[i].uri && !a.artistUri) a.artistUri = results[i].uri!;
     if (results[i].imageUrl) a.artistImage = results[i].imageUrl!;
+  });
+}
+
+async function enrichTrackUris(
+  tracks: Array<{ trackUri: string; trackName: string; artistName: string }>,
+): Promise<void> {
+  const needsUri = tracks.filter((t) => !t.trackUri);
+  if (needsUri.length === 0) return;
+  const results = await Promise.all(
+    needsUri.map((t) => searchTrack(t.trackName, t.artistName)),
+  );
+  needsUri.forEach((t, i) => {
+    if (results[i].uri) t.trackUri = results[i].uri!;
+  });
+}
+
+async function enrichAlbumUris(
+  albums: Array<{ albumUri: string; albumName: string; artistName: string }>,
+): Promise<void> {
+  const needsUri = albums.filter((a) => !a.albumUri);
+  if (needsUri.length === 0) return;
+  const results = await Promise.all(
+    needsUri.map((a) => searchAlbum(a.albumName, a.artistName)),
+  );
+  needsUri.forEach((a, i) => {
+    if (results[i].uri) a.albumUri = results[i].uri!;
   });
 }
 
@@ -182,6 +208,8 @@ async function calculateRecentStats(): Promise<ListeningStats> {
     }));
 
   await enrichArtistImages(topArtists);
+  await enrichTrackUris(topTracks);
+  await enrichAlbumUris(topAlbums);
 
   const hourlyDistribution = new Array(24).fill(0);
   for (const t of recentTracks) {
@@ -296,6 +324,8 @@ async function calculateRankedStats(period: string): Promise<ListeningStats> {
   }));
 
   await enrichArtistImages(topArtists);
+  await enrichTrackUris(topTracks);
+  await enrichAlbumUris(topAlbums);
 
   const recentTracks: RecentTrack[] = (
     Array.isArray(recentLfm) ? recentLfm : []
