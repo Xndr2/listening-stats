@@ -2002,3 +2002,49 @@
 .stat-tooltip-wrapper:hover .stat-tooltip {
   opacity: 1;
 }
+
+/* ===== Collapsible Settings Categories (SETT-01) ===== */
+.settings-category {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-category:last-child {
+  border-bottom: none;
+}
+
+.settings-category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 0;
+  background: none;
+  border: none;
+  color: var(--text-base);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-category-header:hover {
+  color: var(--text-bright-accent, #fff);
+}
+
+.settings-chevron {
+  margin-left: auto;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--text-subdued);
+  transition: transform 0.2s ease;
+}
+
+.settings-chevron.open {
+  transform: rotate(180deg);
+}
+
+.settings-category-body {
+  padding-bottom: 16px;
+}

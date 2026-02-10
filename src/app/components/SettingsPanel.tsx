@@ -5,6 +5,7 @@ import {
   exportStatsAsJSON,
 } from "../../services/export";
 import * as LastFm from "../../services/lastfm";
+import { getPreferences, setPreference } from "../../services/preferences";
 import {
   activateProvider,
   clearProviderSelection,
@@ -23,6 +24,30 @@ import { ListeningStats, ProviderType } from "../../types/listeningstats";
 import { Icons } from "../icons";
 
 const { useState } = Spicetify.React;
+
+function SettingsCategory({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="settings-category">
+      <button
+        className={`settings-category-header ${open ? "open" : ""}`}
+        onClick={() => setOpen(!open)}
+      >
+        <span>{title}</span>
+        <span className={`settings-chevron ${open ? "open" : ""}`} />
+      </button>
+      {open && <div className="settings-category-body">{children}</div>}
+    </div>
+  );
+}
 
 interface SettingsPanelProps {
   onRefresh: () => void;
@@ -64,6 +89,7 @@ export function SettingsPanel({
   const sfmConnected = Statsfm.isConnected();
   const sfmConfig = Statsfm.getConfig();
   const [loggingOn, setLoggingOn] = useState(isLoggingEnabled());
+  const [use24h, setUse24h] = useState(getPreferences().use24HourTime);
 
   const switchProvider = (type: ProviderType) => {
     activateProvider(type);
@@ -137,8 +163,8 @@ export function SettingsPanel({
         )}
       </div>
 
-      <div className="settings-provider">
-        <h4 className="settings-section-title">Data Source</h4>
+      {/* --- Data Source --- */}
+      <SettingsCategory title="Data Source" defaultOpen>
         <div className="settings-provider-current">
           <span>
             Currently using:{" "}
@@ -235,214 +261,253 @@ export function SettingsPanel({
             </button>
           </div>
         )}
-      </div>
 
-      <div className="settings-row">
-        <button
-          className="footer-btn"
-          onClick={() => {
-            clearStatsCache();
-            onRefresh();
-          }}
-        >
-          Refresh
-        </button>
-        <button
-          className="footer-btn"
-          onClick={() => {
-            resetRateLimit();
-            clearApiCaches();
-            clearStatsCache();
-            LastFm.clearLastfmCache();
-            Statsfm.clearStatsfmCache();
-            Spicetify.showNotification("Cache cleared");
-          }}
-        >
-          Clear Cache
-        </button>
-        <button className="footer-btn" onClick={onCheckUpdates}>
-          Check Updates
-        </button>
-        {currentProvider === "local" && (
+        {currentProvider === "lastfm" && lfmConnected && lfmConfig && (
+          <div className="settings-lastfm">
+            <h4 className="settings-section-title">Last.fm Account</h4>
+            <div className="settings-lastfm-connected">
+              <div className="settings-lastfm-info">
+                <span
+                  className="lastfm-status-icon"
+                  dangerouslySetInnerHTML={{ __html: Icons.check }}
+                />
+                <span>
+                  Connected as <strong>{lfmConfig.username}</strong>
+                </span>
+              </div>
+              <button
+                className="footer-btn danger"
+                onClick={() => {
+                  handleLfmDisconnect();
+                  switchProvider("local");
+                }}
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentProvider === "statsfm" && sfmConnected && sfmConfig && (
+          <div className="settings-lastfm">
+            <h4 className="settings-section-title">stats.fm Account</h4>
+            <div className="settings-lastfm-connected">
+              <div className="settings-lastfm-info">
+                <span
+                  className="lastfm-status-icon"
+                  dangerouslySetInnerHTML={{ __html: Icons.check }}
+                />
+                <span>
+                  Connected as <strong>{sfmConfig.username}</strong>
+                </span>
+              </div>
+              <button
+                className="footer-btn danger"
+                onClick={() => {
+                  handleSfmDisconnect();
+                  switchProvider("local");
+                }}
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+        )}
+      </SettingsCategory>
+
+      {/* --- Display --- */}
+      <SettingsCategory title="Display">
+        <div className="settings-toggle-row">
+          <div className="settings-toggle-info">
+            <h4 className="settings-section-title">24-hour time</h4>
+            <p className="settings-toggle-desc">
+              Show times as 14:00 instead of 2pm
+            </p>
+          </div>
+          <button
+            className={`settings-toggle ${use24h ? "active" : ""}`}
+            onClick={() => {
+              const next = !use24h;
+              setPreference("use24HourTime", next);
+              setUse24h(next);
+            }}
+          >
+            <span className="settings-toggle-knob" />
+          </button>
+        </div>
+      </SettingsCategory>
+
+      {/* --- Layout --- */}
+      <SettingsCategory title="Layout">
+        <p className="settings-toggle-desc">
+          Layout customization coming soon.
+        </p>
+      </SettingsCategory>
+
+      {/* --- Advanced --- */}
+      <SettingsCategory title="Advanced">
+        <div className="settings-toggle-row">
+          <div className="settings-toggle-info">
+            <h4 className="settings-section-title">Console Logging</h4>
+            <p className="settings-toggle-desc">
+              Log tracked songs, skips, and playback events to the browser
+              console (F12).
+            </p>
+          </div>
+          <button
+            className={`settings-toggle ${loggingOn ? "active" : ""}`}
+            onClick={() => {
+              const next = !loggingOn;
+              setLoggingEnabled(next);
+              setLoggingOn(next);
+              Spicetify.showNotification(
+                next
+                  ? "Logging enabled. Open DevTools (Ctrl + Shift + I) to see output"
+                  : "Logging disabled",
+              );
+            }}
+          >
+            <span className="settings-toggle-knob" />
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <button
+            className="footer-btn"
+            onClick={() => {
+              clearStatsCache();
+              onRefresh();
+            }}
+          >
+            Refresh
+          </button>
+          <button
+            className="footer-btn"
+            onClick={() => {
+              resetRateLimit();
+              clearApiCaches();
+              clearStatsCache();
+              LastFm.clearLastfmCache();
+              Statsfm.clearStatsfmCache();
+              Spicetify.showNotification("Cache cleared");
+            }}
+          >
+            Clear Cache
+          </button>
+          <button className="footer-btn" onClick={onCheckUpdates}>
+            Check Updates
+          </button>
+          {currentProvider === "local" && (
+            <button
+              className="footer-btn danger"
+              onClick={() => {
+                if (
+                  confirm(
+                    "Delete all local tracking data? This cannot be undone.",
+                  )
+                ) {
+                  clearIndexedDB();
+                  clearPollingData();
+                  Spicetify.showNotification("All local data cleared");
+                  onRefresh();
+                }
+              }}
+            >
+              Reset Local Data
+            </button>
+          )}
+        </div>
+
+        <div className="settings-export">
+          <h4 className="settings-section-title">Export Data</h4>
+          <div className="settings-row">
+            <button
+              className="footer-btn"
+              disabled={!stats}
+              onClick={() =>
+                stats && period && exportStatsAsJSON(stats, period)
+              }
+            >
+              Export JSON
+            </button>
+            <button
+              className="footer-btn"
+              disabled={!stats}
+              onClick={() =>
+                stats && period && exportStatsAsCSV(stats, period)
+              }
+            >
+              Export CSV
+            </button>
+            {currentProvider === "local" && (
+              <>
+                <button
+                  className="footer-btn"
+                  onClick={() => {
+                    exportRawEventsAsJSON();
+                    Spicetify.showNotification("Exporting...");
+                  }}
+                >
+                  Raw History (JSON)
+                </button>
+                <button
+                  className="footer-btn"
+                  onClick={() => {
+                    exportRawEventsAsCSV();
+                    Spicetify.showNotification("Exporting...");
+                  }}
+                >
+                  Raw History (CSV)
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="settings-danger-zone">
+          <h4 className="settings-section-title">Danger Zone</h4>
+          <p className="settings-danger-desc">
+            Wipe all data and return to the setup screen. This clears the
+            IndexedDB database, all saved accounts, caches, and preferences.
+          </p>
           <button
             className="footer-btn danger"
             onClick={() => {
               if (
                 confirm(
-                  "Delete all local tracking data? This cannot be undone.",
+                  "This will delete ALL data including your IndexedDB history, saved accounts, and preferences. This cannot be undone. Continue?",
                 )
               ) {
                 clearIndexedDB();
                 clearPollingData();
-                Spicetify.showNotification("All local data cleared");
-                onRefresh();
+                clearStatsCache();
+                clearApiCaches();
+                resetRateLimit();
+                LastFm.clearConfig();
+                LastFm.clearLastfmCache();
+                Statsfm.clearConfig();
+                Statsfm.clearStatsfmCache();
+                clearProviderSelection();
+                try {
+                  localStorage.removeItem(
+                    "listening-stats:sfm-promo-dismissed",
+                  );
+                  localStorage.removeItem("listening-stats:lastUpdateCheck");
+                  localStorage.removeItem("listening-stats:lastUpdate");
+                  localStorage.removeItem("listening-stats:searchCache");
+                  localStorage.removeItem("listening-stats:logging");
+                  localStorage.removeItem("listening-stats:preferences");
+                } catch {
+                  /* ignore */
+                }
+                onReset?.();
               }
             }}
           >
-            Reset Local Data
+            Wipe Everything
           </button>
-        )}
-      </div>
-
-      <div className="settings-export">
-        <h4 className="settings-section-title">Export Data</h4>
-        <div className="settings-row">
-          <button
-            className="footer-btn"
-            disabled={!stats}
-            onClick={() => stats && period && exportStatsAsJSON(stats, period)}
-          >
-            Export JSON
-          </button>
-          <button
-            className="footer-btn"
-            disabled={!stats}
-            onClick={() => stats && period && exportStatsAsCSV(stats, period)}
-          >
-            Export CSV
-          </button>
-          {currentProvider === "local" && (
-            <>
-              <button
-                className="footer-btn"
-                onClick={() => {
-                  exportRawEventsAsJSON();
-                  Spicetify.showNotification("Exporting...");
-                }}
-              >
-                Raw History (JSON)
-              </button>
-              <button
-                className="footer-btn"
-                onClick={() => {
-                  exportRawEventsAsCSV();
-                  Spicetify.showNotification("Exporting...");
-                }}
-              >
-                Raw History (CSV)
-              </button>
-            </>
-          )}
         </div>
-      </div>
-
-      <div className="settings-toggle-row">
-        <div className="settings-toggle-info">
-          <h4 className="settings-section-title">Console Logging</h4>
-          <p className="settings-toggle-desc">
-            Log tracked songs, skips, and playback events to the browser console
-            (F12).
-          </p>
-        </div>
-        <button
-          className={`settings-toggle ${loggingOn ? "active" : ""}`}
-          onClick={() => {
-            const next = !loggingOn;
-            setLoggingEnabled(next);
-            setLoggingOn(next);
-            Spicetify.showNotification(
-              next
-                ? "Logging enabled. Open DevTools (Ctrl + Shift + I) to see output"
-                : "Logging disabled",
-            );
-          }}
-        >
-          <span className="settings-toggle-knob" />
-        </button>
-      </div>
-
-      {currentProvider === "lastfm" && lfmConnected && lfmConfig && (
-        <div className="settings-lastfm">
-          <h4 className="settings-section-title">Last.fm Account</h4>
-          <div className="settings-lastfm-connected">
-            <div className="settings-lastfm-info">
-              <span
-                className="lastfm-status-icon"
-                dangerouslySetInnerHTML={{ __html: Icons.check }}
-              />
-              <span>
-                Connected as <strong>{lfmConfig.username}</strong>
-              </span>
-            </div>
-            <button
-              className="footer-btn danger"
-              onClick={() => {
-                handleLfmDisconnect();
-                switchProvider("local");
-              }}
-            >
-              Disconnect
-            </button>
-          </div>
-        </div>
-      )}
-
-      {currentProvider === "statsfm" && sfmConnected && sfmConfig && (
-        <div className="settings-lastfm">
-          <h4 className="settings-section-title">stats.fm Account</h4>
-          <div className="settings-lastfm-connected">
-            <div className="settings-lastfm-info">
-              <span
-                className="lastfm-status-icon"
-                dangerouslySetInnerHTML={{ __html: Icons.check }}
-              />
-              <span>
-                Connected as <strong>{sfmConfig.username}</strong>
-              </span>
-            </div>
-            <button
-              className="footer-btn danger"
-              onClick={() => {
-                handleSfmDisconnect();
-                switchProvider("local");
-              }}
-            >
-              Disconnect
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="settings-danger-zone">
-        <h4 className="settings-section-title">Danger Zone</h4>
-        <p className="settings-danger-desc">
-          Wipe all data and return to the setup screen. This clears the
-          IndexedDB database, all saved accounts, caches, and preferences.
-        </p>
-        <button
-          className="footer-btn danger"
-          onClick={() => {
-            if (
-              confirm(
-                "This will delete ALL data including your IndexedDB history, saved accounts, and preferences. This cannot be undone. Continue?",
-              )
-            ) {
-              clearIndexedDB();
-              clearPollingData();
-              clearStatsCache();
-              clearApiCaches();
-              resetRateLimit();
-              LastFm.clearConfig();
-              LastFm.clearLastfmCache();
-              Statsfm.clearConfig();
-              Statsfm.clearStatsfmCache();
-              clearProviderSelection();
-              try {
-                localStorage.removeItem("listening-stats:sfm-promo-dismissed");
-                localStorage.removeItem("listening-stats:lastUpdateCheck");
-                localStorage.removeItem("listening-stats:lastUpdate");
-                localStorage.removeItem("listening-stats:searchCache");
-                localStorage.removeItem("listening-stats:logging");
-              } catch {
-                /* ignore */
-              }
-              onReset?.();
-            }
-          }}
-        >
-          Wipe Everything
-        </button>
-      </div>
+      </SettingsCategory>
     </div>
   );
 }
