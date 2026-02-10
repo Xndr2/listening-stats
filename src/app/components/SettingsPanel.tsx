@@ -127,7 +127,7 @@ export function SettingsPanel({
     setSfmError("");
     try {
       const info = await Statsfm.validateUser(sfmUsername.trim());
-      Statsfm.saveConfig({ username: info.customId });
+      Statsfm.saveConfig({ username: info.customId, isPlus: info.isPlus });
       switchProvider("statsfm");
     } catch (err: any) {
       setSfmError(err.message || "Connection failed");

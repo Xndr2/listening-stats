@@ -77,6 +77,7 @@ export interface LastfmConfig {
 
 export interface StatsfmConfig {
   username: string;
+  isPlus?: boolean;
 }
 
 export interface PlayEvent {

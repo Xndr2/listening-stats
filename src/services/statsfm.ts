@@ -262,6 +262,21 @@ export async function getDateStats(
   return { hours: item.hours || {} };
 }
 
+export async function refreshPlusStatus(): Promise<boolean> {
+  const config = getConfig();
+  if (!config?.username) return false;
+  try {
+    const info = await validateUser(config.username);
+    if (info.isPlus !== (config.isPlus ?? false)) {
+      saveConfig({ ...config, isPlus: info.isPlus });
+      return true; // tier changed
+    }
+  } catch {
+    // Silently ignore -- keep existing tier assumption
+  }
+  return false;
+}
+
 export function extractSpotifyUri(
   externalIds: { spotify?: string[] } | undefined,
   type: "track" | "artist" | "album",

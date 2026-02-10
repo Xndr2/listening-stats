@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-10)
 
 ## Current Position
 
-Phase: 5 of 6 (Onboarding and Tour)
-Plan: 2 of 3 in current phase
-Status: Executing
-Last activity: 2026-02-10 -- Completed 05-01 (setup wizard)
+Phase: 5 of 6 (Onboarding and Tour) -- COMPLETE
+Plan: 3 of 3 in current phase
+Status: Phase Complete
+Last activity: 2026-02-10 -- Completed 05-03 (tour integration)
 
-Progress: [████████░░] 80%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
+- Total plans completed: 13
 - Average duration: 2min
-- Total execution time: 0.40 hours
+- Total execution time: 0.45 hours
 
 **By Phase:**
 
@@ -31,10 +31,10 @@ Progress: [████████░░] 80%
 | 02-settings-and-display | 3 | 6min | 2min |
 | 03-data-accuracy-and-api-resilience | 3 | 6min | 2min |
 | 04-drag-and-drop-layout | 2 | 4min | 2min |
-| 05-onboarding-and-tour | 2 | 3min | 1.5min |
+| 05-onboarding-and-tour | 3 | 6min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 03-03 (2min), 04-01 (1min), 04-02 (3min), 05-02 (1min), 05-01 (2min)
+- Last 5 plans: 04-01 (1min), 04-02 (3min), 05-01 (2min), 05-02 (1min), 05-03 (3min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -83,6 +83,10 @@ Recent decisions affecting current work:
 - [05-01]: Wizard uses separate function components per step (ChooseStep, ConfigureStep, ValidateStep, SuccessStep)
 - [05-01]: Validation runs automatically on mount via useEffect, not on button click
 - [05-01]: Local tracking bypasses wizard entirely (single click activateProvider + onComplete)
+- [05-03]: Tour auto-triggers with 500ms delay after mount to let sections render
+- [05-03]: shouldShowTour returns full/update/none based on localStorage tour-seen and tour-version keys
+- [05-03]: Custom event listening-stats:start-tour bridges Settings button to DashboardSections hook
+- [05-03]: Settings modal closes before tour starts (300ms delay) so tour targets are visible
 
 ### Pending Todos
 
@@ -97,5 +101,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-10
-Stopped at: Completed 05-01-PLAN.md (setup wizard)
+Stopped at: Completed 05-03-PLAN.md (tour integration) -- Phase 5 complete
 Resume file: None

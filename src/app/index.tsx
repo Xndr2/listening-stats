@@ -520,7 +520,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
   handleSfmSwitch = async (username: string) => {
     try {
       const info = await Statsfm.validateUser(username.trim());
-      Statsfm.saveConfig({ username: info.customId });
+      Statsfm.saveConfig({ username: info.customId, isPlus: info.isPlus });
       this.dismissSfmPromo();
       activateProvider("statsfm");
       this.handleProviderChanged();

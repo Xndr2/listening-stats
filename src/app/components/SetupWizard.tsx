@@ -330,7 +330,7 @@ function ValidateStep({
     if (provider === "statsfm") {
       Statsfm.validateUser(username.trim())
         .then((info) => {
-          Statsfm.saveConfig({ username: info.customId });
+          Statsfm.saveConfig({ username: info.customId, isPlus: info.isPlus });
           activateProvider("statsfm");
           onSuccess(info.customId);
         })
