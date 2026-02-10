@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-10)
 
 ## Current Position
 
-Phase: 3 of 6 (Data Accuracy and API Resilience)
-Plan: 2 of 3 in current phase
-Status: Executing
-Last activity: 2026-02-10 -- Completed 03-02 (API resilience utilities and queue refactor, 2 tasks, 2 commits)
+Phase: 3 of 6 (Data Accuracy and API Resilience) -- COMPLETE
+Plan: 3 of 3 in current phase
+Status: Phase Complete
+Last activity: 2026-02-10 -- Completed 03-03 (Cover art retry and error state discrimination, 2 tasks, 2 commits)
 
-Progress: [████░░░░░░] 40%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: 2min
-- Total execution time: 0.25 hours
+- Total execution time: 0.28 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [████░░░░░░] 40%
 |-------|-------|-------|----------|
 | 01-data-integrity | 2 | 4min | 2min |
 | 02-settings-and-display | 3 | 6min | 2min |
-| 03-data-accuracy-and-api-resilience | 2 | 4min | 2min |
+| 03-data-accuracy-and-api-resilience | 3 | 6min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (1min), 02-02 (2min), 02-03 (3min), 03-01 (1min), 03-02 (3min)
+- Last 5 plans: 02-02 (2min), 02-03 (3min), 03-01 (1min), 03-02 (3min), 03-03 (2min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -65,6 +65,8 @@ Recent decisions affecting current work:
 - [03-02]: No new runtime deps for resilience -- CircuitBreaker, batch coalescer, retry all hand-rolled per project convention
 - [03-02]: Circuit breaker: 5 failures / 60s reset; batch coalescer: 50ms window / 50 max batch
 - [03-02]: ApiError marks 429+5xx retryable, 4xx non-retryable to avoid hammering permanent failures
+- [03-03]: ImageWithRetry uses 3 retries with 1s/2s/4s backoff and ?retry=N cache-busting
+- [03-03]: Error discrimination uses instanceof ApiError + name fallback for cross-bundle safety
 
 ### Pending Todos
 
@@ -79,5 +81,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-10
-Stopped at: Completed 03-02-PLAN.md
+Stopped at: Completed 03-03-PLAN.md (Phase 03 complete)
 Resume file: None
