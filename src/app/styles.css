@@ -1091,6 +1091,73 @@
   background: #e74c3c;
 }
 
+/* ===== Drag and Drop ===== */
+.draggable-section {
+  position: relative;
+  transition: opacity 0.2s ease;
+}
+
+.draggable-section.is-dragging {
+  opacity: 0.4;
+}
+
+.section-drag-handle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  position: absolute;
+  top: 12px;
+  left: -32px;
+  z-index: 1;
+}
+
+.draggable-section:hover .section-drag-handle {
+  opacity: 0.5;
+}
+
+.section-drag-handle:hover {
+  opacity: 1 !important;
+  background: var(--background-tinted-highlight);
+}
+
+.section-drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-grip-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-subdued);
+}
+
+.drop-indicator {
+  height: 3px;
+  background: var(--ls-accent);
+  border-radius: 2px;
+  margin: 4px 0;
+  pointer-events: none;
+  animation: drop-indicator-pulse 1s ease-in-out infinite;
+}
+
+@keyframes drop-indicator-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.stats-page--compact .section-drag-handle {
+  top: 8px;
+  left: -28px;
+}
+
 /* ===== Footer ===== */
 .stats-footer {
   padding-top: 20px;
