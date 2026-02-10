@@ -3,6 +3,7 @@ import { ListeningStats } from "../../types";
 import { formatNumber } from "../format";
 import { Icons } from "../icons";
 import { getRankClass, lazyNavigate, navigateToUri } from "../utils";
+import { ImageWithRetry } from "./ImageWithRetry";
 
 interface TopListsProps {
   stats: ListeningStats;
@@ -43,7 +44,7 @@ export function TopLists({
             >
               <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
               {t.albumArt ? (
-                <img src={t.albumArt} className="item-art" alt="" />
+                <ImageWithRetry src={t.albumArt} className="item-art" />
               ) : (
                 <div className="item-art placeholder" />
               )}
@@ -98,7 +99,7 @@ export function TopLists({
               >
                 <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
                 {a.artistImage ? (
-                  <img src={a.artistImage} className="item-art round" alt="" />
+                  <ImageWithRetry src={a.artistImage} className="item-art round" />
                 ) : (
                   <div className="item-art round placeholder artist-placeholder" />
                 )}
@@ -139,7 +140,7 @@ export function TopLists({
             >
               <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
               {a.albumArt ? (
-                <img src={a.albumArt} className="item-art" alt="" />
+                <ImageWithRetry src={a.albumArt} className="item-art" />
               ) : (
                 <div className="item-art placeholder" />
               )}
