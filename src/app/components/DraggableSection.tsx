@@ -50,6 +50,7 @@ export function DraggableSection({
   return (
     <div
       className={wrapperClass}
+      data-section-id={id}
       onDragOver={(e: React.DragEvent<HTMLDivElement>) => onDragOver(e, id)}
       onDrop={(e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();

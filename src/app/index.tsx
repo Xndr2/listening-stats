@@ -87,12 +87,12 @@ const SECTION_REGISTRY: Record<
 function DashboardSections(props: DashboardSectionsProps) {
   const { order, reorder } = useSectionOrder();
 
-  // Drag state tracked via refs (Pattern 2 from research: avoid re-renders during drag)
+  const containerRef = useRef<HTMLDivElement>(null);
   const dragItemRef = useRef<string | null>(null);
   const dragOverRef = useRef<string | null>(null);
   const insertBeforeRef = useRef<boolean>(true);
+  const scrollRafRef = useRef<number>(0);
 
-  // Visual state only -- triggers re-render for drop indicator and opacity
   const [dropTarget, setDropTarget] = useState<{
     id: string;
     position: "before" | "after";
@@ -104,50 +104,116 @@ function DashboardSections(props: DashboardSectionsProps) {
     setDraggingId(id);
   }, []);
 
-  const handleDragOver = useCallback(
-    (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
-      e.preventDefault();
-      if (targetId === dragItemRef.current) {
-        if (dropTarget) setDropTarget(null);
-        return;
+  // Find nearest section boundary from mouse Y, scanning all sections
+  const computeDropTarget = useCallback(
+    (clientY: number) => {
+      if (!containerRef.current || !dragItemRef.current) return;
+      const sections =
+        containerRef.current.querySelectorAll<HTMLElement>(".draggable-section");
+      let bestId: string | null = null;
+      let bestBefore = true;
+      let bestDist = Infinity;
+
+      sections.forEach((el) => {
+        const id = el.dataset.sectionId;
+        if (!id || id === dragItemRef.current) return;
+        const rect = el.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        // Distance to top edge vs bottom edge
+        const distTop = Math.abs(clientY - rect.top);
+        const distBot = Math.abs(clientY - rect.bottom);
+        const dist = Math.min(distTop, distBot);
+        // Use midpoint to decide before/after
+        const before = clientY < mid;
+
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = id;
+          bestBefore = before;
+        }
+      });
+
+      if (bestId) {
+        dragOverRef.current = bestId;
+        insertBeforeRef.current = bestBefore;
+        setDropTarget({
+          id: bestId,
+          position: bestBefore ? "before" : "after",
+        });
       }
-      const rect = e.currentTarget.getBoundingClientRect();
-      const midpoint = rect.top + rect.height / 2;
-      const before = e.clientY < midpoint;
-      insertBeforeRef.current = before;
-      dragOverRef.current = targetId;
-      setDropTarget({ id: targetId, position: before ? "before" : "after" });
     },
-    [dropTarget],
+    [],
   );
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>, _targetId: string) => {
+  // Auto-scroll when dragging near viewport edges
+  const autoScroll = useCallback((clientY: number) => {
+    cancelAnimationFrame(scrollRafRef.current);
+    const EDGE = 80; // px from edge to start scrolling
+    const MAX_SPEED = 18; // px per frame
+    const scrollContainer = document.querySelector(
+      ".main-view-container__scroll-node",
+    ) as HTMLElement | null;
+    const target = scrollContainer || document.documentElement;
+
+    let speed = 0;
+    if (clientY < EDGE) {
+      speed = -MAX_SPEED * (1 - clientY / EDGE);
+    } else if (clientY > window.innerHeight - EDGE) {
+      speed = MAX_SPEED * (1 - (window.innerHeight - clientY) / EDGE);
+    }
+
+    if (speed !== 0) {
+      const tick = () => {
+        target.scrollTop += speed;
+        scrollRafRef.current = requestAnimationFrame(tick);
+      };
+      scrollRafRef.current = requestAnimationFrame(tick);
+    }
+  }, []);
+
+  const handleContainerDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
-      const draggedId = dragItemRef.current;
-      const overId = dragOverRef.current;
-      const before = insertBeforeRef.current;
-
-      if (draggedId && overId && draggedId !== overId) {
-        const newOrder = order.filter((id) => id !== draggedId);
-        const targetIdx = newOrder.indexOf(overId);
-        if (targetIdx !== -1) {
-          const insertIdx = before ? targetIdx : targetIdx + 1;
-          newOrder.splice(insertIdx, 0, draggedId);
-          reorder(newOrder);
-        }
-      }
-
-      dragItemRef.current = null;
-      dragOverRef.current = null;
-      insertBeforeRef.current = true;
-      setDropTarget(null);
-      setDraggingId(null);
+      e.dataTransfer.dropEffect = "move";
+      computeDropTarget(e.clientY);
+      autoScroll(e.clientY);
     },
-    [order, reorder],
+    [computeDropTarget, autoScroll],
+  );
+
+  const executeDrop = useCallback(() => {
+    cancelAnimationFrame(scrollRafRef.current);
+    const draggedId = dragItemRef.current;
+    const overId = dragOverRef.current;
+    const before = insertBeforeRef.current;
+
+    if (draggedId && overId && draggedId !== overId) {
+      const newOrder = order.filter((id) => id !== draggedId);
+      const targetIdx = newOrder.indexOf(overId);
+      if (targetIdx !== -1) {
+        const insertIdx = before ? targetIdx : targetIdx + 1;
+        newOrder.splice(insertIdx, 0, draggedId);
+        reorder(newOrder);
+      }
+    }
+
+    dragItemRef.current = null;
+    dragOverRef.current = null;
+    insertBeforeRef.current = true;
+    setDropTarget(null);
+    setDraggingId(null);
+  }, [order, reorder]);
+
+  const handleContainerDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      executeDrop();
+    },
+    [executeDrop],
   );
 
   const handleDragEnd = useCallback(() => {
+    cancelAnimationFrame(scrollRafRef.current);
     dragItemRef.current = null;
     dragOverRef.current = null;
     insertBeforeRef.current = true;
@@ -155,8 +221,19 @@ function DashboardSections(props: DashboardSectionsProps) {
     setDraggingId(null);
   }, []);
 
+  // Passthrough handlers for DraggableSection (events bubble to container)
+  const noop = useCallback(
+    (_e: React.DragEvent<HTMLDivElement>, _id: string) => {},
+    [],
+  );
+
   return (
-    <>
+    <div
+      ref={containerRef}
+      className="dashboard-sections"
+      onDragOver={handleContainerDragOver}
+      onDrop={handleContainerDrop}
+    >
       {order.map((sectionId) => {
         const renderFn = SECTION_REGISTRY[sectionId];
         if (!renderFn) return null;
@@ -169,8 +246,8 @@ function DashboardSections(props: DashboardSectionsProps) {
             key={sectionId}
             id={sectionId}
             onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
+            onDragOver={noop}
+            onDrop={noop}
             onDragEnd={handleDragEnd}
             isDragging={draggingId === sectionId}
             dropPosition={sectionDropPosition}
@@ -179,7 +256,7 @@ function DashboardSections(props: DashboardSectionsProps) {
           </DraggableSection>
         );
       })}
-    </>
+    </div>
   );
 }
 

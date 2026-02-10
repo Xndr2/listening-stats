@@ -1135,10 +1135,12 @@
 }
 
 .drop-indicator {
-  height: 3px;
+  height: 4px;
   background: var(--ls-accent);
   border-radius: 2px;
-  margin: 4px 0;
+  margin: 8px 0;
+  padding: 4px 0;
+  background-clip: content-box;
   pointer-events: none;
   animation: drop-indicator-pulse 1s ease-in-out infinite;
 }
