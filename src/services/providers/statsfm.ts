@@ -42,17 +42,19 @@ async function calculateStatsfmStats(
     topGenresRaw,
     recentRaw,
     streamStats,
+    dateStats,
   ] = await Promise.all([
     Statsfm.getTopTracks(range, 50),
     Statsfm.getTopArtists(range, 50),
     Statsfm.getTopAlbums(range, 50),
     Statsfm.getTopGenres(range, 20),
     Statsfm.getRecentStreams(50).catch(() => []),
-    Statsfm.getStreamStats().catch(() => ({
+    Statsfm.getStreamStats(range).catch(() => ({
       durationMs: 0,
       count: 0,
       cardinality: { tracks: 0, artists: 0, albums: 0 },
     })),
+    Statsfm.getDateStats(range).catch(() => ({ hours: {} as Record<number, { durationMs: number; count: number }> })),
   ]);
 
   const pollingData = getPollingData();
@@ -151,10 +153,21 @@ async function calculateStatsfmStats(
     .slice(0, 10)
     .map((g) => ({ genre: g.genre.tag, count: g.streams ?? g.position }));
 
-  const hourlyDistribution = new Array(24).fill(0);
-  for (const t of recentTracks) {
-    const hour = new Date(t.playedAt).getHours();
-    hourlyDistribution[hour]++;
+  let hourlyDistribution = new Array(24).fill(0);
+  const hasDateStats = Object.keys(dateStats.hours).length > 0;
+  if (hasDateStats) {
+    for (const [hour, stat] of Object.entries(dateStats.hours)) {
+      const h = parseInt(hour, 10);
+      if (h >= 0 && h < 24) {
+        hourlyDistribution[h] = stat.count;
+      }
+    }
+  } else {
+    // Fallback for non-Plus users where dateStats endpoint may fail
+    for (const t of recentTracks) {
+      const hour = new Date(t.playedAt).getHours();
+      hourlyDistribution[hour]++;
+    }
   }
 
   const uniqueTrackCount =
