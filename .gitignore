@@ -32,5 +32,8 @@ ChangelogEditor/
 # AI files for generating the wiki and readme
 .claude/
 
+# GSD planning docs
+.planning/
+
 # Wiki files
 Wiki/
