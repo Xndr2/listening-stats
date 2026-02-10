@@ -339,9 +339,25 @@ export function SettingsPanel({
 
       {/* --- Layout --- */}
       <SettingsCategory title="Layout">
-        <p className="settings-toggle-desc">
-          Layout customization coming soon.
-        </p>
+        <div className="settings-toggle-row">
+          <div className="settings-toggle-info">
+            <h4 className="settings-section-title">Card Order</h4>
+            <p className="settings-toggle-desc">
+              Drag section headers on the main page to reorder cards.
+            </p>
+          </div>
+          <button
+            className="footer-btn"
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent("listening-stats:reset-layout"),
+              );
+              Spicetify.showNotification("Layout reset to default");
+            }}
+          >
+            Reset to Default
+          </button>
+        </div>
       </SettingsCategory>
 
       {/* --- Advanced --- */}
