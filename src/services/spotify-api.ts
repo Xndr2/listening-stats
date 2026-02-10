@@ -1,4 +1,9 @@
 import type * as Spotify from "../types/spotify";
+import {
+  CircuitBreaker,
+  createBatchCoalescer,
+  ApiError,
+} from "./api-resilience";
 
 const STORAGE_PREFIX = "listening-stats:";
 const QUEUE_DELAY_MS = 300;
@@ -34,6 +39,7 @@ export function getRateLimitRemaining(): number {
 export function resetRateLimit(): void {
   rateLimitedUntil = 0;
   localStorage.removeItem(`${STORAGE_PREFIX}rateLimitedUntil`);
+  circuitBreaker.reset();
 }
 
 function setRateLimit(error: any): void {
@@ -78,20 +84,40 @@ export function clearApiCaches(): void {
   cache.clear();
 }
 
+type Priority = "high" | "normal" | "low";
+const PRIORITY_ORDER: Record<Priority, number> = { high: 0, normal: 1, low: 2 };
+
 type QueueItem = {
+  key: string;
   fn: () => Promise<any>;
   resolve: (value: any) => void;
   reject: (reason: any) => void;
+  priority: Priority;
 };
 
 const queue: QueueItem[] = [];
 let draining = false;
+const inflight = new Map<string, Promise<any>>();
+const circuitBreaker = new CircuitBreaker(5, 60000);
 
-function enqueue<T>(fn: () => Promise<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    queue.push({ fn, resolve, reject });
+function enqueueWithPriority<T>(
+  key: string,
+  fn: () => Promise<T>,
+  priority: Priority = "normal",
+): Promise<T> {
+  // Dedup: return existing in-flight promise for same key
+  const existing = inflight.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const promise = new Promise<T>((resolve, reject) => {
+    queue.push({ key, fn, resolve, reject, priority });
+    queue.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
     if (!draining) drainQueue();
   });
+
+  inflight.set(key, promise);
+  promise.finally(() => inflight.delete(key));
+  return promise;
 }
 
 async function drainQueue(): Promise<void> {
@@ -105,10 +131,10 @@ async function drainQueue(): Promise<void> {
 
     const item = queue.shift()!;
     try {
-      const result = await item.fn();
+      const result = await circuitBreaker.execute(() => item.fn());
       item.resolve(result);
     } catch (error: any) {
-      if (error?.message?.includes("429") || error?.status === 429) {
+      if (error?.message?.includes("429") || error?.status === 429 || error?.statusCode === 429) {
         setRateLimit(error);
       }
       item.reject(error);
@@ -126,28 +152,36 @@ async function apiFetch<T>(url: string): Promise<T> {
   const cached = getCached<T>(url);
   if (cached) return cached;
 
-  return enqueue(async () => {
+  return enqueueWithPriority(url, async () => {
     let response: any;
     try {
       response = await Spicetify.CosmosAsync.get(url);
     } catch (err: any) {
       if (err?.status === 429 || String(err?.message || "").includes("429")) {
         setRateLimit(err);
+        throw new ApiError(
+          err?.message || "Rate limited",
+          429,
+          true,
+        );
       }
-      throw err;
+      const status = err?.status as number | undefined;
+      throw new ApiError(
+        err?.message || "API request failed",
+        status,
+        status !== undefined && (status === 429 || status >= 500),
+      );
     }
 
     if (!response) {
-      throw new Error("Empty API response");
+      throw new ApiError("Empty API response", undefined, false);
     }
     if (response.error) {
-      const status = response.error.status;
-      const err: any = new Error(
-        response.error.message || `Spotify API error ${status}`,
-      );
-      err.status = status;
+      const status: number = response.error.status;
+      const message =
+        response.error.message || `Spotify API error ${status}`;
       if (status === 429) setRateLimit(response);
-      throw err;
+      throw new ApiError(message, status, status === 429 || status >= 500);
     }
 
     setCache(url, response);
@@ -357,4 +391,34 @@ export async function getArtistsBatch(
   }
 
   return results;
+}
+
+const artistCoalescer = createBatchCoalescer<string, Spotify.Artist>(
+  async (ids: string[]) => {
+    const results = new Map<string, Spotify.Artist>();
+    for (let i = 0; i < ids.length; i += MAX_BATCH) {
+      const chunk = ids.slice(i, i + MAX_BATCH);
+      try {
+        const response = await apiFetch<Spotify.SeveralArtistsResponse>(
+          `https://api.spotify.com/v1/artists?ids=${chunk.join(",")}`,
+        );
+        if (response?.artists) {
+          for (const artist of response.artists.filter(Boolean)) {
+            if (artist.id) results.set(artist.id, artist);
+          }
+        }
+      } catch (error) {
+        console.warn("[ListeningStats] Artist batch fetch failed:", error);
+      }
+    }
+    return results;
+  },
+  50,
+  MAX_BATCH,
+);
+
+export function getArtist(
+  artistId: string,
+): Promise<Spotify.Artist | undefined> {
+  return artistCoalescer(artistId);
 }
