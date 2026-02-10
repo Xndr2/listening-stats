@@ -5,6 +5,8 @@ const STORAGE_KEY = "listening-stats:pollingData";
 const LOGGING_KEY = "listening-stats:logging";
 const SKIP_THRESHOLD_MS = 30000;
 const STATS_UPDATED_EVENT = "listening-stats:updated";
+const THRESHOLD_KEY = "listening-stats:playThreshold";
+const DEFAULT_THRESHOLD_MS = 10000; // 10 seconds per user decision
 
 let activeProviderType: ProviderType | null = null;
 
@@ -23,6 +25,21 @@ export function setLoggingEnabled(enabled: boolean): void {
   } catch {
     /* ignore */
   }
+}
+
+export function getPlayThreshold(): number {
+  try {
+    const stored = localStorage.getItem(THRESHOLD_KEY);
+    if (stored) {
+      const val = parseInt(stored, 10);
+      if (val >= 0 && val <= 60000) return val; // 0-60s range
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_THRESHOLD_MS;
+}
+
+export function setPlayThreshold(ms: number): void {
+  localStorage.setItem(THRESHOLD_KEY, String(Math.max(0, Math.min(60000, ms))));
 }
 
 function log(...args: any[]): void {
@@ -117,9 +134,10 @@ function handleSongChange(): void {
     const data = getPollingData();
     data.totalPlays++;
 
+    const threshold = getPlayThreshold();
     const skipped =
-      totalPlayedMs < SKIP_THRESHOLD_MS &&
-      currentTrackDuration > SKIP_THRESHOLD_MS;
+      totalPlayedMs < threshold &&
+      currentTrackDuration > threshold;
     if (skipped) {
       data.skipEvents++;
     }
@@ -134,7 +152,7 @@ function handleSongChange(): void {
       );
     }
 
-    writePlayEvent(totalPlayedMs);
+    writePlayEvent(totalPlayedMs, skipped);
   }
 
   const playerData = Spicetify.Player.data;
@@ -196,8 +214,14 @@ function captureCurrentTrackData(): void {
   };
 }
 
-function writePlayEvent(totalPlayedMs: number): void {
+function writePlayEvent(totalPlayedMs: number, skipped?: boolean): void {
   if (!previousTrackData) return;
+
+  // Determine skip status if not already computed by caller
+  if (skipped === undefined) {
+    const threshold = getPlayThreshold();
+    skipped = totalPlayedMs < threshold && previousTrackData.durationMs > threshold;
+  }
 
   const event: PlayEvent = {
     trackUri: previousTrackData.trackUri,
@@ -211,6 +235,7 @@ function writePlayEvent(totalPlayedMs: number): void {
     playedMs: totalPlayedMs,
     startedAt: previousTrackData.startedAt,
     endedAt: Date.now(),
+    type: skipped ? "skip" : "play",
   };
 
   addPlayEvent(event).catch((err) => {
