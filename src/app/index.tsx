@@ -3,6 +3,7 @@ import {
   getActiveProvider,
   getSelectedProviderType,
 } from "../services/providers";
+import { ApiError } from "../services/api-resilience";
 import { onPreferencesChanged } from "../services/preferences";
 import { calculateStats, clearStatsCache } from "../services/stats";
 import * as Statsfm from "../services/statsfm";
@@ -41,6 +42,7 @@ interface State {
   stats: ListeningStats | null;
   loading: boolean;
   error: string | null;
+  errorType: "api" | "generic" | null;
   likedTracks: Map<string, boolean>;
   updateInfo: UpdateInfo | null;
   showUpdateBanner: boolean;
@@ -79,6 +81,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       stats: null,
       loading: !needsSetup,
       error: null,
+      errorType: null,
       likedTracks: new Map(),
       updateInfo: null,
       showUpdateBanner: false,
@@ -171,10 +174,10 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
   };
 
   loadStats = async () => {
-    this.setState({ loading: true, error: null });
+    this.setState({ loading: true, error: null, errorType: null });
     try {
       const data = await calculateStats(this.state.period);
-      this.setState({ stats: data, loading: false });
+      this.setState({ stats: data, loading: false, errorType: null });
 
       if (data.topTracks.length > 0 && data.topTracks[0].trackUri) {
         const uris = data.topTracks.map((t) => t.trackUri).filter(Boolean);
@@ -197,9 +200,11 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       }
     } catch (e: any) {
       console.error("[ListeningStats] Load failed:", e);
+      const isApiError = e instanceof ApiError || e?.name === "ApiError";
       this.setState({
         loading: false,
         error: e.message || "Failed to load stats",
+        errorType: isApiError ? "api" : "generic",
       });
     }
   };
@@ -393,6 +398,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
       : null;
 
     if (error && !stats) {
+      const isApiFailure = this.state.errorType === "api";
       return (
         <div className="stats-page">
           <Header
@@ -403,8 +409,12 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
           />
           <div className="error-state">
             <div className="error-message">
-              <h3>Something went wrong</h3>
-              <p>{error}</p>
+              <h3>{isApiFailure ? "Could not fetch data" : "Something went wrong"}</h3>
+              <p>
+                {isApiFailure
+                  ? "The data source is temporarily unavailable. This is usually caused by rate limiting — please wait a moment and try again."
+                  : error}
+              </p>
               <button className="footer-btn primary" onClick={this.loadStats}>
                 Try Again
               </button>
