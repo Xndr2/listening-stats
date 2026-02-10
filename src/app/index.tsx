@@ -3,6 +3,7 @@ import {
   getActiveProvider,
   getSelectedProviderType,
 } from "../services/providers";
+import { onPreferencesChanged } from "../services/preferences";
 import { calculateStats, clearStatsCache } from "../services/stats";
 import * as Statsfm from "../services/statsfm";
 import { onStatsUpdated } from "../services/tracker";
@@ -55,6 +56,7 @@ interface State {
 class StatsPage extends Spicetify.React.Component<{}, State> {
   private pollInterval: number | null = null;
   private unsubStatsUpdate: (() => void) | null = null;
+  private unsubPrefs: (() => void) | null = null;
 
   constructor(props: {}) {
     super(props);
@@ -114,11 +116,16 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
         this.loadStats();
       }
     });
+
+    this.unsubPrefs = onPreferencesChanged(() => {
+      this.forceUpdate();
+    });
   }
 
   componentWillUnmount() {
     if (this.pollInterval) clearInterval(this.pollInterval);
     this.unsubStatsUpdate?.();
+    this.unsubPrefs?.();
   }
 
   componentDidUpdate(_: {}, prev: State) {

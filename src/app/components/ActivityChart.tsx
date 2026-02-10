@@ -1,4 +1,5 @@
-import { formatHour, formatMinutes } from "../utils";
+import { formatHour } from "../format";
+import { formatMinutes } from "../utils";
 
 interface ActivityChartProps {
   hourlyDistribution: number[];
@@ -49,11 +50,11 @@ export function ActivityChart({
         })}
       </div>
       <div className="chart-labels">
-        <span>12am</span>
-        <span>6am</span>
-        <span>12pm</span>
-        <span>6pm</span>
-        <span>12am</span>
+        <span>{formatHour(0)}</span>
+        <span>{formatHour(6)}</span>
+        <span>{formatHour(12)}</span>
+        <span>{formatHour(18)}</span>
+        <span>{formatHour(0)}</span>
       </div>
     </div>
   );
