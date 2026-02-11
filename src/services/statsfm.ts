@@ -234,14 +234,47 @@ export async function getRecentStreams(
   return data.items || [];
 }
 
-export async function getStreamStats(): Promise<StatsfmStreamStats> {
-  const data = await statsfmFetch<any>(`/users/${getUsername()}/streams/stats`);
+export async function getStreamStats(range: StatsfmRange): Promise<StatsfmStreamStats> {
+  const data = await statsfmFetch<any>(
+    `/users/${getUsername()}/streams/stats?range=${range}`,
+  );
   const item = data.items || data;
   return {
     durationMs: item.durationMs || 0,
     count: item.count || 0,
     cardinality: item.cardinality || { tracks: 0, artists: 0, albums: 0 },
   };
+}
+
+export interface StatsfmDateStats {
+  hours: Record<number, { durationMs: number; count: number }>;
+}
+
+export async function getDateStats(
+  range: StatsfmRange,
+  timeZoneOffset?: number,
+): Promise<StatsfmDateStats> {
+  const tz = timeZoneOffset ?? -(new Date().getTimezoneOffset());
+  const data = await statsfmFetch<any>(
+    `/users/${getUsername()}/streams/stats/dates?range=${range}&timeZoneOffset=${tz}`,
+  );
+  const item = data.items || data;
+  return { hours: item.hours || {} };
+}
+
+export async function refreshPlusStatus(): Promise<boolean> {
+  const config = getConfig();
+  if (!config?.username) return false;
+  try {
+    const info = await validateUser(config.username);
+    if (info.isPlus !== (config.isPlus ?? false)) {
+      saveConfig({ ...config, isPlus: info.isPlus });
+      return true; // tier changed
+    }
+  } catch {
+    // Silently ignore -- keep existing tier assumption
+  }
+  return false;
 }
 
 export function extractSpotifyUri(

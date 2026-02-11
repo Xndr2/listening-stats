@@ -141,6 +141,17 @@ var ListeningStatsApp = (() => {
     });
     return openPromise;
   }
+  function deleteDB(name, { blocked } = {}) {
+    const request = indexedDB.deleteDatabase(name);
+    if (blocked) {
+      request.addEventListener("blocked", (event) => blocked(
+        // Casting due to https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/1405
+        event.oldVersion,
+        event
+      ));
+    }
+    return wrap(request).then(() => void 0);
+  }
   function getMethod(target, prop) {
     if (!(target instanceof IDBDatabase && !(prop in target) && typeof prop === "string")) {
       return;
@@ -263,34 +274,226 @@ var ListeningStatsApp = (() => {
   __export(storage_exports, {
     addPlayEvent: () => addPlayEvent,
     clearAllData: () => clearAllData,
+    deduplicateExistingEvents: () => deduplicateExistingEvents,
     getAllPlayEvents: () => getAllPlayEvents,
     getDB: () => getDB,
     getPlayEventsByTimeRange: () => getPlayEventsByTimeRange
   });
+  async function backupBeforeMigration() {
+    let events = [];
+    try {
+      const currentDb = await openDB(DB_NAME);
+      const version = currentDb.version;
+      if (currentDb.objectStoreNames.contains(STORE_NAME)) {
+        events = await currentDb.getAll(STORE_NAME);
+      }
+      currentDb.close();
+      if (events.length === 0) {
+        return events;
+      }
+      localStorage.setItem(BACKUP_VERSION_KEY, String(version));
+      try {
+        const json = JSON.stringify(events);
+        localStorage.setItem(BACKUP_LS_KEY, json);
+        console.log(`[ListeningStats] Backed up ${events.length} events to localStorage`);
+      } catch (e) {
+        if (e?.name === "QuotaExceededError" || e?.code === 22) {
+          console.warn("[ListeningStats] localStorage full, using IndexedDB backup");
+          localStorage.removeItem(BACKUP_LS_KEY);
+          try {
+            await deleteDB(BACKUP_DB_NAME);
+          } catch {
+          }
+          const backupDb = await openDB(BACKUP_DB_NAME, 1, {
+            upgrade(db) {
+              db.createObjectStore("backup");
+            }
+          });
+          await backupDb.put("backup", events, "events");
+          backupDb.close();
+          console.log(`[ListeningStats] Backed up ${events.length} events to IndexedDB`);
+        } else {
+          throw e;
+        }
+      }
+    } catch (e) {
+      console.error("[ListeningStats] Backup failed:", e);
+    }
+    return events;
+  }
+  async function restoreFromBackup() {
+    let events = null;
+    try {
+      const json = localStorage.getItem(BACKUP_LS_KEY);
+      if (json) {
+        events = JSON.parse(json);
+      }
+    } catch {
+    }
+    if (!events) {
+      try {
+        const backupDb = await openDB(BACKUP_DB_NAME, 1, {
+          upgrade(db) {
+            if (!db.objectStoreNames.contains("backup")) {
+              db.createObjectStore("backup");
+            }
+          }
+        });
+        events = await backupDb.get("backup", "events");
+        backupDb.close();
+      } catch {
+      }
+    }
+    if (events && events.length > 0) {
+      try {
+        const db = await openDB(DB_NAME);
+        if (db.objectStoreNames.contains(STORE_NAME)) {
+          const tx = db.transaction(STORE_NAME, "readwrite");
+          await tx.store.clear();
+          for (const event of events) {
+            await tx.store.add(event);
+          }
+          await tx.done;
+          console.log(`[ListeningStats] Restored ${events.length} events from backup`);
+        }
+        db.close();
+      } catch (e) {
+        console.error("[ListeningStats] Restore failed:", e);
+      }
+    }
+    await cleanupBackup();
+  }
+  async function cleanupBackup() {
+    try {
+      localStorage.removeItem(BACKUP_LS_KEY);
+    } catch {
+    }
+    try {
+      localStorage.removeItem(BACKUP_VERSION_KEY);
+    } catch {
+    }
+    try {
+      await deleteDB(BACKUP_DB_NAME);
+    } catch {
+    }
+  }
   function getDB() {
     if (!dbPromise) {
-      dbPromise = openDB(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion) {
-          if (db.objectStoreNames.contains(STORE_NAME) && oldVersion < 3) {
-            db.deleteObjectStore(STORE_NAME);
-          }
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-            const store = db.createObjectStore(STORE_NAME, {
+      dbPromise = initDB();
+    }
+    return dbPromise;
+  }
+  async function initDB() {
+    let needsBackup = false;
+    let oldDbVersion = 0;
+    try {
+      const existingDb = await openDB(DB_NAME);
+      oldDbVersion = existingDb.version;
+      existingDb.close();
+      needsBackup = oldDbVersion < DB_VERSION && oldDbVersion > 0;
+    } catch {
+      needsBackup = false;
+    }
+    if (needsBackup) {
+      await backupBeforeMigration();
+    }
+    try {
+      const db = await openDB(DB_NAME, DB_VERSION, {
+        upgrade(db2, oldVersion, _newVersion, transaction) {
+          if (oldVersion < 1) {
+            const store = db2.createObjectStore(STORE_NAME, {
               keyPath: "id",
               autoIncrement: true
             });
             store.createIndex("by-startedAt", "startedAt");
             store.createIndex("by-trackUri", "trackUri");
             store.createIndex("by-artistUri", "artistUri");
+            store.createIndex("by-type", "type");
+          }
+          if (oldVersion >= 1 && oldVersion < 3) {
+            const store = transaction.objectStore(STORE_NAME);
+            if (!store.indexNames.contains("by-startedAt")) {
+              store.createIndex("by-startedAt", "startedAt");
+            }
+            if (!store.indexNames.contains("by-trackUri")) {
+              store.createIndex("by-trackUri", "trackUri");
+            }
+            if (!store.indexNames.contains("by-artistUri")) {
+              store.createIndex("by-artistUri", "artistUri");
+            }
+          }
+          if (oldVersion >= 1 && oldVersion < 4) {
+            const store = transaction.objectStore(STORE_NAME);
+            if (!store.indexNames.contains("by-type")) {
+              store.createIndex("by-type", "type");
+            }
           }
         }
       });
+      if (needsBackup) {
+        await cleanupBackup();
+        Spicetify?.showNotification?.("Database updated successfully");
+        console.log(`[ListeningStats] Migration from v${oldDbVersion} to v${DB_VERSION} complete`);
+      }
+      const dedupDone = localStorage.getItem("listening-stats:dedup-done");
+      if (!dedupDone) {
+        const removed = await runDedup(db);
+        if (removed > 0) {
+          Spicetify?.showNotification?.(`Cleaned up ${removed} duplicate entries`);
+        }
+        localStorage.setItem("listening-stats:dedup-done", "1");
+      }
+      return db;
+    } catch (e) {
+      console.error("[ListeningStats] Migration failed, attempting rollback:", e);
+      if (needsBackup) {
+        await restoreFromBackup();
+      }
+      const fallbackDb = await openDB(DB_NAME);
+      console.log(`[ListeningStats] Opened fallback DB at v${fallbackDb.version}`);
+      return fallbackDb;
     }
-    return dbPromise;
+  }
+  async function runDedup(db) {
+    try {
+      const allEvents = await db.getAll(STORE_NAME);
+      const seen = /* @__PURE__ */ new Set();
+      const duplicateIds = [];
+      for (const event of allEvents) {
+        const key = `${event.trackUri}:${event.startedAt}`;
+        if (seen.has(key)) {
+          duplicateIds.push(event.id);
+        } else {
+          seen.add(key);
+        }
+      }
+      if (duplicateIds.length > 0) {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        for (const id of duplicateIds) {
+          tx.store.delete(id);
+        }
+        await tx.done;
+        console.log(`[ListeningStats] Removed ${duplicateIds.length} duplicate events`);
+      }
+      return duplicateIds.length;
+    } catch (e) {
+      console.error("[ListeningStats] Dedup failed:", e);
+      return 0;
+    }
   }
   async function addPlayEvent(event) {
     const db = await getDB();
+    const range = IDBKeyRange.only(event.startedAt);
+    const existing = await db.getAllFromIndex(STORE_NAME, "by-startedAt", range);
+    if (existing.some((e) => e.trackUri === event.trackUri)) {
+      console.warn("[ListeningStats] Duplicate event blocked:", event.trackName);
+      return;
+    }
     await db.add(STORE_NAME, event);
+  }
+  async function deduplicateExistingEvents() {
+    const db = await getDB();
+    return runDedup(db);
   }
   async function getPlayEventsByTimeRange(start, end) {
     const db = await getDB();
@@ -306,13 +509,16 @@ var ListeningStatsApp = (() => {
     await db.clear(STORE_NAME);
     console.log("[ListeningStats] IndexedDB data cleared");
   }
-  var DB_NAME, DB_VERSION, STORE_NAME, dbPromise;
+  var DB_NAME, DB_VERSION, STORE_NAME, BACKUP_LS_KEY, BACKUP_VERSION_KEY, BACKUP_DB_NAME, dbPromise;
   var init_storage = __esm({
     "src/services/storage.ts"() {
       init_build();
       DB_NAME = "listening-stats";
-      DB_VERSION = 3;
+      DB_VERSION = 4;
       STORE_NAME = "playEvents";
+      BACKUP_LS_KEY = "listening-stats:migration-backup";
+      BACKUP_VERSION_KEY = "listening-stats:migration-version";
+      BACKUP_DB_NAME = "listening-stats-backup";
       dbPromise = null;
     }
   });
@@ -322,6 +528,139 @@ var ListeningStatsApp = (() => {
   __export(index_exports, {
     default: () => index_default
   });
+
+  // src/services/api-resilience.ts
+  var ApiError = class extends Error {
+    constructor(message, statusCode, retryable = false) {
+      super(message);
+      this.statusCode = statusCode;
+      this.retryable = retryable;
+      this.name = "ApiError";
+    }
+  };
+  var CircuitBreaker = class {
+    constructor(failureThreshold = 5, resetTimeoutMs = 6e4) {
+      this.failureThreshold = failureThreshold;
+      this.resetTimeoutMs = resetTimeoutMs;
+      this.state = "closed";
+      this.failures = 0;
+      this.lastFailure = 0;
+    }
+    async execute(fn) {
+      if (this.state === "open") {
+        if (Date.now() - this.lastFailure >= this.resetTimeoutMs) {
+          this.state = "half_open";
+        } else {
+          throw new ApiError(
+            "Circuit open: API temporarily unavailable",
+            void 0,
+            true
+          );
+        }
+      }
+      try {
+        const result = await fn();
+        this.onSuccess();
+        return result;
+      } catch (error) {
+        this.onFailure();
+        throw error;
+      }
+    }
+    reset() {
+      this.failures = 0;
+      this.state = "closed";
+    }
+    onSuccess() {
+      this.failures = 0;
+      this.state = "closed";
+    }
+    onFailure() {
+      this.failures++;
+      this.lastFailure = Date.now();
+      if (this.failures >= this.failureThreshold) {
+        this.state = "open";
+      }
+    }
+  };
+  function createBatchCoalescer(batchFn, windowMs = 50, maxBatch = 50) {
+    let pending = /* @__PURE__ */ new Map();
+    let timer = null;
+    function flush() {
+      timer = null;
+      const batch = pending;
+      pending = /* @__PURE__ */ new Map();
+      const keys = [...batch.keys()];
+      batchFn(keys).then((results) => {
+        for (const [key, entries] of batch) {
+          const val = results.get(key);
+          for (const entry of entries) {
+            entry.resolve(val);
+          }
+        }
+      }).catch((err) => {
+        for (const entries of batch.values()) {
+          for (const entry of entries) {
+            entry.reject(err);
+          }
+        }
+      });
+    }
+    return function request(key) {
+      return new Promise((resolve, reject) => {
+        const entries = pending.get(key) || [];
+        entries.push({ resolve, reject });
+        pending.set(key, entries);
+        if (pending.size >= maxBatch) {
+          if (timer) clearTimeout(timer);
+          flush();
+        } else if (!timer) {
+          timer = setTimeout(flush, windowMs);
+        }
+      });
+    };
+  }
+
+  // src/services/preferences.ts
+  var PREFS_KEY = "listening-stats:preferences";
+  var PREFS_CHANGED_EVENT = "listening-stats:prefs-changed";
+  var DEFAULTS = {
+    use24HourTime: false
+  };
+  var cached = null;
+  function getPreferences() {
+    if (cached) return cached;
+    try {
+      const stored = localStorage.getItem(PREFS_KEY);
+      if (stored) {
+        cached = { ...DEFAULTS, ...JSON.parse(stored) };
+        return cached;
+      }
+    } catch {
+    }
+    cached = { ...DEFAULTS };
+    return cached;
+  }
+  function setPreference(key, value) {
+    const prefs = getPreferences();
+    prefs[key] = value;
+    cached = prefs;
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+    }
+    window.dispatchEvent(
+      new CustomEvent(PREFS_CHANGED_EVENT, { detail: { key, value } })
+    );
+  }
+  function onPreferencesChanged(callback) {
+    const handler = (e) => {
+      const { key, value } = e.detail;
+      callback(key, value);
+    };
+    window.addEventListener(PREFS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(PREFS_CHANGED_EVENT, handler);
+  }
 
   // src/services/lastfm.ts
   var LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/";
@@ -385,8 +724,8 @@ var ListeningStatsApp = (() => {
       url.searchParams.set(k, v);
     }
     const cacheKey = url.toString();
-    const cached = getCached(cacheKey);
-    if (cached) return cached;
+    const cached2 = getCached(cacheKey);
+    if (cached2) return cached2;
     const response = await fetch(url.toString());
     if (!response.ok) {
       if (response.status === 403) throw new Error("Invalid Last.fm API key");
@@ -549,6 +888,7 @@ var ListeningStatsApp = (() => {
   function resetRateLimit() {
     rateLimitedUntil = 0;
     localStorage.removeItem(`${STORAGE_PREFIX}rateLimitedUntil`);
+    circuitBreaker.reset();
   }
   function setRateLimit(error) {
     let backoffMs = DEFAULT_BACKOFF_MS;
@@ -581,13 +921,22 @@ var ListeningStatsApp = (() => {
   function clearApiCaches() {
     cache2.clear();
   }
+  var PRIORITY_ORDER = { high: 0, normal: 1, low: 2 };
   var queue = [];
   var draining = false;
-  function enqueue(fn) {
-    return new Promise((resolve, reject) => {
-      queue.push({ fn, resolve, reject });
+  var inflight = /* @__PURE__ */ new Map();
+  var circuitBreaker = new CircuitBreaker(5, 6e4);
+  function enqueueWithPriority(key, fn, priority = "normal") {
+    const existing = inflight.get(key);
+    if (existing) return existing;
+    const promise = new Promise((resolve, reject) => {
+      queue.push({ key, fn, resolve, reject, priority });
+      queue.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
       if (!draining) drainQueue();
     });
+    inflight.set(key, promise);
+    promise.finally(() => inflight.delete(key));
+    return promise;
   }
   async function drainQueue() {
     draining = true;
@@ -598,10 +947,10 @@ var ListeningStatsApp = (() => {
       }
       const item = queue.shift();
       try {
-        const result = await item.fn();
+        const result = await circuitBreaker.execute(() => item.fn());
         item.resolve(result);
       } catch (error) {
-        if (error?.message?.includes("429") || error?.status === 429) {
+        if (error?.message?.includes("429") || error?.status === 429 || error?.statusCode === 429) {
           setRateLimit(error);
         }
         item.reject(error);
@@ -613,29 +962,36 @@ var ListeningStatsApp = (() => {
     draining = false;
   }
   async function apiFetch(url) {
-    const cached = getCached2(url);
-    if (cached) return cached;
-    return enqueue(async () => {
+    const cached2 = getCached2(url);
+    if (cached2) return cached2;
+    return enqueueWithPriority(url, async () => {
       let response;
       try {
         response = await Spicetify.CosmosAsync.get(url);
       } catch (err) {
         if (err?.status === 429 || String(err?.message || "").includes("429")) {
           setRateLimit(err);
+          throw new ApiError(
+            err?.message || "Rate limited",
+            429,
+            true
+          );
         }
-        throw err;
+        const status = err?.status;
+        throw new ApiError(
+          err?.message || "API request failed",
+          status,
+          status !== void 0 && (status === 429 || status >= 500)
+        );
       }
       if (!response) {
-        throw new Error("Empty API response");
+        throw new ApiError("Empty API response", void 0, false);
       }
       if (response.error) {
         const status = response.error.status;
-        const err = new Error(
-          response.error.message || `Spotify API error ${status}`
-        );
-        err.status = status;
+        const message = response.error.message || `Spotify API error ${status}`;
         if (status === 429) setRateLimit(response);
-        throw err;
+        throw new ApiError(message, status, status === 429 || status >= 500);
       }
       setCache2(url, response);
       return response;
@@ -763,13 +1119,37 @@ var ListeningStatsApp = (() => {
     }
     return results;
   }
+  var artistCoalescer = createBatchCoalescer(
+    async (ids) => {
+      const results = /* @__PURE__ */ new Map();
+      for (let i = 0; i < ids.length; i += MAX_BATCH) {
+        const chunk = ids.slice(i, i + MAX_BATCH);
+        try {
+          const response = await apiFetch(
+            `https://api.spotify.com/v1/artists?ids=${chunk.join(",")}`
+          );
+          if (response?.artists) {
+            for (const artist of response.artists.filter(Boolean)) {
+              if (artist.id) results.set(artist.id, artist);
+            }
+          }
+        } catch (error) {
+          console.warn("[ListeningStats] Artist batch fetch failed:", error);
+        }
+      }
+      return results;
+    },
+    50,
+    MAX_BATCH
+  );
 
   // src/services/tracker.ts
   init_storage();
   var STORAGE_KEY2 = "listening-stats:pollingData";
   var LOGGING_KEY = "listening-stats:logging";
-  var SKIP_THRESHOLD_MS = 3e4;
   var STATS_UPDATED_EVENT = "listening-stats:updated";
+  var THRESHOLD_KEY = "listening-stats:playThreshold";
+  var DEFAULT_THRESHOLD_MS = 1e4;
   var activeProviderType = null;
   function isLoggingEnabled() {
     try {
@@ -784,6 +1164,17 @@ var ListeningStatsApp = (() => {
       else localStorage.removeItem(LOGGING_KEY);
     } catch {
     }
+  }
+  function getPlayThreshold() {
+    try {
+      const stored = localStorage.getItem(THRESHOLD_KEY);
+      if (stored) {
+        const val = parseInt(stored, 10);
+        if (val >= 0 && val <= 6e4) return val;
+      }
+    } catch {
+    }
+    return DEFAULT_THRESHOLD_MS;
   }
   function log(...args) {
     if (isLoggingEnabled()) console.log("[ListeningStats]", ...args);
@@ -859,12 +1250,15 @@ var ListeningStatsApp = (() => {
   var accumulatedPlayTime = 0;
   var isPlaying = false;
   var currentTrackDuration = 0;
+  var lastProgressMs = 0;
+  var progressHandler = null;
   function handleSongChange() {
     if (currentTrackUri && playStartTime !== null) {
       const totalPlayedMs = accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
       const data = getPollingData();
       data.totalPlays++;
-      const skipped = totalPlayedMs < SKIP_THRESHOLD_MS && currentTrackDuration > SKIP_THRESHOLD_MS;
+      const threshold = getPlayThreshold();
+      const skipped = totalPlayedMs < threshold && currentTrackDuration > threshold;
       if (skipped) {
         data.skipEvents++;
       }
@@ -876,7 +1270,7 @@ var ListeningStatsApp = (() => {
           `(${Math.round(totalPlayedMs / 1e3)}s / ${Math.round(currentTrackDuration / 1e3)}s)`
         );
       }
-      writePlayEvent(totalPlayedMs);
+      writePlayEvent(totalPlayedMs, skipped);
     }
     const playerData = Spicetify.Player.data;
     if (playerData?.item) {
@@ -917,8 +1311,12 @@ var ListeningStatsApp = (() => {
       startedAt: Date.now()
     };
   }
-  function writePlayEvent(totalPlayedMs) {
+  function writePlayEvent(totalPlayedMs, skipped) {
     if (!previousTrackData) return;
+    if (skipped === void 0) {
+      const threshold = getPlayThreshold();
+      skipped = totalPlayedMs < threshold && previousTrackData.durationMs > threshold;
+    }
     const event = {
       trackUri: previousTrackData.trackUri,
       trackName: previousTrackData.trackName,
@@ -930,7 +1328,8 @@ var ListeningStatsApp = (() => {
       durationMs: previousTrackData.durationMs,
       playedMs: totalPlayedMs,
       startedAt: previousTrackData.startedAt,
-      endedAt: Date.now()
+      endedAt: Date.now(),
+      type: skipped ? "skip" : "play"
     };
     addPlayEvent(event).catch((err) => {
       console.warn("[ListeningStats] Failed to write play event:", err);
@@ -951,6 +1350,21 @@ var ListeningStatsApp = (() => {
       log("Resumed");
     }
   }
+  function handleProgress() {
+    const progress = Spicetify.Player.getProgress();
+    const duration = Spicetify.Player.getDuration();
+    const repeat = Spicetify.Player.getRepeat();
+    if (repeat === 2 && duration > 0) {
+      const wasNearEnd = lastProgressMs > duration * 0.9;
+      const nowNearStart = progress < duration * 0.1;
+      if (wasNearEnd && nowNearStart && currentTrackUri) {
+        log("Repeat-one loop detected, recording play");
+        handleSongChange();
+        captureCurrentTrackData();
+      }
+    }
+    lastProgressMs = progress;
+  }
   var pollIntervalId = null;
   var activeSongChangeHandler = null;
   function initPoller(providerType) {
@@ -961,16 +1375,23 @@ var ListeningStatsApp = (() => {
     if (win.__lsPauseHandler) {
       Spicetify.Player.removeEventListener("onplaypause", win.__lsPauseHandler);
     }
+    if (win.__lsProgressHandler) {
+      Spicetify.Player.removeEventListener("onprogress", win.__lsProgressHandler);
+    }
     activeProviderType = providerType;
     captureCurrentTrackData();
     activeSongChangeHandler = () => {
+      lastProgressMs = 0;
       handleSongChange();
       captureCurrentTrackData();
     };
     Spicetify.Player.addEventListener("songchange", activeSongChangeHandler);
     Spicetify.Player.addEventListener("onplaypause", handlePlayPause);
+    progressHandler = handleProgress;
+    Spicetify.Player.addEventListener("onprogress", progressHandler);
     win.__lsSongHandler = activeSongChangeHandler;
     win.__lsPauseHandler = handlePlayPause;
+    win.__lsProgressHandler = progressHandler;
     const playerData = Spicetify.Player.data;
     if (playerData?.item) {
       currentTrackUri = playerData.item.uri;
@@ -985,9 +1406,15 @@ var ListeningStatsApp = (() => {
       activeSongChangeHandler = null;
     }
     Spicetify.Player.removeEventListener("onplaypause", handlePlayPause);
+    if (progressHandler) {
+      Spicetify.Player.removeEventListener("onprogress", progressHandler);
+      progressHandler = null;
+    }
     const win = window;
     win.__lsSongHandler = null;
     win.__lsPauseHandler = null;
+    win.__lsProgressHandler = null;
+    lastProgressMs = 0;
     if (pollIntervalId !== null) {
       clearInterval(pollIntervalId);
       pollIntervalId = null;
@@ -1044,6 +1471,26 @@ var ListeningStatsApp = (() => {
     needsImage.forEach((a, i) => {
       if (results[i].uri && !a.artistUri) a.artistUri = results[i].uri;
       if (results[i].imageUrl) a.artistImage = results[i].imageUrl;
+    });
+  }
+  async function enrichTrackUris(tracks) {
+    const needsUri = tracks.filter((t) => !t.trackUri);
+    if (needsUri.length === 0) return;
+    const results = await Promise.all(
+      needsUri.map((t) => searchTrack(t.trackName, t.artistName))
+    );
+    needsUri.forEach((t, i) => {
+      if (results[i].uri) t.trackUri = results[i].uri;
+    });
+  }
+  async function enrichAlbumUris(albums) {
+    const needsUri = albums.filter((a) => !a.albumUri);
+    if (needsUri.length === 0) return;
+    const results = await Promise.all(
+      needsUri.map((a) => searchAlbum(a.albumName, a.artistName))
+    );
+    needsUri.forEach((a, i) => {
+      if (results[i].uri) a.albumUri = results[i].uri;
     });
   }
   async function calculateRecentStats() {
@@ -1129,6 +1576,8 @@ var ListeningStatsApp = (() => {
       playCount: a.count
     }));
     await enrichArtistImages(topArtists);
+    await enrichTrackUris(topTracks);
+    await enrichAlbumUris(topAlbums);
     const hourlyDistribution = new Array(24).fill(0);
     for (const t of recentTracks) {
       const hour = new Date(t.playedAt).getHours();
@@ -1223,6 +1672,8 @@ var ListeningStatsApp = (() => {
       playCount: a.playCount
     }));
     await enrichArtistImages(topArtists);
+    await enrichTrackUris(topTracks);
+    await enrichAlbumUris(topAlbums);
     const recentTracks = (Array.isArray(recentLfm) ? recentLfm : []).filter((t) => !t.nowPlaying).map((t) => ({
       trackUri: "",
       trackName: t.name,
@@ -1555,8 +2006,8 @@ var ListeningStatsApp = (() => {
   }
   async function statsfmFetch(path) {
     const url = `${API_BASE}${path}`;
-    const cached = getCached3(url);
-    if (cached) return cached;
+    const cached2 = getCached3(url);
+    if (cached2) return cached2;
     const response = await fetch(url);
     if (!response.ok) {
       if (response.status === 404) throw new Error("User not found");
@@ -1624,14 +2075,37 @@ var ListeningStatsApp = (() => {
     );
     return data.items || [];
   }
-  async function getStreamStats() {
-    const data = await statsfmFetch(`/users/${getUsername()}/streams/stats`);
+  async function getStreamStats(range) {
+    const data = await statsfmFetch(
+      `/users/${getUsername()}/streams/stats?range=${range}`
+    );
     const item = data.items || data;
     return {
       durationMs: item.durationMs || 0,
       count: item.count || 0,
       cardinality: item.cardinality || { tracks: 0, artists: 0, albums: 0 }
     };
+  }
+  async function getDateStats(range, timeZoneOffset) {
+    const tz = timeZoneOffset ?? -(/* @__PURE__ */ new Date()).getTimezoneOffset();
+    const data = await statsfmFetch(
+      `/users/${getUsername()}/streams/stats/dates?range=${range}&timeZoneOffset=${tz}`
+    );
+    const item = data.items || data;
+    return { hours: item.hours || {} };
+  }
+  async function refreshPlusStatus() {
+    const config = getConfig2();
+    if (!config?.username) return false;
+    try {
+      const info = await validateUser2(config.username);
+      if (info.isPlus !== (config.isPlus ?? false)) {
+        saveConfig2({ ...config, isPlus: info.isPlus });
+        return true;
+      }
+    } catch {
+    }
+    return false;
   }
   function extractSpotifyUri(externalIds, type) {
     const ids = externalIds?.spotify;
@@ -1642,26 +2116,51 @@ var ListeningStatsApp = (() => {
   }
 
   // src/services/providers/statsfm.ts
-  var PERIODS3 = ["weeks", "months", "lifetime"];
-  var PERIOD_LABELS3 = {
+  var FREE_PERIODS = ["weeks", "months", "lifetime"];
+  var FREE_LABELS = {
+    weeks: "4 Weeks",
+    months: "6 Months",
+    lifetime: "Lifetime"
+  };
+  var PLUS_PERIODS = ["today", "days", "weeks", "months", "lifetime"];
+  var PLUS_LABELS = {
+    today: "Today",
+    days: "This Week",
     weeks: "4 Weeks",
     months: "6 Months",
     lifetime: "Lifetime"
   };
   function createStatsfmProvider() {
+    const config = getConfig2();
+    const isPlus = config?.isPlus ?? false;
+    const periods = isPlus ? [...PLUS_PERIODS] : [...FREE_PERIODS];
+    const periodLabels = isPlus ? { ...PLUS_LABELS } : { ...FREE_LABELS };
     return {
       type: "statsfm",
-      periods: [...PERIODS3],
-      periodLabels: PERIOD_LABELS3,
+      periods,
+      periodLabels,
       defaultPeriod: "weeks",
       init() {
         initPoller("statsfm");
+        refreshPlusStatus().catch(() => {
+        });
       },
       destroy() {
         destroyPoller();
       },
       async calculateStats(period) {
-        return calculateStatsfmStats(period);
+        try {
+          return await calculateStatsfmStats(period);
+        } catch (err) {
+          if (err?.message?.includes("400") && (period === "today" || period === "days")) {
+            const cfg = getConfig2();
+            if (cfg) {
+              saveConfig2({ ...cfg, isPlus: false });
+            }
+            return calculateStatsfmStats("weeks");
+          }
+          throw err;
+        }
       }
     };
   }
@@ -1672,18 +2171,20 @@ var ListeningStatsApp = (() => {
       topAlbumsRaw,
       topGenresRaw,
       recentRaw,
-      streamStats
+      streamStats,
+      dateStats
     ] = await Promise.all([
       getTopTracks2(range, 50),
       getTopArtists2(range, 50),
       getTopAlbums2(range, 50),
       getTopGenres(range, 20),
       getRecentStreams(50).catch(() => []),
-      getStreamStats().catch(() => ({
+      getStreamStats(range).catch(() => ({
         durationMs: 0,
         count: 0,
         cardinality: { tracks: 0, artists: 0, albums: 0 }
-      }))
+      })),
+      getDateStats(range).catch(() => ({ hours: {} }))
     ]);
     const pollingData = getPollingData();
     const topTracks = topTracksRaw.slice(0, 10).map((item, i) => ({
@@ -1754,10 +2255,20 @@ var ListeningStatsApp = (() => {
       genres[g.genre.tag] = g.streams ?? g.position;
     }
     const topGenres = topGenresRaw.slice(0, 10).map((g) => ({ genre: g.genre.tag, count: g.streams ?? g.position }));
-    const hourlyDistribution = new Array(24).fill(0);
-    for (const t of recentTracks) {
-      const hour = new Date(t.playedAt).getHours();
-      hourlyDistribution[hour]++;
+    let hourlyDistribution = new Array(24).fill(0);
+    const hasDateStats = Object.keys(dateStats.hours).length > 0;
+    if (hasDateStats) {
+      for (const [hour, stat] of Object.entries(dateStats.hours)) {
+        const h = parseInt(hour, 10);
+        if (h >= 0 && h < 24) {
+          hourlyDistribution[h] = stat.count;
+        }
+      }
+    } else {
+      for (const t of recentTracks) {
+        const hour = new Date(t.playedAt).getHours();
+        hourlyDistribution[hour]++;
+      }
     }
     const uniqueTrackCount = streamStats.cardinality?.tracks || new Set(
       topTracksRaw.map(
@@ -1873,9 +2384,9 @@ var ListeningStatsApp = (() => {
       throw new Error("No tracking provider active");
     }
     const cacheKey = `${provider.type}:${period}`;
-    const cached = statsCache.get(cacheKey);
-    if (cached && Date.now() < cached.expiresAt) {
-      return cached.data;
+    const cached2 = statsCache.get(cacheKey);
+    if (cached2 && Date.now() < cached2.expiresAt) {
+      return cached2.data;
     }
     const data = await provider.calculateStats(period);
     statsCache.set(cacheKey, { data, expiresAt: Date.now() + STATS_CACHE_TTL });
@@ -1919,7 +2430,7 @@ var ListeningStatsApp = (() => {
   var INSTALL_CMD_WINDOWS = `iwr -useb 'https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.ps1' | iex`;
   function getCurrentVersion() {
     try {
-      return "1.2.47";
+      return "1.3.1";
     } catch {
       return "0.0.0";
     }
@@ -2007,6 +2518,80 @@ var ListeningStatsApp = (() => {
     }
   }
 
+  // src/app/format.ts
+  var numberFormatter = new Intl.NumberFormat();
+  function formatNumber(n) {
+    return numberFormatter.format(n);
+  }
+  function formatHour(h) {
+    const { use24HourTime } = getPreferences();
+    if (use24HourTime) {
+      return h.toString().padStart(2, "0") + ":00";
+    }
+    if (h === 0) return "12am";
+    if (h === 12) return "12pm";
+    return h < 12 ? `${h}am` : `${h - 12}pm`;
+  }
+  function renderMarkdown(text) {
+    if (!text) return "";
+    let html = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    const codeBlocks = [];
+    html = html.replace(/`([^`]+)`/g, (_match, code) => {
+      const idx = codeBlocks.length;
+      codeBlocks.push(`<code>${code}</code>`);
+      return `\0CODE${idx}\0`;
+    });
+    const lines = html.split("\n");
+    const processed = [];
+    let inList = false;
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+      if (line.match(/^###\s+(.+)$/)) {
+        if (inList) {
+          processed.push("</ul>");
+          inList = false;
+        }
+        processed.push(`<h5>${line.replace(/^###\s+/, "")}</h5>`);
+        continue;
+      }
+      if (line.match(/^##\s+(.+)$/)) {
+        if (inList) {
+          processed.push("</ul>");
+          inList = false;
+        }
+        processed.push(`<h4>${line.replace(/^##\s+/, "")}</h4>`);
+        continue;
+      }
+      if (line.match(/^[\-\*]\s+(.+)$/)) {
+        if (!inList) {
+          processed.push("<ul>");
+          inList = true;
+        }
+        processed.push(`<li>${line.replace(/^[\-\*]\s+/, "")}</li>`);
+        continue;
+      }
+      if (inList) {
+        processed.push("</ul>");
+        inList = false;
+      }
+      if (line.trim() === "") {
+        processed.push("<br>");
+        continue;
+      }
+      processed.push(line);
+    }
+    if (inList) {
+      processed.push("</ul>");
+    }
+    html = processed.join("\n");
+    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "<em>$1</em>");
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    html = html.replace(/\x00CODE(\d+)\x00/g, (_match, idx) => codeBlocks[parseInt(idx)]);
+    html = html.replace(/(?<!\>)\n(?!\<)/g, "<br>");
+    return html;
+  }
+
   // src/app/icons.ts
   var Icons = {
     heart: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M1.69 2A4.582 4.582 0 018 2.023 4.583 4.583 0 0114.31 2a4.583 4.583 0 010 6.496L8 14.153l-6.31-5.657A4.583 4.583 0 011.69 2m6.31 10.06l5.715-5.12a3.087 3.087 0 00-4.366-4.371L8 3.839l-1.35-1.27a3.087 3.087 0 00-4.366 4.37z"/></svg>',
@@ -2032,7 +2617,7 @@ var ListeningStatsApp = (() => {
     onDismiss,
     onCopyCommand
   }) {
-    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-page" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-container" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-header" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-icon" }, "\u{1F389}"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-title" }, "Update Available!"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-version" }, "v", updateInfo.currentVersion, " \u2192 v", updateInfo.latestVersion)), updateInfo.changelog && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-changelog" }, updateInfo.changelog), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-links" }, /* @__PURE__ */ Spicetify.React.createElement(
+    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-page" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-container" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-header" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-icon" }, "\u{1F389}"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-title" }, "Update Available!"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-version" }, "v", updateInfo.currentVersion, " \u2192 v", updateInfo.latestVersion)), updateInfo.changelog && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-changelog", dangerouslySetInnerHTML: { __html: renderMarkdown(updateInfo.changelog) } }), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "update-banner-links" }, /* @__PURE__ */ Spicetify.React.createElement(
       "a",
       {
         className: "lastfm-help-link standalone",
@@ -2185,6 +2770,22 @@ var ListeningStatsApp = (() => {
   // src/app/components/SettingsPanel.tsx
   init_storage();
   var { useState } = Spicetify.React;
+  function SettingsCategory({
+    title,
+    children,
+    defaultOpen = false
+  }) {
+    const [open, setOpen] = useState(defaultOpen);
+    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-category" }, /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        className: `settings-category-header ${open ? "open" : ""}`,
+        onClick: () => setOpen(!open)
+      },
+      /* @__PURE__ */ Spicetify.React.createElement("span", null, title),
+      /* @__PURE__ */ Spicetify.React.createElement("span", { className: `settings-chevron ${open ? "open" : ""}` })
+    ), open && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-category-body" }, children));
+  }
   var PROVIDER_NAMES = {
     local: "Local Tracking",
     lastfm: "Last.fm",
@@ -2213,6 +2814,7 @@ var ListeningStatsApp = (() => {
     const sfmConnected = isConnected2();
     const sfmConfig = getConfig2();
     const [loggingOn, setLoggingOn] = useState(isLoggingEnabled());
+    const [use24h, setUse24h] = useState(getPreferences().use24HourTime);
     const switchProvider = (type) => {
       activateProvider(type);
       setShowProviderPicker(false);
@@ -2247,7 +2849,7 @@ var ListeningStatsApp = (() => {
       setSfmError("");
       try {
         const info = await validateUser2(sfmUsername.trim());
-        saveConfig2({ username: info.customId });
+        saveConfig2({ username: info.customId, isPlus: info.isPlus });
         switchProvider("statsfm");
       } catch (err) {
         setSfmError(err.message || "Connection failed");
@@ -2274,21 +2876,58 @@ var ListeningStatsApp = (() => {
         onClick: onClose,
         dangerouslySetInnerHTML: { __html: Icons.close || "&times;" }
       }
-    )), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-provider" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Data Source"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-provider-current" }, /* @__PURE__ */ Spicetify.React.createElement("span", null, "Currently using:", " ", /* @__PURE__ */ Spicetify.React.createElement("strong", null, currentProvider ? PROVIDER_NAMES[currentProvider] : "None")), /* @__PURE__ */ Spicetify.React.createElement(
+    )), /* @__PURE__ */ Spicetify.React.createElement(SettingsCategory, { title: "Data Source", defaultOpen: true }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-provider-current" }, /* @__PURE__ */ Spicetify.React.createElement("span", null, "Currently using:", " ", /* @__PURE__ */ Spicetify.React.createElement("strong", null, currentProvider ? PROVIDER_NAMES[currentProvider] : "None")), /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: "footer-btn",
         onClick: () => setShowProviderPicker(!showProviderPicker)
       },
       "Change"
+    )), !showProviderPicker && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "provider-guides-row" }, currentProvider !== "statsfm" && !sfmConnected && /* @__PURE__ */ Spicetify.React.createElement(
+      "a",
+      {
+        className: "provider-setup-link",
+        href: "https://github.com/Xndr2/listening-stats/wiki/stats.fm-Setup-Guide",
+        target: "_blank",
+        rel: "noopener noreferrer"
+      },
+      "stats.fm Setup Guide",
+      " ",
+      /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
+    ), currentProvider !== "lastfm" && !lfmConnected && /* @__PURE__ */ Spicetify.React.createElement(
+      "a",
+      {
+        className: "provider-setup-link",
+        href: "https://github.com/Xndr2/listening-stats/wiki/Last.fm-Setup-Guide",
+        target: "_blank",
+        rel: "noopener noreferrer"
+      },
+      "Last.fm Setup Guide",
+      " ",
+      /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
     )), showProviderPicker && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-provider-picker" }, sfmConnected || currentProvider === "statsfm" ? /* @__PURE__ */ Spicetify.React.createElement(
-      "button",
+      "div",
       {
         className: `provider-option ${currentProvider === "statsfm" ? "active" : ""}`,
-        onClick: () => switchProvider("statsfm")
+        onClick: () => switchProvider("statsfm"),
+        role: "button",
+        tabIndex: 0
       },
       /* @__PURE__ */ Spicetify.React.createElement("strong", null, "stats.fm"),
-      /* @__PURE__ */ Spicetify.React.createElement("span", null, "Connected as ", sfmConfig?.username || "...")
+      /* @__PURE__ */ Spicetify.React.createElement("span", null, "Connected as ", sfmConfig?.username || "..."),
+      /* @__PURE__ */ Spicetify.React.createElement(
+        "a",
+        {
+          className: "provider-setup-link",
+          href: "https://github.com/Xndr2/listening-stats/wiki/stats.fm-Setup-Guide",
+          target: "_blank",
+          rel: "noopener noreferrer",
+          onClick: (e) => e.stopPropagation()
+        },
+        "View Setup Guide",
+        " ",
+        /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
+      )
     ) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "provider-option lastfm-setup" }, /* @__PURE__ */ Spicetify.React.createElement("strong", null, "stats.fm"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-lastfm-form compact" }, /* @__PURE__ */ Spicetify.React.createElement(
       "input",
       {
@@ -2307,14 +2946,40 @@ var ListeningStatsApp = (() => {
         disabled: sfmValidating
       },
       sfmValidating ? "Connecting..." : "Connect & Switch"
-    ))), lfmConnected || currentProvider === "lastfm" ? /* @__PURE__ */ Spicetify.React.createElement(
-      "button",
+    )), /* @__PURE__ */ Spicetify.React.createElement(
+      "a",
+      {
+        className: "provider-setup-link",
+        href: "https://github.com/Xndr2/listening-stats/wiki/stats.fm-Setup-Guide",
+        target: "_blank",
+        rel: "noopener noreferrer"
+      },
+      "View Setup Guide",
+      " ",
+      /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
+    )), lfmConnected || currentProvider === "lastfm" ? /* @__PURE__ */ Spicetify.React.createElement(
+      "div",
       {
         className: `provider-option ${currentProvider === "lastfm" ? "active" : ""}`,
-        onClick: () => switchProvider("lastfm")
+        onClick: () => switchProvider("lastfm"),
+        role: "button",
+        tabIndex: 0
       },
       /* @__PURE__ */ Spicetify.React.createElement("strong", null, "Last.fm"),
-      /* @__PURE__ */ Spicetify.React.createElement("span", null, "Connected as ", lfmConfig?.username || "...")
+      /* @__PURE__ */ Spicetify.React.createElement("span", null, "Connected as ", lfmConfig?.username || "..."),
+      /* @__PURE__ */ Spicetify.React.createElement(
+        "a",
+        {
+          className: "provider-setup-link",
+          href: "https://github.com/Xndr2/listening-stats/wiki/Last.fm-Setup-Guide",
+          target: "_blank",
+          rel: "noopener noreferrer",
+          onClick: (e) => e.stopPropagation()
+        },
+        "View Setup Guide",
+        " ",
+        /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
+      )
     ) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "provider-option lastfm-setup" }, /* @__PURE__ */ Spicetify.React.createElement("strong", null, "Last.fm"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-lastfm-form compact" }, /* @__PURE__ */ Spicetify.React.createElement(
       "input",
       {
@@ -2343,7 +3008,18 @@ var ListeningStatsApp = (() => {
         disabled: lfmValidating
       },
       lfmValidating ? "Connecting..." : "Connect & Switch"
-    ))), /* @__PURE__ */ Spicetify.React.createElement(
+    )), /* @__PURE__ */ Spicetify.React.createElement(
+      "a",
+      {
+        className: "provider-setup-link",
+        href: "https://github.com/Xndr2/listening-stats/wiki/Last.fm-Setup-Guide",
+        target: "_blank",
+        rel: "noopener noreferrer"
+      },
+      "View Setup Guide",
+      " ",
+      /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
+    )), /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: `provider-option ${currentProvider === "local" ? "active" : ""}`,
@@ -2351,7 +3027,88 @@ var ListeningStatsApp = (() => {
       },
       /* @__PURE__ */ Spicetify.React.createElement("strong", null, "Local Tracking"),
       /* @__PURE__ */ Spicetify.React.createElement("span", null, "Tracks on this device with IndexedDB")
-    ))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ Spicetify.React.createElement(
+    )), currentProvider === "lastfm" && lfmConnected && lfmConfig && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Last.fm Account"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm-connected" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm-info" }, /* @__PURE__ */ Spicetify.React.createElement(
+      "span",
+      {
+        className: "lastfm-status-icon",
+        dangerouslySetInnerHTML: { __html: Icons.check }
+      }
+    ), /* @__PURE__ */ Spicetify.React.createElement("span", null, "Connected as ", /* @__PURE__ */ Spicetify.React.createElement("strong", null, lfmConfig.username))), /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        className: "footer-btn danger",
+        onClick: () => {
+          handleLfmDisconnect();
+          switchProvider("local");
+        }
+      },
+      "Disconnect"
+    ))), currentProvider === "statsfm" && sfmConnected && sfmConfig && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "stats.fm Account"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm-connected" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm-info" }, /* @__PURE__ */ Spicetify.React.createElement(
+      "span",
+      {
+        className: "lastfm-status-icon",
+        dangerouslySetInnerHTML: { __html: Icons.check }
+      }
+    ), /* @__PURE__ */ Spicetify.React.createElement("span", null, "Connected as ", /* @__PURE__ */ Spicetify.React.createElement("strong", null, sfmConfig.username))), /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        className: "footer-btn danger",
+        onClick: () => {
+          handleSfmDisconnect();
+          switchProvider("local");
+        }
+      },
+      "Disconnect"
+    )))), /* @__PURE__ */ Spicetify.React.createElement(SettingsCategory, { title: "Display" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-info" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "24-hour time"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Show times as 14:00 instead of 2pm")), /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        className: `settings-toggle ${use24h ? "active" : ""}`,
+        onClick: () => {
+          const next = !use24h;
+          setPreference("use24HourTime", next);
+          setUse24h(next);
+        }
+      },
+      /* @__PURE__ */ Spicetify.React.createElement("span", { className: "settings-toggle-knob" })
+    ))), /* @__PURE__ */ Spicetify.React.createElement(SettingsCategory, { title: "Layout" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-info" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Card Order"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Drag section headers on the main page to reorder cards.")), /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        className: "footer-btn",
+        onClick: () => {
+          window.dispatchEvent(
+            new CustomEvent("listening-stats:reset-layout")
+          );
+          Spicetify.showNotification("Layout reset to default");
+        }
+      },
+      "Reset to Default"
+    )), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-info" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Feature Tour"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Walk through the app's features with a guided tooltip tour.")), /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        className: "footer-btn",
+        onClick: () => {
+          onClose?.();
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("listening-stats:start-tour"));
+          }, 300);
+        }
+      },
+      "Restart Tour"
+    ))), /* @__PURE__ */ Spicetify.React.createElement(SettingsCategory, { title: "Advanced" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-info" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Console Logging"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Log tracked songs, skips, and playback events to the browser console (F12).")), /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        className: `settings-toggle ${loggingOn ? "active" : ""}`,
+        onClick: () => {
+          const next = !loggingOn;
+          setLoggingEnabled(next);
+          setLoggingOn(next);
+          Spicetify.showNotification(
+            next ? "Logging enabled. Open DevTools (Ctrl + Shift + I) to see output" : "Logging disabled"
+          );
+        }
+      },
+      /* @__PURE__ */ Spicetify.React.createElement("span", { className: "settings-toggle-knob" })
+    )), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-actions-row" }, /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: "footer-btn",
@@ -2375,23 +3132,7 @@ var ListeningStatsApp = (() => {
         }
       },
       "Clear Cache"
-    ), /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn", onClick: onCheckUpdates }, "Check Updates"), currentProvider === "local" && /* @__PURE__ */ Spicetify.React.createElement(
-      "button",
-      {
-        className: "footer-btn danger",
-        onClick: () => {
-          if (confirm(
-            "Delete all local tracking data? This cannot be undone."
-          )) {
-            clearAllData();
-            clearPollingData();
-            Spicetify.showNotification("All local data cleared");
-            onRefresh();
-          }
-        }
-      },
-      "Reset Local Data"
-    )), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-export" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Export Data"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ Spicetify.React.createElement(
+    ), /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn", onClick: onCheckUpdates }, "Check Updates")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-export" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Export Data"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-actions-row" }, /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: "footer-btn",
@@ -2427,53 +3168,24 @@ var ListeningStatsApp = (() => {
         }
       },
       "Raw History (CSV)"
-    )))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-info" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Console Logging"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Log tracked songs, skips, and playback events to the browser console (F12).")), /* @__PURE__ */ Spicetify.React.createElement(
-      "button",
-      {
-        className: `settings-toggle ${loggingOn ? "active" : ""}`,
-        onClick: () => {
-          const next = !loggingOn;
-          setLoggingEnabled(next);
-          setLoggingOn(next);
-          Spicetify.showNotification(
-            next ? "Logging enabled. Open DevTools (Ctrl + Shift + I) to see output" : "Logging disabled"
-          );
-        }
-      },
-      /* @__PURE__ */ Spicetify.React.createElement("span", { className: "settings-toggle-knob" })
-    )), currentProvider === "lastfm" && lfmConnected && lfmConfig && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Last.fm Account"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm-connected" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm-info" }, /* @__PURE__ */ Spicetify.React.createElement(
-      "span",
-      {
-        className: "lastfm-status-icon",
-        dangerouslySetInnerHTML: { __html: Icons.check }
-      }
-    ), /* @__PURE__ */ Spicetify.React.createElement("span", null, "Connected as ", /* @__PURE__ */ Spicetify.React.createElement("strong", null, lfmConfig.username))), /* @__PURE__ */ Spicetify.React.createElement(
+    )))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-danger-zone" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Danger Zone"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-danger-desc" }, "Wipe all data and return to the setup screen. This clears the IndexedDB database, all saved accounts, caches, and preferences."), currentProvider === "local" && /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: "footer-btn danger",
+        style: { marginBottom: 8 },
         onClick: () => {
-          handleLfmDisconnect();
-          switchProvider("local");
+          if (confirm(
+            "Delete all local tracking data? This cannot be undone."
+          )) {
+            clearAllData();
+            clearPollingData();
+            Spicetify.showNotification("All local data cleared");
+            onRefresh();
+          }
         }
       },
-      "Disconnect"
-    ))), currentProvider === "statsfm" && sfmConnected && sfmConfig && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "stats.fm Account"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm-connected" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-lastfm-info" }, /* @__PURE__ */ Spicetify.React.createElement(
-      "span",
-      {
-        className: "lastfm-status-icon",
-        dangerouslySetInnerHTML: { __html: Icons.check }
-      }
-    ), /* @__PURE__ */ Spicetify.React.createElement("span", null, "Connected as ", /* @__PURE__ */ Spicetify.React.createElement("strong", null, sfmConfig.username))), /* @__PURE__ */ Spicetify.React.createElement(
-      "button",
-      {
-        className: "footer-btn danger",
-        onClick: () => {
-          handleSfmDisconnect();
-          switchProvider("local");
-        }
-      },
-      "Disconnect"
-    ))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-danger-zone" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Danger Zone"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-danger-desc" }, "Wipe all data and return to the setup screen. This clears the IndexedDB database, all saved accounts, caches, and preferences."), /* @__PURE__ */ Spicetify.React.createElement(
+      "Reset Local Data"
+    ), /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: "footer-btn danger",
@@ -2492,11 +3204,16 @@ var ListeningStatsApp = (() => {
             clearStatsfmCache();
             clearProviderSelection();
             try {
-              localStorage.removeItem("listening-stats:sfm-promo-dismissed");
+              localStorage.removeItem(
+                "listening-stats:sfm-promo-dismissed"
+              );
               localStorage.removeItem("listening-stats:lastUpdateCheck");
               localStorage.removeItem("listening-stats:lastUpdate");
               localStorage.removeItem("listening-stats:searchCache");
               localStorage.removeItem("listening-stats:logging");
+              localStorage.removeItem("listening-stats:preferences");
+              localStorage.removeItem("listening-stats:tour-seen");
+              localStorage.removeItem("listening-stats:tour-version");
             } catch {
             }
             onReset?.();
@@ -2504,7 +3221,7 @@ var ListeningStatsApp = (() => {
         }
       },
       "Wipe Everything"
-    )));
+    ))));
   }
 
   // src/app/utils.ts
@@ -2552,11 +3269,6 @@ var ListeningStatsApp = (() => {
       console.error("[ListeningStats] Failed to check liked status:", error);
     }
     return result;
-  }
-  function formatHour(h) {
-    if (h === 0) return "12am";
-    if (h === 12) return "12pm";
-    return h < 12 ? `${h}am` : `${h - 12}pm`;
   }
   function formatMinutes(ms) {
     return `${Math.round(ms / 6e4)} min`;
@@ -2642,6 +3354,53 @@ var ListeningStatsApp = (() => {
     )));
   }
 
+  // src/app/components/PortalTooltip.tsx
+  var { useState: useState3, useRef: useRef2, useCallback } = Spicetify.React;
+  function PortalTooltip({ text, children, className, style }) {
+    const [show, setShow] = useState3(false);
+    const [pos, setPos] = useState3({ top: 0, left: 0 });
+    const ref = useRef2(null);
+    const onEnter = useCallback(() => {
+      if (ref.current) {
+        const rect = ref.current.getBoundingClientRect();
+        setPos({
+          top: rect.top - 8,
+          left: rect.left + rect.width / 2
+        });
+      }
+      setShow(true);
+    }, []);
+    const onLeave = useCallback(() => setShow(false), []);
+    return /* @__PURE__ */ Spicetify.React.createElement(
+      "div",
+      {
+        ref,
+        className,
+        style,
+        onMouseEnter: onEnter,
+        onMouseLeave: onLeave
+      },
+      children,
+      show && Spicetify.ReactDOM.createPortal(
+        /* @__PURE__ */ Spicetify.React.createElement(
+          "div",
+          {
+            className: "stat-tooltip-portal",
+            style: {
+              position: "fixed",
+              top: pos.top,
+              left: pos.left,
+              transform: "translate(-50%, -100%)",
+              zIndex: 9990
+            }
+          },
+          text
+        ),
+        document.body
+      )
+    );
+  }
+
   // src/app/components/OverviewCards.tsx
   function OverviewCards({
     stats,
@@ -2659,7 +3418,64 @@ var ListeningStatsApp = (() => {
         periodLabels,
         onPeriodChange
       }
-    ), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-secondary" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-value" }, /* @__PURE__ */ Spicetify.React.createElement(AnimatedNumber, { value: stats.trackCount })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-label" }, "Tracks")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-value" }, /* @__PURE__ */ Spicetify.React.createElement(AnimatedNumber, { value: stats.uniqueArtistCount })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-label" }, "Artists")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-value" }, /* @__PURE__ */ Spicetify.React.createElement(AnimatedNumber, { value: stats.uniqueTrackCount })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-label" }, "Unique")), stats.lastfmConnected && stats.totalScrobbles ? /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-value" }, stats.totalScrobbles.toLocaleString()), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-label" }, "Scrobbles")) : null)), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card-list" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-colored" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-text" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value green" }, "$", payout), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "Spotify paid artists"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label-tooltip" }, "From you listening to their music!")))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-colored" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-text" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value orange" }, stats.streakDays), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "Day Streak"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label-tooltip" }, "Resets at midnight local time.")))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-colored" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-text" }, stats.newArtistsCount > 0 ? /* @__PURE__ */ Spicetify.React.createElement(Spicetify.React.Fragment, null, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value purple" }, stats.newArtistsCount), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "New Artists"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label-tooltip" }, "You're cool if this is high!")) : /* @__PURE__ */ Spicetify.React.createElement(Spicetify.React.Fragment, null, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value purple" }, stats.listenedDays), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "Days Listened"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label-tooltip" }, "Days with at least one play."))))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-colored" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-text" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value red" }, Math.floor(stats.skipRate * 100), "%"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "Skip Rate"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label-tooltip" }, "Get this as low as possible!"))))));
+    ), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-secondary" }, /* @__PURE__ */ Spicetify.React.createElement(PortalTooltip, { text: "Total number of tracks played (including repeats)" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-value" }, /* @__PURE__ */ Spicetify.React.createElement(AnimatedNumber, { value: stats.trackCount, format: formatNumber })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-label" }, "Tracks"))), /* @__PURE__ */ Spicetify.React.createElement(PortalTooltip, { text: "Number of different artists you've listened to" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-value" }, /* @__PURE__ */ Spicetify.React.createElement(AnimatedNumber, { value: stats.uniqueArtistCount, format: formatNumber })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-label" }, "Artists"))), /* @__PURE__ */ Spicetify.React.createElement(PortalTooltip, { text: "Number of different tracks you've listened to" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-value" }, /* @__PURE__ */ Spicetify.React.createElement(AnimatedNumber, { value: stats.uniqueTrackCount, format: formatNumber })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-label" }, "Unique"))), stats.lastfmConnected && stats.totalScrobbles ? /* @__PURE__ */ Spicetify.React.createElement(PortalTooltip, { text: "Total plays recorded by Last.fm" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-value" }, formatNumber(stats.totalScrobbles)), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-stat-label" }, "Scrobbles"))) : null)), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card-list" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-colored" }, /* @__PURE__ */ Spicetify.React.createElement(PortalTooltip, { text: "Estimated amount Spotify paid artists from your streams ($0.004/stream)" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-text" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value green" }, "$", payout), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "Spotify paid artists"))))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-colored" }, /* @__PURE__ */ Spicetify.React.createElement(PortalTooltip, { text: "Consecutive days with at least one play" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-text" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value orange" }, formatNumber(stats.streakDays)), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "Day Streak"))))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-colored" }, /* @__PURE__ */ Spicetify.React.createElement(PortalTooltip, { text: stats.newArtistsCount > 0 ? "Artists you listened to for the first time in this period" : "Number of days with at least one play in this period" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-text" }, stats.newArtistsCount > 0 ? /* @__PURE__ */ Spicetify.React.createElement(Spicetify.React.Fragment, null, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value purple" }, formatNumber(stats.newArtistsCount)), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "New Artists")) : /* @__PURE__ */ Spicetify.React.createElement(Spicetify.React.Fragment, null, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value purple" }, formatNumber(stats.listenedDays)), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "Days Listened")))))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-card" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-colored" }, /* @__PURE__ */ Spicetify.React.createElement(PortalTooltip, { text: "Percentage of tracks skipped before the play threshold" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stat-text" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-value red" }, Math.floor(stats.skipRate * 100), "%"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "overview-label" }, "Skip Rate")))))));
+  }
+
+  // src/app/components/ImageWithRetry.tsx
+  var { useState: useState4, useRef: useRef3, useEffect: useEffect2 } = Spicetify.React;
+  function ImageWithRetry({
+    src,
+    className = "",
+    alt = "",
+    maxRetries = 3
+  }) {
+    const [attempt, setAttempt] = useState4(0);
+    const [failed, setFailed] = useState4(false);
+    const prevSrcRef = useRef3(src);
+    const timerRef = useRef3(null);
+    useEffect2(() => {
+      if (prevSrcRef.current !== src) {
+        prevSrcRef.current = src;
+        setAttempt(0);
+        setFailed(false);
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+      }
+    }, [src]);
+    useEffect2(() => {
+      return () => {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+        }
+      };
+    }, []);
+    const handleError = () => {
+      if (attempt < maxRetries) {
+        const delay = 1e3 * Math.pow(2, attempt);
+        timerRef.current = setTimeout(() => {
+          timerRef.current = null;
+          setAttempt((prev) => prev + 1);
+        }, delay);
+      } else {
+        setFailed(true);
+      }
+    };
+    if (failed || !src) {
+      return /* @__PURE__ */ Spicetify.React.createElement("div", { className: `${className} placeholder` });
+    }
+    const retrySrc = attempt > 0 ? src + (src.includes("?") ? "&" : "?") + `retry=${attempt}` : src;
+    return /* @__PURE__ */ Spicetify.React.createElement(
+      "img",
+      {
+        key: retrySrc,
+        src: retrySrc,
+        className,
+        alt,
+        onError: handleError
+      }
+    );
   }
 
   // src/app/components/TopLists.tsx
@@ -2679,10 +3495,10 @@ var ListeningStatsApp = (() => {
         onClick: () => t.trackUri ? navigateToUri(t.trackUri) : lazyNavigate("track", t.trackName, t.artistName)
       },
       /* @__PURE__ */ Spicetify.React.createElement("span", { className: `item-rank ${getRankClass(i)}` }, i + 1),
-      t.albumArt ? /* @__PURE__ */ Spicetify.React.createElement("img", { src: t.albumArt, className: "item-art", alt: "" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-art placeholder" }),
+      t.albumArt ? /* @__PURE__ */ Spicetify.React.createElement(ImageWithRetry, { src: t.albumArt, className: "item-art" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-art placeholder" }),
       /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-info" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-name" }, t.trackName), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-meta" }, t.artistName)),
-      /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-stats" }, t.playCount ? /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-plays" }, t.playCount, " plays") : null, t.totalTimeMs > 0 && /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-time" }, formatDuration(t.totalTimeMs))),
-      showLikeButtons && t.trackUri && /* @__PURE__ */ Spicetify.React.createElement(
+      /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-stats" }, t.playCount ? /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-plays" }, formatNumber(t.playCount), " plays") : null, t.totalTimeMs > 0 && /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-time" }, formatDuration(t.totalTimeMs))),
+      showLikeButtons && (t.trackUri ? /* @__PURE__ */ Spicetify.React.createElement(
         "button",
         {
           className: `heart-btn ${likedTracks.get(t.trackUri) ? "liked" : ""}`,
@@ -2691,7 +3507,13 @@ var ListeningStatsApp = (() => {
             __html: likedTracks.get(t.trackUri) ? Icons.heartFilled : Icons.heart
           }
         }
-      )
+      ) : /* @__PURE__ */ Spicetify.React.createElement(PortalTooltip, { text: "No Spotify link, can't save to library" }, /* @__PURE__ */ Spicetify.React.createElement(
+        "span",
+        {
+          className: "heart-btn disabled",
+          dangerouslySetInnerHTML: { __html: Icons.heart }
+        }
+      )))
     )))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "top-list" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "top-list-header" }, /* @__PURE__ */ Spicetify.React.createElement("h3", { className: "top-list-title" }, /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.users } }), "Top Artists")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-list" }, stats.topArtists.slice(0, itemCount).map((a, i) => {
       return /* @__PURE__ */ Spicetify.React.createElement(
         "div",
@@ -2701,9 +3523,15 @@ var ListeningStatsApp = (() => {
           onClick: () => a.artistUri ? navigateToUri(a.artistUri) : lazyNavigate("artist", a.artistName)
         },
         /* @__PURE__ */ Spicetify.React.createElement("span", { className: `item-rank ${getRankClass(i)}` }, i + 1),
-        a.artistImage ? /* @__PURE__ */ Spicetify.React.createElement("img", { src: a.artistImage, className: "item-art round", alt: "" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-art round placeholder artist-placeholder" }),
+        a.artistImage ? /* @__PURE__ */ Spicetify.React.createElement(
+          ImageWithRetry,
+          {
+            src: a.artistImage,
+            className: "item-art round"
+          }
+        ) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-art round placeholder artist-placeholder" }),
         /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-info" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-name" }, a.artistName), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-meta" }, a.genres?.slice(0, 2).join(", ") || "")),
-        a.playCount ? /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-stats" }, /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-plays" }, a.playCount, " plays")) : null
+        a.playCount ? /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-stats" }, /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-plays" }, formatNumber(a.playCount), " plays")) : null
       );
     }))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "top-list" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "top-list-header" }, /* @__PURE__ */ Spicetify.React.createElement("h3", { className: "top-list-title" }, /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.album } }), "Top Albums")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-list" }, stats.topAlbums.slice(0, itemCount).map((a, i) => /* @__PURE__ */ Spicetify.React.createElement(
       "div",
@@ -2713,9 +3541,9 @@ var ListeningStatsApp = (() => {
         onClick: () => a.albumUri ? navigateToUri(a.albumUri) : lazyNavigate("album", a.albumName, a.artistName)
       },
       /* @__PURE__ */ Spicetify.React.createElement("span", { className: `item-rank ${getRankClass(i)}` }, i + 1),
-      a.albumArt ? /* @__PURE__ */ Spicetify.React.createElement("img", { src: a.albumArt, className: "item-art", alt: "" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-art placeholder" }),
+      a.albumArt ? /* @__PURE__ */ Spicetify.React.createElement(ImageWithRetry, { src: a.albumArt, className: "item-art" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-art placeholder" }),
       /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-info" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-name" }, a.albumName), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-meta" }, a.artistName)),
-      /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-stats" }, a.playCount ? /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-plays" }, a.playCount, " plays") : null, /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-time" }, a.trackCount, " tracks"))
+      /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-stats" }, a.playCount ? /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-plays" }, formatNumber(a.playCount), " plays") : null, /* @__PURE__ */ Spicetify.React.createElement("span", { className: "item-time" }, formatNumber(a.trackCount), " tracks"))
     )))));
   }
 
@@ -2732,7 +3560,7 @@ var ListeningStatsApp = (() => {
         className: "recent-card",
         onClick: () => t.trackUri ? navigateToUri(t.trackUri) : lazyNavigate("track", t.trackName, t.artistName)
       },
-      t.albumArt ? /* @__PURE__ */ Spicetify.React.createElement("img", { src: t.albumArt, className: "recent-art", alt: "" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "recent-art placeholder" }),
+      t.albumArt ? /* @__PURE__ */ Spicetify.React.createElement(ImageWithRetry, { src: t.albumArt, className: "recent-art" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "recent-art placeholder" }),
       /* @__PURE__ */ Spicetify.React.createElement("div", { className: "recent-name" }, t.trackName),
       /* @__PURE__ */ Spicetify.React.createElement("div", { className: "recent-meta" }, t.artistName),
       /* @__PURE__ */ Spicetify.React.createElement("div", { className: "recent-time" }, timeAgo(t.playedAt))
@@ -2764,108 +3592,147 @@ var ListeningStatsApp = (() => {
   }
 
   // src/app/components/LastfmBanner.tsx
-  var { useState: useState3, useEffect: useEffect2 } = Spicetify.React;
+  var { useState: useState5, useEffect: useEffect3 } = Spicetify.React;
 
-  // src/app/components/SetupScreen.tsx
-  var { useState: useState4 } = Spicetify.React;
-  function SetupScreen({ onProviderSelected }) {
-    const [lfmUsername, setLfmUsername] = useState4("");
-    const [lfmApiKey, setLfmApiKey] = useState4("");
-    const [lfmValidating, setLfmValidating] = useState4(false);
-    const [lfmError, setLfmError] = useState4("");
-    const [sfmUsername, setSfmUsername] = useState4("");
-    const [sfmValidating, setSfmValidating] = useState4(false);
-    const [sfmError, setSfmError] = useState4("");
-    const handleLastfmSelect = async () => {
-      if (!lfmUsername.trim() || !lfmApiKey.trim()) {
-        setLfmError("Both username and API key are required");
+  // src/app/components/SetupWizard.tsx
+  var { useState: useState6, useEffect: useEffect4 } = Spicetify.React;
+  var STEPS = ["choose", "configure", "validate", "success"];
+  function SetupWizard({ onComplete }) {
+    const [stepIndex, setStepIndex] = useState6(0);
+    const [provider, setProvider] = useState6(null);
+    const [username, setUsername] = useState6("");
+    const [apiKey, setApiKey] = useState6("");
+    const [validating, setValidating] = useState6(false);
+    const [validationError, setValidationError] = useState6("");
+    const [confirmedUsername, setConfirmedUsername] = useState6("");
+    const currentStep = STEPS[stepIndex];
+    const goBack = () => {
+      if (stepIndex > 0) {
+        setValidationError("");
+        setValidating(false);
+        setStepIndex(stepIndex - 1);
+      }
+    };
+    const handleChooseProvider = (choice) => {
+      if (choice === "local") {
+        activateProvider("local");
+        onComplete();
         return;
       }
-      setLfmValidating(true);
-      setLfmError("");
-      try {
-        const info = await validateUser(
-          lfmUsername.trim(),
-          lfmApiKey.trim()
-        );
-        saveConfig({ username: info.username, apiKey: lfmApiKey.trim() });
-        activateProvider("lastfm");
-        onProviderSelected();
-      } catch (err) {
-        setLfmError(err.message || "Connection failed");
-      } finally {
-        setLfmValidating(false);
-      }
+      setProvider(choice);
+      setUsername("");
+      setApiKey("");
+      setValidationError("");
+      setStepIndex(1);
     };
-    const handleStatsfmSelect = async () => {
-      if (!sfmUsername.trim()) {
-        setSfmError("Username is required");
-        return;
-      }
-      setSfmValidating(true);
-      setSfmError("");
-      try {
-        const info = await validateUser2(sfmUsername.trim());
-        saveConfig2({ username: info.customId });
-        activateProvider("statsfm");
-        onProviderSelected();
-      } catch (err) {
-        setSfmError(err.message || "Connection failed");
-      } finally {
-        setSfmValidating(false);
-      }
+    const handleConfigureNext = () => {
+      if (provider === "statsfm" && !username.trim()) return;
+      if (provider === "lastfm" && (!username.trim() || !apiKey.trim())) return;
+      setStepIndex(2);
     };
-    const handleLocalSelect = () => {
-      activateProvider("local");
-      onProviderSelected();
-    };
-    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-screen" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-header" }, /* @__PURE__ */ Spicetify.React.createElement("h1", { className: "setup-title" }, "Listening Stats"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "setup-subtitle" }, "Connect your stats.fm or Last.fm account to get started")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-main" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-card primary" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-card-icon" }, /* @__PURE__ */ Spicetify.React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ Spicetify.React.createElement("path", { d: "M2 4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4l-4 4-4-4H4a2 2 0 0 1-2-2V4zm6 3a1 1 0 0 0-1 1v4a1 1 0 0 0 2 0V8a1 1 0 0 0-1-1zm4-1a1 1 0 0 0-1 1v6a1 1 0 0 0 2 0V7a1 1 0 0 0-1-1zm4 2a1 1 0 0 0-1 1v3a1 1 0 0 0 2 0V9a1 1 0 0 0-1-1z" }))), /* @__PURE__ */ Spicetify.React.createElement("h3", null, "stats.fm ", /* @__PURE__ */ Spicetify.React.createElement("span", { className: "setup-badge" }, "Recommended")), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "setup-card-desc" }, "Detailed listening statistics with accurate play counts and listening time."), /* @__PURE__ */ Spicetify.React.createElement("ul", { className: "setup-card-pros" }, /* @__PURE__ */ Spicetify.React.createElement("li", null, "Accurate play counts & duration"), /* @__PURE__ */ Spicetify.React.createElement("li", null, "No API key needed"), /* @__PURE__ */ Spicetify.React.createElement("li", null, "Easy setup, just your username")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-lastfm-form" }, /* @__PURE__ */ Spicetify.React.createElement(
+    const providerLabel = provider === "statsfm" ? "stats.fm" : provider === "lastfm" ? "Last.fm" : "";
+    const canAdvanceConfigure = provider === "statsfm" ? username.trim().length > 0 : provider === "lastfm" ? username.trim().length > 0 && apiKey.trim().length > 0 : false;
+    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-wizard" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-progress" }, STEPS.map((step, i) => {
+      let cls = "wizard-dot";
+      if (i === stepIndex) cls += " wizard-dot--active";
+      else if (i < stepIndex) cls += " wizard-dot--completed";
+      return /* @__PURE__ */ Spicetify.React.createElement("div", { key: step, className: cls });
+    })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-step" }, currentStep === "choose" && /* @__PURE__ */ Spicetify.React.createElement(ChooseStep, { onChoose: handleChooseProvider }), currentStep === "configure" && /* @__PURE__ */ Spicetify.React.createElement(
+      ConfigureStep,
+      {
+        provider,
+        username,
+        apiKey,
+        onUsernameChange: setUsername,
+        onApiKeyChange: setApiKey,
+        onBack: goBack,
+        onNext: handleConfigureNext,
+        canAdvance: canAdvanceConfigure
+      }
+    ), currentStep === "validate" && /* @__PURE__ */ Spicetify.React.createElement(
+      ValidateStep,
+      {
+        provider,
+        username,
+        apiKey,
+        validating,
+        error: validationError,
+        onValidating: setValidating,
+        onError: setValidationError,
+        onSuccess: (name) => {
+          setConfirmedUsername(name);
+          setStepIndex(3);
+        },
+        onBack: goBack
+      }
+    ), currentStep === "success" && /* @__PURE__ */ Spicetify.React.createElement(
+      SuccessStep,
+      {
+        provider,
+        username: confirmedUsername,
+        onComplete
+      }
+    )));
+  }
+  function ChooseStep({
+    onChoose
+  }) {
+    return /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("h2", { className: "wizard-step-title" }, "Choose your data source"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "wizard-step-desc" }, "Select where your listening stats come from."), /* @__PURE__ */ Spicetify.React.createElement(
+      "div",
+      {
+        className: "wizard-card recommended",
+        onClick: () => onChoose("statsfm")
+      },
+      /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-card-header" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-card-icon" }, /* @__PURE__ */ Spicetify.React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ Spicetify.React.createElement("path", { d: "M2 4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4l-4 4-4-4H4a2 2 0 0 1-2-2V4zm6 3a1 1 0 0 0-1 1v4a1 1 0 0 0 2 0V8a1 1 0 0 0-1-1zm4-1a1 1 0 0 0-1 1v6a1 1 0 0 0 2 0V7a1 1 0 0 0-1-1zm4 2a1 1 0 0 0-1 1v3a1 1 0 0 0 2 0V9a1 1 0 0 0-1-1z" }))), /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("strong", null, "stats.fm"), /* @__PURE__ */ Spicetify.React.createElement("span", { className: "setup-badge" }, "Recommended"))),
+      /* @__PURE__ */ Spicetify.React.createElement("p", { className: "wizard-card-desc" }, "Accurate play counts and listening time. Just needs your username.")
+    ), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-card", onClick: () => onChoose("lastfm") }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-card-header" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-card-icon" }, /* @__PURE__ */ Spicetify.React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ Spicetify.React.createElement("path", { d: "M10.584 17.21l-.88-2.392s-1.43 1.594-3.573 1.594c-1.897 0-3.244-1.649-3.244-4.288 0-3.382 1.704-4.591 3.381-4.591 2.422 0 3.19 1.567 3.849 3.574l.88 2.749c.88 2.666 2.529 4.81 7.284 4.81 3.409 0 5.718-1.044 5.718-3.793 0-2.227-1.265-3.381-3.63-3.932l-1.758-.385c-1.21-.275-1.567-.77-1.567-1.595 0-.935.742-1.484 1.952-1.484 1.32 0 2.034.495 2.144 1.677l2.749-.33c-.22-2.474-1.924-3.492-4.729-3.492-2.474 0-4.893.935-4.893 3.932 0 1.87.907 3.051 3.189 3.602l1.87.44c1.402.33 1.869.907 1.869 1.704 0 1.017-.99 1.43-2.86 1.43-2.776 0-3.932-1.457-4.59-3.464l-.907-2.75c-1.155-3.573-2.997-4.893-6.653-4.893C2.144 5.333 0 7.89 0 12.233c0 4.18 2.144 6.434 5.993 6.434 3.106 0 4.591-1.457 4.591-1.457z" }))), /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("strong", null, "Last.fm"))), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "wizard-card-desc" }, "Accurate play counts across all devices. Requires an API key.")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-divider" }, /* @__PURE__ */ Spicetify.React.createElement("span", null, "or")), /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        className: "setup-alt-option",
+        onClick: () => onChoose("local")
+      },
+      /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.music } }),
+      /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("strong", null, "Use Local Tracking instead"), /* @__PURE__ */ Spicetify.React.createElement("span", null, "Tracks on this device only, no account needed"))
+    ));
+  }
+  function ConfigureStep({
+    provider,
+    username,
+    apiKey,
+    onUsernameChange,
+    onApiKeyChange,
+    onBack,
+    onNext,
+    canAdvance
+  }) {
+    return /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("h2", { className: "wizard-step-title" }, "Configure ", provider === "statsfm" ? "stats.fm" : "Last.fm"), provider === "statsfm" && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-form" }, /* @__PURE__ */ Spicetify.React.createElement(
       "input",
       {
         className: "lastfm-input",
         type: "text",
-        placeholder: "stats.fm username - From the URL bar, not the display name!",
-        value: sfmUsername,
-        onChange: (e) => setSfmUsername(e.target.value),
-        disabled: sfmValidating
+        placeholder: "stats.fm username",
+        value: username,
+        onChange: (e) => onUsernameChange(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter" && canAdvance) onNext();
+        }
       }
-    ), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-links" }, /* @__PURE__ */ Spicetify.React.createElement(
+    ), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "wizard-helper" }, "Your stats.fm username (from the URL bar, not your display name).", " ", /* @__PURE__ */ Spicetify.React.createElement(
       "a",
       {
-        className: "lastfm-help-link standalone",
-        href: "https://github.com/Xndr2/listening-stats/wiki/stats.fm-Setup-Guide",
-        target: "_blank",
-        rel: "noopener noreferrer"
-      },
-      "Setup guide",
-      /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
-    ), /* @__PURE__ */ Spicetify.React.createElement(
-      "a",
-      {
-        className: "lastfm-help-link standalone",
         href: "https://stats.fm",
         target: "_blank",
         rel: "noopener noreferrer"
       },
-      "Create an account",
-      /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
-    )), sfmError && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "lastfm-error" }, sfmError)), /* @__PURE__ */ Spicetify.React.createElement(
-      "button",
-      {
-        className: "footer-btn primary",
-        onClick: handleStatsfmSelect,
-        disabled: sfmValidating
-      },
-      sfmValidating ? "Connecting..." : "Connect & Start"
-    )), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-card primary" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-card-icon" }, /* @__PURE__ */ Spicetify.React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ Spicetify.React.createElement("path", { d: "M10.584 17.21l-.88-2.392s-1.43 1.594-3.573 1.594c-1.897 0-3.244-1.649-3.244-4.288 0-3.382 1.704-4.591 3.381-4.591 2.422 0 3.19 1.567 3.849 3.574l.88 2.749c.88 2.666 2.529 4.81 7.284 4.81 3.409 0 5.718-1.044 5.718-3.793 0-2.227-1.265-3.381-3.63-3.932l-1.758-.385c-1.21-.275-1.567-.77-1.567-1.595 0-.935.742-1.484 1.952-1.484 1.32 0 2.034.495 2.144 1.677l2.749-.33c-.22-2.474-1.924-3.492-4.729-3.492-2.474 0-4.893.935-4.893 3.932 0 1.87.907 3.051 3.189 3.602l1.87.44c1.402.33 1.869.907 1.869 1.704 0 1.017-.99 1.43-2.86 1.43-2.776 0-3.932-1.457-4.59-3.464l-.907-2.75c-1.155-3.573-2.997-4.893-6.653-4.893C2.144 5.333 0 7.89 0 12.233c0 4.18 2.144 6.434 5.993 6.434 3.106 0 4.591-1.457 4.591-1.457z" }))), /* @__PURE__ */ Spicetify.React.createElement("h3", null, "Last.fm"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "setup-card-desc" }, "Accurate play counts and listening history across all your devices."), /* @__PURE__ */ Spicetify.React.createElement("ul", { className: "setup-card-pros" }, /* @__PURE__ */ Spicetify.React.createElement("li", null, "Accurate play counts"), /* @__PURE__ */ Spicetify.React.createElement("li", null, "Tracks across all devices"), /* @__PURE__ */ Spicetify.React.createElement("li", null, "7 time period options")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-lastfm-form" }, /* @__PURE__ */ Spicetify.React.createElement(
+      "Don't have an account? Create one at stats.fm"
+    ))), provider === "lastfm" && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-form" }, /* @__PURE__ */ Spicetify.React.createElement(
       "input",
       {
         className: "lastfm-input",
         type: "text",
         placeholder: "Last.fm username",
-        value: lfmUsername,
-        onChange: (e) => setLfmUsername(e.target.value),
-        disabled: lfmValidating
+        value: username,
+        onChange: (e) => onUsernameChange(e.target.value)
       }
     ), /* @__PURE__ */ Spicetify.React.createElement(
       "input",
@@ -2873,39 +3740,106 @@ var ListeningStatsApp = (() => {
         className: "lastfm-input",
         type: "text",
         placeholder: "Last.fm API key",
-        value: lfmApiKey,
-        onChange: (e) => setLfmApiKey(e.target.value),
-        disabled: lfmValidating
+        value: apiKey,
+        onChange: (e) => onApiKeyChange(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter" && canAdvance) onNext();
+        }
       }
-    ), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-links" }, /* @__PURE__ */ Spicetify.React.createElement(
+    ), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-helper" }, /* @__PURE__ */ Spicetify.React.createElement("p", { style: { margin: "0 0 4px 0" } }, "How to get your API key:"), /* @__PURE__ */ Spicetify.React.createElement("ol", { style: { margin: 0, paddingLeft: "18px" } }, /* @__PURE__ */ Spicetify.React.createElement("li", null, "Visit", " ", /* @__PURE__ */ Spicetify.React.createElement(
       "a",
       {
-        className: "lastfm-help-link standalone",
-        href: "https://github.com/Xndr2/listening-stats/wiki/Last.fm-Setup-Guide",
-        target: "_blank",
-        rel: "noopener noreferrer"
-      },
-      "Setup guide",
-      /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
-    ), /* @__PURE__ */ Spicetify.React.createElement(
-      "a",
-      {
-        className: "lastfm-help-link standalone",
         href: "https://www.last.fm/api/account/create",
         target: "_blank",
         rel: "noopener noreferrer"
       },
-      "Get an API key",
-      /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.external } })
-    )), lfmError && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "lastfm-error" }, lfmError)), /* @__PURE__ */ Spicetify.React.createElement(
+      "last.fm/api/account/create"
+    )), /* @__PURE__ */ Spicetify.React.createElement("li", null, "Fill in the application form (any name works)"), /* @__PURE__ */ Spicetify.React.createElement("li", null, "Copy the API key shown on the next page")))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-actions" }, /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn", onClick: onBack }, "Back"), /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: "footer-btn primary",
-        onClick: handleLastfmSelect,
-        disabled: lfmValidating
+        onClick: onNext,
+        disabled: !canAdvance
       },
-      lfmValidating ? "Connecting..." : "Connect & Start"
-    )), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-divider" }, /* @__PURE__ */ Spicetify.React.createElement("span", null, "or")), /* @__PURE__ */ Spicetify.React.createElement("button", { className: "setup-alt-option", onClick: handleLocalSelect }, /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.music } }), /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("strong", null, "Use Local Tracking instead"), /* @__PURE__ */ Spicetify.React.createElement("span", null, "Tracks on this device only, no account needed")))));
+      "Next"
+    )));
+  }
+  function ValidateStep({
+    provider,
+    username,
+    apiKey,
+    validating,
+    error,
+    onValidating,
+    onError,
+    onSuccess,
+    onBack
+  }) {
+    const runValidation = () => {
+      onValidating(true);
+      onError("");
+      if (provider === "statsfm") {
+        validateUser2(username.trim()).then((info) => {
+          saveConfig2({ username: info.customId, isPlus: info.isPlus });
+          activateProvider("statsfm");
+          onSuccess(info.customId);
+        }).catch((err) => {
+          onError(err.message || "Connection failed");
+          onValidating(false);
+        });
+      } else {
+        validateUser(username.trim(), apiKey.trim()).then((info) => {
+          saveConfig({ username: info.username, apiKey: apiKey.trim() });
+          activateProvider("lastfm");
+          onSuccess(info.username);
+        }).catch((err) => {
+          onError(err.message || "Connection failed");
+          onValidating(false);
+        });
+      }
+    };
+    useEffect4(() => {
+      runValidation();
+    }, []);
+    if (error) {
+      return /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("h2", { className: "wizard-step-title" }, "Validation Failed"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-error" }, error), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-actions" }, /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn", onClick: onBack }, "Back"), /* @__PURE__ */ Spicetify.React.createElement(
+        "button",
+        {
+          className: "footer-btn primary",
+          onClick: () => {
+            onError("");
+            runValidation();
+          }
+        },
+        "Try Again"
+      )));
+    }
+    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-validating" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-spinner" }), /* @__PURE__ */ Spicetify.React.createElement("p", null, "Validating your account..."));
+  }
+  function SuccessStep({
+    provider,
+    username,
+    onComplete
+  }) {
+    const providerLabel = provider === "statsfm" ? "stats.fm" : "Last.fm";
+    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-success" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "wizard-success-icon" }, /* @__PURE__ */ Spicetify.React.createElement(
+      "svg",
+      {
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: "2.5",
+        strokeLinecap: "round",
+        strokeLinejoin: "round"
+      },
+      /* @__PURE__ */ Spicetify.React.createElement("path", { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }),
+      /* @__PURE__ */ Spicetify.React.createElement("polyline", { points: "22 4 12 14.01 9 11.01" })
+    )), /* @__PURE__ */ Spicetify.React.createElement("h2", { className: "wizard-step-title" }, "You're all set!"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "wizard-step-desc" }, "Connected to ", /* @__PURE__ */ Spicetify.React.createElement("strong", null, providerLabel), " as", " ", /* @__PURE__ */ Spicetify.React.createElement("strong", null, username), "."), /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn primary", onClick: onComplete }, "Start Exploring"));
+  }
+
+  // src/app/components/SetupScreen.tsx
+  function SetupScreen({ onProviderSelected }) {
+    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "setup-screen" }, /* @__PURE__ */ Spicetify.React.createElement(SetupWizard, { onComplete: onProviderSelected }));
   }
 
   // src/app/components/ActivityChart.tsx
@@ -2927,36 +3861,350 @@ var ListeningStatsApp = (() => {
     return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "activity-section" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "activity-header" }, /* @__PURE__ */ Spicetify.React.createElement("h3", { className: "activity-title" }, "Activity by Hour"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "activity-peak" }, "Peak: ", /* @__PURE__ */ Spicetify.React.createElement("strong", null, formatHour(peakHour)))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "activity-chart" }, hourlyDistribution.map((val, hr) => {
       const h = val > 0 ? Math.max(val / max * 100, 5) : 0;
       return /* @__PURE__ */ Spicetify.React.createElement(
-        "div",
+        PortalTooltip,
         {
           key: hr,
+          text: `${formatHour(hr)}: ${formatValue(val)}`,
           className: `activity-bar ${hr === peakHour && val > 0 ? "peak" : ""}`,
           style: { height: `${h}%` }
-        },
-        /* @__PURE__ */ Spicetify.React.createElement("div", { className: "activity-bar-tooltip" }, formatHour(hr), ": ", formatValue(val))
+        }
       );
-    })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "chart-labels" }, /* @__PURE__ */ Spicetify.React.createElement("span", null, "12am"), /* @__PURE__ */ Spicetify.React.createElement("span", null, "6am"), /* @__PURE__ */ Spicetify.React.createElement("span", null, "12pm"), /* @__PURE__ */ Spicetify.React.createElement("span", null, "6pm"), /* @__PURE__ */ Spicetify.React.createElement("span", null, "12am")));
+    })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "chart-labels" }, /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(0)), /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(6)), /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(12)), /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(18)), /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(0))));
+  }
+
+  // src/app/components/DraggableSection.tsx
+  var React = Spicetify.React;
+  function GripIcon() {
+    return /* @__PURE__ */ Spicetify.React.createElement(
+      "svg",
+      {
+        className: "drag-grip-icon",
+        viewBox: "0 0 16 16",
+        fill: "currentColor",
+        xmlns: "http://www.w3.org/2000/svg"
+      },
+      /* @__PURE__ */ Spicetify.React.createElement("circle", { cx: "5.5", cy: "3", r: "1.5" }),
+      /* @__PURE__ */ Spicetify.React.createElement("circle", { cx: "10.5", cy: "3", r: "1.5" }),
+      /* @__PURE__ */ Spicetify.React.createElement("circle", { cx: "5.5", cy: "8", r: "1.5" }),
+      /* @__PURE__ */ Spicetify.React.createElement("circle", { cx: "10.5", cy: "8", r: "1.5" }),
+      /* @__PURE__ */ Spicetify.React.createElement("circle", { cx: "5.5", cy: "13", r: "1.5" }),
+      /* @__PURE__ */ Spicetify.React.createElement("circle", { cx: "10.5", cy: "13", r: "1.5" })
+    );
+  }
+  function DraggableSection({
+    id,
+    children,
+    onDragStart,
+    onDragOver,
+    onDrop,
+    onDragEnd,
+    isDragging,
+    dropPosition
+  }) {
+    const wrapperClass = "draggable-section" + (isDragging ? " is-dragging" : "");
+    return /* @__PURE__ */ Spicetify.React.createElement(
+      "div",
+      {
+        className: wrapperClass,
+        "data-section-id": id,
+        onDragOver: (e) => onDragOver(e, id),
+        onDrop: (e) => {
+          e.preventDefault();
+          onDrop(e, id);
+        }
+      },
+      dropPosition === "before" && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "drop-indicator" }),
+      /* @__PURE__ */ Spicetify.React.createElement(
+        "div",
+        {
+          className: "section-drag-handle",
+          draggable: true,
+          onDragStart: (e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", id);
+            onDragStart(id);
+          },
+          onDragEnd: () => onDragEnd()
+        },
+        /* @__PURE__ */ Spicetify.React.createElement(GripIcon, null)
+      ),
+      children,
+      dropPosition === "after" && /* @__PURE__ */ Spicetify.React.createElement("div", { className: "drop-indicator" })
+    );
+  }
+
+  // src/app/components/TourOverlay.tsx
+  var { useState: useState7, useEffect: useEffect5, useRef: useRef4, useCallback: useCallback2 } = Spicetify.React;
+  var TOOLTIP_WIDTH = 320;
+  var TOOLTIP_HEIGHT = 180;
+  var OFFSET = 16;
+  var EDGE_PADDING = 16;
+  var REPOSITION_DEBOUNCE = 100;
+  function lockScroll() {
+    const el = document.querySelector(".main-view-container__scroll-node");
+    if (!el) return () => {
+    };
+    const prev = el.style.overflowY;
+    el.style.overflowY = "hidden";
+    return () => {
+      el.style.overflowY = prev;
+    };
+  }
+  function computeTooltipPosition(targetRect, placement) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let top = 0;
+    let left = 0;
+    let actualPlacement = placement;
+    const spotTop = targetRect.top - 8;
+    const spotLeft = targetRect.left - 8;
+    const spotWidth = targetRect.width + 16;
+    const spotHeight = targetRect.height + 16;
+    const spotRight = spotLeft + spotWidth;
+    const spotBottom = spotTop + spotHeight;
+    if (placement === "bottom" || placement === "top") {
+      left = targetRect.left + targetRect.width / 2 - TOOLTIP_WIDTH / 2;
+      if (placement === "bottom") {
+        top = spotBottom + OFFSET;
+        if (top + TOOLTIP_HEIGHT > vh - EDGE_PADDING) {
+          top = spotTop - OFFSET - TOOLTIP_HEIGHT;
+          actualPlacement = "top";
+        }
+      } else {
+        top = spotTop - OFFSET - TOOLTIP_HEIGHT;
+        if (top < EDGE_PADDING) {
+          top = spotBottom + OFFSET;
+          actualPlacement = "bottom";
+        }
+      }
+    } else {
+      top = targetRect.top + targetRect.height / 2 - TOOLTIP_HEIGHT / 2;
+      if (placement === "right") {
+        left = spotRight + OFFSET;
+        if (left + TOOLTIP_WIDTH > vw - EDGE_PADDING) {
+          left = spotLeft - OFFSET - TOOLTIP_WIDTH;
+          actualPlacement = "left";
+        }
+      } else {
+        left = spotLeft - OFFSET - TOOLTIP_WIDTH;
+        if (left < EDGE_PADDING) {
+          left = spotRight + OFFSET;
+          actualPlacement = "right";
+        }
+      }
+    }
+    left = Math.max(EDGE_PADDING, Math.min(left, vw - TOOLTIP_WIDTH - EDGE_PADDING));
+    top = Math.max(EDGE_PADDING, Math.min(top, vh - TOOLTIP_HEIGHT - EDGE_PADDING));
+    return { top, left, actualPlacement };
+  }
+  function TourOverlay({
+    step,
+    stepIndex,
+    totalSteps,
+    onNext,
+    onPrev,
+    onEnd,
+    abortSignal
+  }) {
+    const [targetRect, setTargetRect] = useState7(null);
+    const debounceRef = useRef4(0);
+    const updatePosition = useCallback2(() => {
+      const el = document.querySelector(step.target);
+      if (!el) {
+        if (!abortSignal.current.cancelled) {
+          onNext();
+        }
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      setTargetRect({
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+        right: rect.right,
+        bottom: rect.bottom
+      });
+    }, [step.target, onNext, abortSignal]);
+    useEffect5(() => {
+      const el = document.querySelector(step.target);
+      if (!el) {
+        if (!abortSignal.current.cancelled) {
+          onNext();
+        }
+        return;
+      }
+      const needsHighlight = step.target === ".section-drag-handle";
+      if (needsHighlight) {
+        el.classList.add("tour-highlight-handle");
+      }
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const unlockScroll = lockScroll();
+      const timer = setTimeout(() => {
+        if (abortSignal.current.cancelled) {
+          unlockScroll();
+          return;
+        }
+        requestAnimationFrame(() => {
+          updatePosition();
+          unlockScroll();
+        });
+      }, 500);
+      return () => {
+        clearTimeout(timer);
+        unlockScroll();
+        if (needsHighlight) {
+          el.classList.remove("tour-highlight-handle");
+        }
+      };
+    }, [step.target, updatePosition, onNext, abortSignal]);
+    useEffect5(() => {
+      const handleReposition = () => {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = window.setTimeout(updatePosition, REPOSITION_DEBOUNCE);
+      };
+      const scrollContainer = document.querySelector(
+        ".main-view-container__scroll-node"
+      );
+      scrollContainer?.addEventListener("scroll", handleReposition);
+      window.addEventListener("scroll", handleReposition);
+      window.addEventListener("resize", handleReposition);
+      return () => {
+        clearTimeout(debounceRef.current);
+        scrollContainer?.removeEventListener("scroll", handleReposition);
+        window.removeEventListener("scroll", handleReposition);
+        window.removeEventListener("resize", handleReposition);
+      };
+    }, [updatePosition]);
+    useEffect5(() => {
+      const handleKeyDown = (e) => {
+        if (e.key === "Escape") {
+          onEnd();
+        } else if (e.key === "ArrowRight") {
+          onNext();
+        } else if (e.key === "ArrowLeft") {
+          onPrev();
+        }
+      };
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [onEnd, onNext, onPrev]);
+    if (!targetRect) return null;
+    const placement = step.placement || "bottom";
+    const { top: tooltipTop, left: tooltipLeft } = computeTooltipPosition(
+      targetRect,
+      placement
+    );
+    const isLastStep = stepIndex === totalSteps - 1;
+    return Spicetify.React.createElement(
+      Spicetify.React.Fragment,
+      null,
+      // Click-away backdrop
+      Spicetify.React.createElement("div", {
+        className: "tour-backdrop",
+        onClick: onEnd
+      }),
+      // Spotlight
+      Spicetify.React.createElement("div", {
+        className: "tour-spotlight",
+        style: {
+          top: targetRect.top - 8,
+          left: targetRect.left - 8,
+          width: targetRect.width + 16,
+          height: targetRect.height + 16
+        }
+      }),
+      // Tooltip
+      Spicetify.React.createElement(
+        "div",
+        {
+          className: "tour-tooltip",
+          style: { top: tooltipTop, left: tooltipLeft }
+        },
+        Spicetify.React.createElement(
+          "h4",
+          { className: "tour-tooltip-title" },
+          step.title
+        ),
+        Spicetify.React.createElement(
+          "p",
+          { className: "tour-tooltip-content" },
+          step.content
+        ),
+        Spicetify.React.createElement(
+          "div",
+          { className: "tour-tooltip-footer" },
+          Spicetify.React.createElement(
+            "span",
+            { className: "tour-tooltip-counter" },
+            `${stepIndex + 1} of ${totalSteps}`
+          ),
+          Spicetify.React.createElement(
+            "div",
+            { className: "tour-tooltip-actions" },
+            stepIndex > 0 ? Spicetify.React.createElement(
+              "button",
+              { className: "tour-btn", onClick: onPrev },
+              "Back"
+            ) : null,
+            Spicetify.React.createElement(
+              "button",
+              { className: "tour-btn", onClick: onEnd },
+              "Skip"
+            ),
+            Spicetify.React.createElement(
+              "button",
+              {
+                className: "tour-btn tour-btn--primary",
+                onClick: isLastStep ? onEnd : onNext
+              },
+              isLastStep ? "Done" : "Next"
+            )
+          )
+        )
+      )
+    );
   }
 
   // src/app/components/Header.tsx
+  var { useState: useState8, useEffect: useEffect6, useRef: useRef5 } = Spicetify.React;
   var PROVIDER_NAMES2 = {
     local: "Local Tracking",
     lastfm: "Last.fm",
     statsfm: "stats.fm"
   };
+  var ANNOUNCEMENT_URL = "https://raw.githubusercontent.com/Xndr2/listening-stats/main/ANNOUNCEMENT.md";
+  function Announcement() {
+    const [html, setHtml] = useState8(null);
+    const fetched = useRef5(false);
+    useEffect6(() => {
+      if (fetched.current) return;
+      fetched.current = true;
+      const url = ANNOUNCEMENT_URL + "?t=" + Math.floor(Date.now() / 3e5);
+      fetch(url).then((r) => {
+        if (!r.ok) throw new Error();
+        return r.text();
+      }).then((text) => {
+        const trimmed = text.trim();
+        if (trimmed) setHtml(renderMarkdown(trimmed));
+      }).catch(() => {
+      });
+    }, []);
+    if (!html) return null;
+    return /* @__PURE__ */ Spicetify.React.createElement(
+      "div",
+      {
+        className: "stats-announcement",
+        dangerouslySetInnerHTML: { __html: html }
+      }
+    );
+  }
   function Header({
     onShare,
     onToggleSettings,
     providerType
   }) {
-    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-header" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-header-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("h1", { className: "stats-title" }, "Listening Stats"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "stats-subtitle" }, "Your personal music analytics", providerType && /* @__PURE__ */ Spicetify.React.createElement("span", { className: "provider-badge" }, "via ", PROVIDER_NAMES2[providerType])), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-dev-note" }, /* @__PURE__ */ Spicetify.React.createElement("p", { className: "stats-dev-note-main" }, "Important!"), /* @__PURE__ */ Spicetify.React.createElement(
-      "a",
-      {
-        className: "stats-dev-note-sub",
-        href: "https://techcrunch.com/2026/02/06/spotify-changes-developer-mode-api-to-require-premium-accounts-limits-test-users/"
-      },
-      "Spotify is shutting down it's API to access the Spotify music catalog."
-    ), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "stats-dev-note-sub" }, "I have no idea if Listening-Stats will be affected or not. We will have to wait and see. I'll keep you all updated.", /* @__PURE__ */ Spicetify.React.createElement("br", null), "I'm still working on fixing small bugs so I'll push those soon. Thanks for 1K downloads! Y'all are amazing \u2764\uFE0F"))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "header-actions" }, onToggleSettings && /* @__PURE__ */ Spicetify.React.createElement(
+    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-header" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-header-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", null, /* @__PURE__ */ Spicetify.React.createElement("h1", { className: "stats-title" }, "Listening Stats"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "stats-subtitle" }, "Your personal music analytics", providerType && /* @__PURE__ */ Spicetify.React.createElement("span", { className: "provider-badge" }, "via ", PROVIDER_NAMES2[providerType])), /* @__PURE__ */ Spicetify.React.createElement(Announcement, null)), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "header-actions" }, onToggleSettings && /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: "header-btn",
@@ -3960,18 +5208,18 @@ var ListeningStatsApp = (() => {
   }
 
   // src/app/components/ShareCardModal.tsx
-  var { useState: useState5, useRef: useRef2, useEffect: useEffect3 } = Spicetify.React;
+  var { useState: useState9, useRef: useRef6, useEffect: useEffect7 } = Spicetify.React;
   function ShareCardModal({
     stats,
     period,
     providerType,
     onClose
   }) {
-    const [format, setFormat] = useState5("story");
-    const [generating, setGenerating] = useState5(false);
-    const [previewUrl, setPreviewUrl] = useState5(null);
-    const blobRef = useRef2(null);
-    useEffect3(() => {
+    const [format, setFormat] = useState9("story");
+    const [generating, setGenerating] = useState9(false);
+    const [previewUrl, setPreviewUrl] = useState9(null);
+    const blobRef = useRef6(null);
+    useEffect7(() => {
       generatePreview();
     }, [format]);
     async function generatePreview() {
@@ -4070,6 +5318,128 @@ var ListeningStatsApp = (() => {
     );
   }
 
+  // src/app/hooks/useSectionOrder.ts
+  var { useState: useState10, useCallback: useCallback3, useEffect: useEffect8 } = Spicetify.React;
+  var LAYOUT_KEY = "listening-stats:card-order";
+  var DEFAULT_ORDER = [
+    "overview",
+    "toplists",
+    "activity",
+    "recent"
+  ];
+  function useSectionOrder() {
+    const [order, setOrder] = useState10(() => {
+      try {
+        const stored = localStorage.getItem(LAYOUT_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const validated = parsed.filter((id) => DEFAULT_ORDER.includes(id));
+            for (const id of DEFAULT_ORDER) {
+              if (!validated.includes(id)) {
+                validated.push(id);
+              }
+            }
+            return validated;
+          }
+        }
+      } catch {
+      }
+      return [...DEFAULT_ORDER];
+    });
+    const reorder = useCallback3((newOrder) => {
+      setOrder(newOrder);
+      try {
+        localStorage.setItem(LAYOUT_KEY, JSON.stringify(newOrder));
+      } catch {
+      }
+    }, []);
+    const resetOrder = useCallback3(() => {
+      const defaultCopy = [...DEFAULT_ORDER];
+      setOrder(defaultCopy);
+      try {
+        localStorage.setItem(LAYOUT_KEY, JSON.stringify(defaultCopy));
+      } catch {
+      }
+    }, []);
+    useEffect8(() => {
+      const handler = () => resetOrder();
+      window.addEventListener("listening-stats:reset-layout", handler);
+      return () => {
+        window.removeEventListener("listening-stats:reset-layout", handler);
+      };
+    }, [resetOrder]);
+    return { order, reorder, resetOrder };
+  }
+
+  // src/app/hooks/useTour.ts
+  var { useState: useState11, useCallback: useCallback4, useRef: useRef7, createContext, useContext } = Spicetify.React;
+  var TourContext = createContext(null);
+  function TourProvider({ children }) {
+    const [isActive, setIsActive] = useState11(false);
+    const [currentStep, setCurrentStep] = useState11(0);
+    const [steps, setSteps] = useState11([]);
+    const abortRef = useRef7({ cancelled: false });
+    const endTour = useCallback4(() => {
+      abortRef.current.cancelled = true;
+      setIsActive(false);
+      setCurrentStep(0);
+      setSteps([]);
+    }, []);
+    const startTour = useCallback4((tourSteps) => {
+      abortRef.current = { cancelled: false };
+      setSteps(tourSteps);
+      setCurrentStep(0);
+      setIsActive(true);
+    }, []);
+    const nextStep = useCallback4(() => {
+      setCurrentStep((prev) => {
+        if (prev >= steps.length - 1) {
+          abortRef.current.cancelled = true;
+          setTimeout(endTour, 0);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, [steps.length, endTour]);
+    const prevStep = useCallback4(() => {
+      setCurrentStep((prev) => Math.max(0, prev - 1));
+    }, []);
+    const value = {
+      isActive,
+      currentStep,
+      steps,
+      totalSteps: steps.length,
+      startTour,
+      nextStep,
+      prevStep,
+      endTour
+    };
+    const overlay = isActive && steps.length > 0 ? Spicetify.ReactDOM.createPortal(
+      Spicetify.React.createElement(TourOverlay, {
+        step: steps[currentStep],
+        stepIndex: currentStep,
+        totalSteps: steps.length,
+        onNext: nextStep,
+        onPrev: prevStep,
+        onEnd: endTour,
+        abortSignal: abortRef
+      }),
+      document.body
+    ) : null;
+    return Spicetify.React.createElement(
+      TourContext.Provider,
+      { value },
+      children,
+      overlay
+    );
+  }
+  function useTour() {
+    const ctx = useContext(TourContext);
+    if (!ctx) throw new Error("useTour must be used within TourProvider");
+    return ctx;
+  }
+
   // src/app/styles.css
   var styles_default = `/* Listening Stats - Main Styles */
 
@@ -4125,24 +5495,32 @@ var ListeningStatsApp = (() => {
   margin: 0;
 }
 
-.stats-dev-note {
+.stats-announcement {
   font-size: 12px;
+  line-height: 1.5;
   color: var(--text-subdued);
-  margin: 0;
   margin-top: 8px;
 }
 
-.stats-dev-note-main {
-  font-size: 12px;
-  color: var(--text-subdued);
-  margin: 0;
-  font-weight: bold;
+.stats-announcement strong {
+  color: var(--text-base, #fff);
 }
 
-.stats-dev-note-sub {
-  font-size: 12px;
+.stats-announcement a {
   color: var(--text-subdued);
-  margin: 0;
+  text-decoration: underline;
+}
+
+.stats-announcement a:hover {
+  color: var(--text-base, #fff);
+}
+
+.stats-announcement p {
+  margin: 0 0 2px 0;
+}
+
+.stats-announcement p:last-child {
+  margin-bottom: 0;
 }
 
 /* Header Actions */
@@ -4234,6 +5612,7 @@ var ListeningStatsApp = (() => {
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
   gap: 16px;
+  overflow: visible;
 }
 
 .overview-card {
@@ -4242,6 +5621,7 @@ var ListeningStatsApp = (() => {
   padding: 20px;
   display: flex;
   flex-direction: column;
+  overflow: visible;
 }
 
 .overview-card.hero {
@@ -4290,6 +5670,7 @@ var ListeningStatsApp = (() => {
   margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: visible;
 }
 
 .overview-stat {
@@ -4351,6 +5732,7 @@ var ListeningStatsApp = (() => {
   flex-direction: column;
   flex: 1 1 300px;
   min-width: 280px;
+  overflow: visible;
 }
 
 .top-list-header {
@@ -4392,6 +5774,7 @@ var ListeningStatsApp = (() => {
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s ease;
+  overflow: visible;
 }
 
 .item-row:hover {
@@ -4484,11 +5867,23 @@ var ListeningStatsApp = (() => {
   border-radius: 50%;
   transition: all 0.15s ease;
   flex-shrink: 0;
+  min-width: 30px;
+  min-height: 30px;
+}
+
+.heart-btn.disabled {
+  opacity: 0.25;
+  cursor: default;
 }
 
 .heart-btn:hover {
   color: var(--text-base);
   background: rgba(255, 255, 255, 0.1);
+}
+
+.heart-btn.disabled:hover {
+  color: var(--text-subdued);
+  background: none;
 }
 
 .heart-btn.liked {
@@ -4555,26 +5950,6 @@ var ListeningStatsApp = (() => {
   background: var(--ls-accent);
 }
 
-.activity-bar-tooltip {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--background-elevated-base);
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 10;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.activity-bar:hover .activity-bar-tooltip {
-  opacity: 1;
-}
 
 .chart-labels {
   display: flex;
@@ -5164,6 +6539,79 @@ var ListeningStatsApp = (() => {
   background: #e74c3c;
 }
 
+/* ===== Drag and Drop ===== */
+.draggable-section {
+  position: relative;
+  transition: opacity 0.2s ease;
+}
+
+.draggable-section.is-dragging {
+  opacity: 0.4;
+}
+
+.section-drag-handle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  position: absolute;
+  top: 12px;
+  left: -32px;
+  z-index: 1;
+}
+
+.draggable-section:hover .section-drag-handle {
+  opacity: 0.5;
+}
+
+.section-drag-handle:hover {
+  opacity: 1 !important;
+  background: var(--background-tinted-highlight);
+}
+
+.section-drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-grip-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-subdued);
+}
+
+.drop-indicator {
+  height: 3px;
+  background: var(--ls-accent, #1db954);
+  border-radius: 2px;
+  margin: 4px 0;
+  pointer-events: none;
+  animation: drop-indicator-pulse 1s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(29, 185, 84, 0.5);
+}
+
+@keyframes drop-indicator-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Force drag handle visible during tour step 5 */
+.section-drag-handle.tour-highlight-handle {
+  opacity: 1 !important;
+}
+
+.stats-page--compact .section-drag-handle {
+  top: 8px;
+  left: -28px;
+}
+
 /* ===== Footer ===== */
 .stats-footer {
   padding-top: 20px;
@@ -5300,7 +6748,6 @@ var ListeningStatsApp = (() => {
   max-height: 200px;
   overflow-y: auto;
   margin-bottom: 24px;
-  white-space: pre-wrap;
   line-height: 1.6;
   color: var(--text-subdued, #b3b3b3);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -5317,6 +6764,64 @@ var ListeningStatsApp = (() => {
 .update-banner-changelog::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
+}
+
+.update-banner-changelog h4,
+.update-banner-changelog h5 {
+  color: var(--text-base, #fff);
+  margin: 12px 0 6px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.update-banner-changelog h4:first-child,
+.update-banner-changelog h5:first-child {
+  margin-top: 0;
+}
+
+.update-banner-changelog h5 {
+  font-size: 13px;
+}
+
+.update-banner-changelog ul {
+  margin: 4px 0 8px 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.update-banner-changelog li {
+  margin-bottom: 2px;
+  line-height: 1.5;
+}
+
+.update-banner-changelog code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.update-banner-changelog a {
+  color: var(--text-bright-accent, #1db954);
+  text-decoration: none;
+}
+
+.update-banner-changelog a:hover {
+  text-decoration: underline;
+}
+
+.update-banner-changelog strong {
+  color: var(--text-base, #fff);
+  font-weight: 600;
+}
+
+.update-banner-changelog p {
+  margin: 0 0 8px 0;
+}
+
+.update-banner-changelog p:last-child {
+  margin-bottom: 0;
 }
 
 .update-banner-links {
@@ -6048,6 +7553,383 @@ var ListeningStatsApp = (() => {
   gap: 10px;
   margin-top: 16px;
 }
+
+/* ===== Hover Tooltips for Stat Cards (DISP-03) ===== */
+.stat-tooltip-portal {
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 400;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ===== Collapsible Settings Categories (SETT-01) ===== */
+.settings-category {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-category:last-child {
+  border-bottom: none;
+}
+
+.settings-category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 0;
+  background: none;
+  border: none;
+  color: var(--text-base);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-category-header:hover {
+  color: var(--text-bright-accent, #fff);
+}
+
+.settings-chevron {
+  margin-left: auto;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--text-subdued);
+  transition: transform 0.2s ease;
+}
+
+.settings-chevron.open {
+  transform: rotate(180deg);
+}
+
+.settings-category-body {
+  padding-bottom: 16px;
+}
+
+/* ===== Tour Overlay ===== */
+.tour-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  cursor: default;
+}
+
+.tour-spotlight {
+  position: fixed;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+  z-index: 9998;
+  pointer-events: none;
+  transition:
+    top 0.3s ease,
+    left 0.3s ease,
+    width 0.3s ease,
+    height 0.3s ease;
+}
+
+.tour-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--spice-card, #282828);
+  border-radius: 12px;
+  padding: 20px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: tour-fade-in 0.2s ease;
+}
+
+.tour-tooltip-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--spice-text, #fff);
+  margin: 0 0 8px 0;
+}
+
+.tour-tooltip-content {
+  font-size: 14px;
+  color: var(--spice-subtext, #b3b3b3);
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.tour-tooltip-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tour-tooltip-counter {
+  font-size: 12px;
+  color: var(--spice-subtext, #b3b3b3);
+}
+
+.tour-tooltip-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tour-btn {
+  background: none;
+  border: 1px solid var(--spice-button-disabled, #555);
+  color: var(--spice-text, #fff);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tour-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tour-btn--primary {
+  background: var(--ls-accent, #1db954);
+  border-color: var(--ls-accent, #1db954);
+  color: #fff;
+}
+
+.tour-btn--primary:hover {
+  background: var(--ls-accent-hover, #1ed760);
+}
+
+@keyframes tour-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Setup Wizard ===== */
+.setup-wizard {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.wizard-progress {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.wizard-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--spice-button-disabled, #555);
+  transition: background 0.2s;
+}
+
+.wizard-dot--active {
+  background: var(--ls-accent, #1db954);
+}
+
+.wizard-dot--completed {
+  background: var(--ls-accent, #1db954);
+  opacity: 0.6;
+}
+
+@keyframes wizard-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.wizard-step {
+  animation: wizard-fade-in 0.2s ease;
+}
+
+.wizard-step-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: var(--text-base);
+}
+
+.wizard-step-desc {
+  font-size: 14px;
+  color: var(--text-subdued);
+  margin: 0 0 24px 0;
+}
+
+.wizard-card {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 12px;
+}
+
+.wizard-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.wizard-card.recommended {
+  border: 1px solid var(--ls-accent, #1db954);
+}
+
+.wizard-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.wizard-card-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: var(--text-subdued);
+}
+
+.wizard-card-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wizard-card-header strong {
+  font-size: 16px;
+  color: var(--text-base);
+}
+
+.wizard-card-desc {
+  font-size: 13px;
+  color: var(--text-subdued);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.wizard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.wizard-helper {
+  font-size: 13px;
+  color: var(--spice-subtext, #aaa);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.wizard-helper a {
+  color: var(--ls-accent, #1db954);
+  text-decoration: underline;
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+  gap: 12px;
+}
+
+.wizard-validating {
+  text-align: center;
+  padding: 32px;
+}
+
+.wizard-validating p {
+  font-size: 14px;
+  color: var(--text-subdued);
+  margin: 16px 0 0 0;
+}
+
+@keyframes wizard-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.wizard-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--ls-accent, #1db954);
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: wizard-spin 0.8s linear infinite;
+}
+
+.wizard-success {
+  text-align: center;
+  padding: 32px;
+}
+
+.wizard-success-icon {
+  width: 56px;
+  height: 56px;
+  color: var(--ls-accent, #1db954);
+  margin: 0 auto 16px;
+}
+
+.wizard-success-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wizard-error {
+  color: var(--spice-notification, #e74c3c);
+  margin-top: 8px;
+  font-size: 13px;
+  padding: 10px 14px;
+  background: rgba(231, 76, 60, 0.1);
+  border-radius: 8px;
+}
+
+/* ===== Settings Actions Row ===== */
+.settings-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ===== Provider Setup Guide Links ===== */
+.provider-setup-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-subdued, #b3b3b3);
+  font-size: 12px;
+  text-decoration: none;
+  margin-top: 6px;
+  transition: color 0.15s;
+}
+
+.provider-setup-link:hover {
+  color: var(--text-bright-accent, #1db954);
+}
+
+.provider-setup-link svg {
+  width: 12px;
+  height: 12px;
+}
+
+.provider-guides-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  padding-bottom: 4px;
+}
 `;
 
   // src/app/styles.ts
@@ -6061,13 +7943,261 @@ var ListeningStatsApp = (() => {
   }
 
   // src/app/index.tsx
+  var { useRef: useRef8, useState: useState12, useCallback: useCallback5, useEffect: useEffect9 } = Spicetify.React;
   var SFM_PROMO_KEY = "listening-stats:sfm-promo-dismissed";
   var VERSION = getCurrentVersion();
+  var TOUR_SEEN_KEY = "listening-stats:tour-seen";
+  var FULL_TOUR_STEPS = [
+    {
+      target: ".overview-row",
+      title: "Overview",
+      content: "Your key stats at a glance. Total listening time, track count, and more. Use the period tabs above to switch time ranges.",
+      placement: "bottom"
+    },
+    {
+      target: ".top-lists-section",
+      title: "Top Lists",
+      content: "Your most played tracks, artists, albums, and genres ranked by play count.",
+      placement: "bottom"
+    },
+    {
+      target: ".activity-section",
+      title: "Activity",
+      content: "Your listening patterns by hour of day. Find when you listen the most.",
+      placement: "top"
+    },
+    {
+      target: ".recent-section",
+      title: "Recently Played",
+      content: "Your most recent tracks. Click any card to open it in Spotify.",
+      placement: "top"
+    },
+    {
+      target: ".section-drag-handle",
+      title: "Reorder Sections",
+      content: "Drag these handles to rearrange your dashboard layout to your liking.",
+      placement: "right"
+    },
+    {
+      target: ".header-actions",
+      title: "Share & Settings",
+      content: "Share your stats as an image or open settings to customize your experience.",
+      placement: "bottom"
+    }
+  ];
+  function shouldShowTour() {
+    try {
+      const seen = localStorage.getItem(TOUR_SEEN_KEY);
+      if (!seen) return "full";
+      return "none";
+    } catch {
+      return "none";
+    }
+  }
+  function markTourComplete() {
+    try {
+      localStorage.setItem(TOUR_SEEN_KEY, "1");
+    } catch {
+    }
+  }
+  var SECTION_REGISTRY = {
+    overview: (p) => /* @__PURE__ */ Spicetify.React.createElement(
+      OverviewCards,
+      {
+        stats: p.stats,
+        period: p.period,
+        periods: p.periods,
+        periodLabels: p.periodLabels,
+        onPeriodChange: p.onPeriodChange
+      }
+    ),
+    toplists: (p) => /* @__PURE__ */ Spicetify.React.createElement(
+      TopLists,
+      {
+        stats: p.stats,
+        likedTracks: p.likedTracks,
+        onLikeToggle: p.onLikeToggle,
+        showLikeButtons: p.showLikeButtons,
+        period: p.period
+      }
+    ),
+    activity: (p) => /* @__PURE__ */ Spicetify.React.createElement(
+      ActivityChart,
+      {
+        hourlyDistribution: p.stats.hourlyDistribution,
+        peakHour: p.stats.peakHour,
+        hourlyUnit: p.stats.hourlyUnit
+      }
+    ),
+    recent: (p) => /* @__PURE__ */ Spicetify.React.createElement(RecentlyPlayed, { recentTracks: p.stats.recentTracks })
+  };
+  function DashboardSections(props) {
+    const { order, reorder } = useSectionOrder();
+    const { startTour } = useTour();
+    useEffect9(() => {
+      const timer = setTimeout(() => {
+        const tourType = shouldShowTour();
+        if (tourType === "full") {
+          startTour(FULL_TOUR_STEPS);
+          markTourComplete();
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }, []);
+    useEffect9(() => {
+      const handler = () => {
+        startTour(FULL_TOUR_STEPS);
+      };
+      window.addEventListener("listening-stats:start-tour", handler);
+      return () => window.removeEventListener("listening-stats:start-tour", handler);
+    }, [startTour]);
+    const containerRef = useRef8(null);
+    const dragItemRef = useRef8(null);
+    const dragOverRef = useRef8(null);
+    const insertBeforeRef = useRef8(true);
+    const scrollRafRef = useRef8(0);
+    const [dropTarget, setDropTarget] = useState12(null);
+    const [draggingId, setDraggingId] = useState12(null);
+    const handleDragStart = useCallback5((id) => {
+      dragItemRef.current = id;
+      setDraggingId(id);
+    }, []);
+    const computeDropTarget = useCallback5((clientY) => {
+      if (!containerRef.current || !dragItemRef.current) return;
+      const sections = containerRef.current.querySelectorAll(".draggable-section");
+      let bestId = null;
+      let bestBefore = true;
+      let bestDist = Infinity;
+      sections.forEach((el) => {
+        const id = el.dataset.sectionId;
+        if (!id || id === dragItemRef.current) return;
+        const rect = el.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        const distTop = Math.abs(clientY - rect.top);
+        const distBot = Math.abs(clientY - rect.bottom);
+        const dist = Math.min(distTop, distBot);
+        const before = clientY < mid;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = id;
+          bestBefore = before;
+        }
+      });
+      if (bestId) {
+        dragOverRef.current = bestId;
+        insertBeforeRef.current = bestBefore;
+        setDropTarget({
+          id: bestId,
+          position: bestBefore ? "before" : "after"
+        });
+      }
+    }, []);
+    const autoScroll = useCallback5((clientY) => {
+      cancelAnimationFrame(scrollRafRef.current);
+      const EDGE = 80;
+      const MAX_SPEED = 18;
+      const scrollContainer = document.querySelector(
+        ".main-view-container__scroll-node"
+      );
+      const target = scrollContainer || document.documentElement;
+      let speed = 0;
+      if (clientY < EDGE) {
+        speed = -MAX_SPEED * (1 - clientY / EDGE);
+      } else if (clientY > window.innerHeight - EDGE) {
+        speed = MAX_SPEED * (1 - (window.innerHeight - clientY) / EDGE);
+      }
+      if (speed !== 0) {
+        const tick = () => {
+          target.scrollTop += speed;
+          scrollRafRef.current = requestAnimationFrame(tick);
+        };
+        scrollRafRef.current = requestAnimationFrame(tick);
+      }
+    }, []);
+    const handleContainerDragOver = useCallback5(
+      (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        computeDropTarget(e.clientY);
+        autoScroll(e.clientY);
+      },
+      [computeDropTarget, autoScroll]
+    );
+    const executeDrop = useCallback5(() => {
+      cancelAnimationFrame(scrollRafRef.current);
+      const draggedId = dragItemRef.current;
+      const overId = dragOverRef.current;
+      const before = insertBeforeRef.current;
+      if (draggedId && overId && draggedId !== overId) {
+        const newOrder = order.filter((id) => id !== draggedId);
+        const targetIdx = newOrder.indexOf(overId);
+        if (targetIdx !== -1) {
+          const insertIdx = before ? targetIdx : targetIdx + 1;
+          newOrder.splice(insertIdx, 0, draggedId);
+          reorder(newOrder);
+        }
+      }
+      dragItemRef.current = null;
+      dragOverRef.current = null;
+      insertBeforeRef.current = true;
+      setDropTarget(null);
+      setDraggingId(null);
+    }, [order, reorder]);
+    const handleContainerDrop = useCallback5(
+      (e) => {
+        e.preventDefault();
+        executeDrop();
+      },
+      [executeDrop]
+    );
+    const handleDragEnd = useCallback5(() => {
+      cancelAnimationFrame(scrollRafRef.current);
+      dragItemRef.current = null;
+      dragOverRef.current = null;
+      insertBeforeRef.current = true;
+      setDropTarget(null);
+      setDraggingId(null);
+    }, []);
+    const noop = useCallback5(
+      (_e, _id) => {
+      },
+      []
+    );
+    return /* @__PURE__ */ Spicetify.React.createElement(
+      "div",
+      {
+        ref: containerRef,
+        className: "dashboard-sections",
+        onDragOver: handleContainerDragOver,
+        onDrop: handleContainerDrop
+      },
+      order.map((sectionId) => {
+        const renderFn = SECTION_REGISTRY[sectionId];
+        if (!renderFn) return null;
+        const sectionDropPosition = dropTarget && dropTarget.id === sectionId ? dropTarget.position : null;
+        return /* @__PURE__ */ Spicetify.React.createElement(
+          DraggableSection,
+          {
+            key: sectionId,
+            id: sectionId,
+            onDragStart: handleDragStart,
+            onDragOver: noop,
+            onDrop: noop,
+            onDragEnd: handleDragEnd,
+            isDragging: draggingId === sectionId,
+            dropPosition: sectionDropPosition
+          },
+          renderFn(props)
+        );
+      })
+    );
+  }
   var StatsPage = class extends Spicetify.React.Component {
     constructor(props) {
       super(props);
       this.pollInterval = null;
       this.unsubStatsUpdate = null;
+      this.unsubPrefs = null;
       this.checkForUpdateOnLoad = async () => {
         const info = await checkForUpdates();
         if (info.available) {
@@ -6100,10 +8230,10 @@ var ListeningStatsApp = (() => {
         this.setState({ showUpdateBanner: false });
       };
       this.loadStats = async () => {
-        this.setState({ loading: true, error: null });
+        this.setState({ loading: true, error: null, errorType: null });
         try {
           const data = await calculateStats(this.state.period);
-          this.setState({ stats: data, loading: false });
+          this.setState({ stats: data, loading: false, errorType: null });
           if (data.topTracks.length > 0 && data.topTracks[0].trackUri) {
             const uris = data.topTracks.map((t) => t.trackUri).filter(Boolean);
             if (uris.length > 0) {
@@ -6124,9 +8254,11 @@ var ListeningStatsApp = (() => {
           }
         } catch (e) {
           console.error("[ListeningStats] Load failed:", e);
+          const isApiError = e instanceof ApiError || e?.name === "ApiError";
           this.setState({
             loading: false,
-            error: e.message || "Failed to load stats"
+            error: e.message || "Failed to load stats",
+            errorType: isApiError ? "api" : "generic"
           });
         }
       };
@@ -6154,7 +8286,7 @@ var ListeningStatsApp = (() => {
       this.handleSfmSwitch = async (username) => {
         try {
           const info = await validateUser2(username.trim());
-          saveConfig2({ username: info.customId });
+          saveConfig2({ username: info.customId, isPlus: info.isPlus });
           this.dismissSfmPromo();
           activateProvider("statsfm");
           this.handleProviderChanged();
@@ -6233,6 +8365,7 @@ var ListeningStatsApp = (() => {
         stats: null,
         loading: !needsSetup,
         error: null,
+        errorType: null,
         likedTracks: /* @__PURE__ */ new Map(),
         updateInfo: null,
         showUpdateBanner: false,
@@ -6265,10 +8398,14 @@ var ListeningStatsApp = (() => {
           this.loadStats();
         }
       });
+      this.unsubPrefs = onPreferencesChanged(() => {
+        this.forceUpdate();
+      });
     }
     componentWillUnmount() {
       if (this.pollInterval) clearInterval(this.pollInterval);
       this.unsubStatsUpdate?.();
+      this.unsubPrefs?.();
     }
     componentDidUpdate(_, prev) {
       if (prev.period !== this.state.period && !this.state.needsSetup) {
@@ -6349,13 +8486,14 @@ var ListeningStatsApp = (() => {
         document.body
       ) : null;
       if (error && !stats) {
+        const isApiFailure = this.state.errorType === "api";
         return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-page" }, /* @__PURE__ */ Spicetify.React.createElement(
           Header,
           {
             onToggleSettings: () => this.setState({ showSettings: !showSettings }),
             providerType
           }
-        ), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "error-state" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "error-message" }, /* @__PURE__ */ Spicetify.React.createElement("h3", null, "Something went wrong"), /* @__PURE__ */ Spicetify.React.createElement("p", null, error), /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn primary", onClick: this.loadStats }, "Try Again"))), /* @__PURE__ */ Spicetify.React.createElement(
+        ), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "error-state" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "error-message" }, /* @__PURE__ */ Spicetify.React.createElement("h3", null, isApiFailure ? "Could not fetch data" : "Something went wrong"), /* @__PURE__ */ Spicetify.React.createElement("p", null, isApiFailure ? "The data source is temporarily unavailable. This is usually caused by rate limiting. Please wait a moment and try again." : error), /* @__PURE__ */ Spicetify.React.createElement("button", { className: "footer-btn primary", onClick: this.loadStats }, "Try Again"))), /* @__PURE__ */ Spicetify.React.createElement(
           Footer,
           {
             version: VERSION,
@@ -6390,7 +8528,7 @@ var ListeningStatsApp = (() => {
           }
         ), settingsModal);
       }
-      return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-page" }, /* @__PURE__ */ Spicetify.React.createElement(
+      return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "stats-page" }, /* @__PURE__ */ Spicetify.React.createElement(TourProvider, null, /* @__PURE__ */ Spicetify.React.createElement(
         Header,
         {
           onShare: this.handleShare,
@@ -6398,31 +8536,18 @@ var ListeningStatsApp = (() => {
           providerType
         }
       ), /* @__PURE__ */ Spicetify.React.createElement(
-        OverviewCards,
+        DashboardSections,
         {
           stats,
           period,
           periods,
           periodLabels,
-          onPeriodChange: this.handlePeriodChange
-        }
-      ), /* @__PURE__ */ Spicetify.React.createElement(
-        TopLists,
-        {
-          stats,
+          onPeriodChange: this.handlePeriodChange,
           likedTracks,
           onLikeToggle: this.handleLikeToggle,
-          showLikeButtons,
-          period
+          showLikeButtons
         }
       ), /* @__PURE__ */ Spicetify.React.createElement(
-        ActivityChart,
-        {
-          hourlyDistribution: stats.hourlyDistribution,
-          peakHour: stats.peakHour,
-          hourlyUnit: stats.hourlyUnit
-        }
-      ), /* @__PURE__ */ Spicetify.React.createElement(RecentlyPlayed, { recentTracks: stats.recentTracks }), /* @__PURE__ */ Spicetify.React.createElement(
         Footer,
         {
           version: VERSION,
@@ -6440,7 +8565,7 @@ var ListeningStatsApp = (() => {
           }
         ),
         document.body
-      ), sfmPromoPortal);
+      ), sfmPromoPortal));
     }
   };
   function SfmPromoPopup({

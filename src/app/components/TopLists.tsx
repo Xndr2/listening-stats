@@ -1,7 +1,10 @@
 import { formatDuration } from "../../services/stats";
 import { ListeningStats } from "../../types";
+import { formatNumber } from "../format";
 import { Icons } from "../icons";
 import { getRankClass, lazyNavigate, navigateToUri } from "../utils";
+import { ImageWithRetry } from "./ImageWithRetry";
+import { PortalTooltip } from "./PortalTooltip";
 
 interface TopListsProps {
   stats: ListeningStats;
@@ -42,7 +45,7 @@ export function TopLists({
             >
               <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
               {t.albumArt ? (
-                <img src={t.albumArt} className="item-art" alt="" />
+                <ImageWithRetry src={t.albumArt} className="item-art" />
               ) : (
                 <div className="item-art placeholder" />
               )}
@@ -52,7 +55,9 @@ export function TopLists({
               </div>
               <div className="item-stats">
                 {t.playCount ? (
-                  <span className="item-plays">{t.playCount} plays</span>
+                  <span className="item-plays">
+                    {formatNumber(t.playCount)} plays
+                  </span>
                 ) : null}
                 {t.totalTimeMs > 0 && (
                   <span className="item-time">
@@ -60,17 +65,25 @@ export function TopLists({
                   </span>
                 )}
               </div>
-              {showLikeButtons && t.trackUri && (
-                <button
-                  className={`heart-btn ${likedTracks.get(t.trackUri) ? "liked" : ""}`}
-                  onClick={(e) => onLikeToggle(t.trackUri, e)}
-                  dangerouslySetInnerHTML={{
-                    __html: likedTracks.get(t.trackUri)
-                      ? Icons.heartFilled
-                      : Icons.heart,
-                  }}
-                />
-              )}
+              {showLikeButtons &&
+                (t.trackUri ? (
+                  <button
+                    className={`heart-btn ${likedTracks.get(t.trackUri) ? "liked" : ""}`}
+                    onClick={(e) => onLikeToggle(t.trackUri, e)}
+                    dangerouslySetInnerHTML={{
+                      __html: likedTracks.get(t.trackUri)
+                        ? Icons.heartFilled
+                        : Icons.heart,
+                    }}
+                  />
+                ) : (
+                  <PortalTooltip text="No Spotify link, can't save to library">
+                    <span
+                      className="heart-btn disabled"
+                      dangerouslySetInnerHTML={{ __html: Icons.heart }}
+                    />
+                  </PortalTooltip>
+                ))}
             </div>
           ))}
         </div>
@@ -97,7 +110,10 @@ export function TopLists({
               >
                 <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
                 {a.artistImage ? (
-                  <img src={a.artistImage} className="item-art round" alt="" />
+                  <ImageWithRetry
+                    src={a.artistImage}
+                    className="item-art round"
+                  />
                 ) : (
                   <div className="item-art round placeholder artist-placeholder" />
                 )}
@@ -109,7 +125,9 @@ export function TopLists({
                 </div>
                 {a.playCount ? (
                   <div className="item-stats">
-                    <span className="item-plays">{a.playCount} plays</span>
+                    <span className="item-plays">
+                      {formatNumber(a.playCount)} plays
+                    </span>
                   </div>
                 ) : null}
               </div>
@@ -138,7 +156,7 @@ export function TopLists({
             >
               <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
               {a.albumArt ? (
-                <img src={a.albumArt} className="item-art" alt="" />
+                <ImageWithRetry src={a.albumArt} className="item-art" />
               ) : (
                 <div className="item-art placeholder" />
               )}
@@ -148,9 +166,13 @@ export function TopLists({
               </div>
               <div className="item-stats">
                 {a.playCount ? (
-                  <span className="item-plays">{a.playCount} plays</span>
+                  <span className="item-plays">
+                    {formatNumber(a.playCount)} plays
+                  </span>
                 ) : null}
-                <span className="item-time">{a.trackCount} tracks</span>
+                <span className="item-time">
+                  {formatNumber(a.trackCount)} tracks
+                </span>
               </div>
             </div>
           ))}

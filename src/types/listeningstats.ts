@@ -77,6 +77,7 @@ export interface LastfmConfig {
 
 export interface StatsfmConfig {
   username: string;
+  isPlus?: boolean;
 }
 
 export interface PlayEvent {
@@ -92,4 +93,5 @@ export interface PlayEvent {
   playedMs: number;
   startedAt: number;
   endedAt: number;
+  type?: "play" | "skip";
 }

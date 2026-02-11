@@ -1,5 +1,6 @@
 import { RecentTrack } from "../../types";
 import { lazyNavigate, navigateToUri, timeAgo } from "../utils";
+import { ImageWithRetry } from "./ImageWithRetry";
 
 interface RecentlyPlayedProps {
   recentTracks: RecentTrack[];
@@ -29,7 +30,7 @@ export function RecentlyPlayed({ recentTracks }: RecentlyPlayedProps) {
             }
           >
             {t.albumArt ? (
-              <img src={t.albumArt} className="recent-art" alt="" />
+              <ImageWithRetry src={t.albumArt} className="recent-art" />
             ) : (
               <div className="recent-art placeholder" />
             )}

@@ -1,5 +1,8 @@
 import { ProviderType } from "../../types/listeningstats";
+import { renderMarkdown } from "../format";
 import { Icons } from "../icons";
+
+const { useState, useEffect, useRef } = Spicetify.React;
 
 interface HeaderProps {
   onShare?: () => void;
@@ -12,6 +15,39 @@ const PROVIDER_NAMES: Record<ProviderType, string> = {
   lastfm: "Last.fm",
   statsfm: "stats.fm",
 };
+
+const ANNOUNCEMENT_URL =
+  "https://raw.githubusercontent.com/Xndr2/listening-stats/main/ANNOUNCEMENT.md";
+
+function Announcement() {
+  const [html, setHtml] = useState<string | null>(null);
+  const fetched = useRef(false);
+
+  useEffect(() => {
+    if (fetched.current) return;
+    fetched.current = true;
+    const url = ANNOUNCEMENT_URL + "?t=" + Math.floor(Date.now() / 300000);
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.text();
+      })
+      .then((text) => {
+        const trimmed = text.trim();
+        if (trimmed) setHtml(renderMarkdown(trimmed));
+      })
+      .catch(() => {});
+  }, []);
+
+  if (!html) return null;
+
+  return (
+    <div
+      className="stats-announcement"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
 
 export function Header({
   onShare,
@@ -31,23 +67,7 @@ export function Header({
               </span>
             )}
           </p>
-          <div className="stats-dev-note">
-            <p className="stats-dev-note-main">Important!</p>
-            <a
-              className="stats-dev-note-sub"
-              href="https://techcrunch.com/2026/02/06/spotify-changes-developer-mode-api-to-require-premium-accounts-limits-test-users/"
-            >
-              Spotify is shutting down it's API to access the Spotify music
-              catalog.
-            </a>
-            <p className="stats-dev-note-sub">
-              I have no idea if Listening-Stats will be affected or not. We will
-              have to wait and see. I'll keep you all updated.
-              <br />
-              I'm still working on fixing small bugs so I'll push those soon.
-              Thanks for 1K downloads! Y'all are amazing ❤️
-            </p>
-          </div>
+          <Announcement />
         </div>
         <div className="header-actions">
           {onToggleSettings && (

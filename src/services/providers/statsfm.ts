@@ -3,23 +3,38 @@ import * as Statsfm from "../statsfm";
 import { initPoller, destroyPoller, getPollingData } from "../tracker";
 import type { TrackingProvider } from "./types";
 
-const PERIODS = ["weeks", "months", "lifetime"] as const;
+const FREE_PERIODS = ["weeks", "months", "lifetime"] as const;
+const FREE_LABELS: Record<string, string> = {
+  weeks: "4 Weeks",
+  months: "6 Months",
+  lifetime: "Lifetime",
+};
 
-const PERIOD_LABELS: Record<string, string> = {
+const PLUS_PERIODS = ["today", "days", "weeks", "months", "lifetime"] as const;
+const PLUS_LABELS: Record<string, string> = {
+  today: "Today",
+  days: "This Week",
   weeks: "4 Weeks",
   months: "6 Months",
   lifetime: "Lifetime",
 };
 
 export function createStatsfmProvider(): TrackingProvider {
+  const config = Statsfm.getConfig();
+  const isPlus = config?.isPlus ?? false;
+  const periods = isPlus ? [...PLUS_PERIODS] : [...FREE_PERIODS];
+  const periodLabels = isPlus ? { ...PLUS_LABELS } : { ...FREE_LABELS };
+
   return {
     type: "statsfm",
-    periods: [...PERIODS],
-    periodLabels: PERIOD_LABELS,
+    periods,
+    periodLabels,
     defaultPeriod: "weeks",
 
     init() {
       initPoller("statsfm");
+      // Fire-and-forget: detect tier upgrades between sessions
+      Statsfm.refreshPlusStatus().catch(() => {/* ignore */});
     },
 
     destroy() {
@@ -27,7 +42,22 @@ export function createStatsfmProvider(): TrackingProvider {
     },
 
     async calculateStats(period: string): Promise<ListeningStats> {
-      return calculateStatsfmStats(period as Statsfm.StatsfmRange);
+      try {
+        return await calculateStatsfmStats(period as Statsfm.StatsfmRange);
+      } catch (err: any) {
+        // If a Plus-only range returned 400, user's tier may have changed
+        if (
+          err?.message?.includes("400") &&
+          (period === "today" || period === "days")
+        ) {
+          const cfg = Statsfm.getConfig();
+          if (cfg) {
+            Statsfm.saveConfig({ ...cfg, isPlus: false });
+          }
+          return calculateStatsfmStats("weeks");
+        }
+        throw err;
+      }
     },
   };
 }
@@ -42,17 +72,19 @@ async function calculateStatsfmStats(
     topGenresRaw,
     recentRaw,
     streamStats,
+    dateStats,
   ] = await Promise.all([
     Statsfm.getTopTracks(range, 50),
     Statsfm.getTopArtists(range, 50),
     Statsfm.getTopAlbums(range, 50),
     Statsfm.getTopGenres(range, 20),
     Statsfm.getRecentStreams(50).catch(() => []),
-    Statsfm.getStreamStats().catch(() => ({
+    Statsfm.getStreamStats(range).catch(() => ({
       durationMs: 0,
       count: 0,
       cardinality: { tracks: 0, artists: 0, albums: 0 },
     })),
+    Statsfm.getDateStats(range).catch(() => ({ hours: {} as Record<number, { durationMs: number; count: number }> })),
   ]);
 
   const pollingData = getPollingData();
@@ -151,10 +183,21 @@ async function calculateStatsfmStats(
     .slice(0, 10)
     .map((g) => ({ genre: g.genre.tag, count: g.streams ?? g.position }));
 
-  const hourlyDistribution = new Array(24).fill(0);
-  for (const t of recentTracks) {
-    const hour = new Date(t.playedAt).getHours();
-    hourlyDistribution[hour]++;
+  let hourlyDistribution = new Array(24).fill(0);
+  const hasDateStats = Object.keys(dateStats.hours).length > 0;
+  if (hasDateStats) {
+    for (const [hour, stat] of Object.entries(dateStats.hours)) {
+      const h = parseInt(hour, 10);
+      if (h >= 0 && h < 24) {
+        hourlyDistribution[h] = stat.count;
+      }
+    }
+  } else {
+    // Fallback for non-Plus users where dateStats endpoint may fail
+    for (const t of recentTracks) {
+      const hour = new Date(t.playedAt).getHours();
+      hourlyDistribution[hour]++;
+    }
   }
 
   const uniqueTrackCount =

@@ -189,6 +189,98 @@
     }
   }
 
+  // src/services/api-resilience.ts
+  var ApiError = class extends Error {
+    constructor(message, statusCode, retryable = false) {
+      super(message);
+      this.statusCode = statusCode;
+      this.retryable = retryable;
+      this.name = "ApiError";
+    }
+  };
+  var CircuitBreaker = class {
+    constructor(failureThreshold = 5, resetTimeoutMs = 6e4) {
+      this.failureThreshold = failureThreshold;
+      this.resetTimeoutMs = resetTimeoutMs;
+      this.state = "closed";
+      this.failures = 0;
+      this.lastFailure = 0;
+    }
+    async execute(fn) {
+      if (this.state === "open") {
+        if (Date.now() - this.lastFailure >= this.resetTimeoutMs) {
+          this.state = "half_open";
+        } else {
+          throw new ApiError(
+            "Circuit open: API temporarily unavailable",
+            void 0,
+            true
+          );
+        }
+      }
+      try {
+        const result = await fn();
+        this.onSuccess();
+        return result;
+      } catch (error) {
+        this.onFailure();
+        throw error;
+      }
+    }
+    reset() {
+      this.failures = 0;
+      this.state = "closed";
+    }
+    onSuccess() {
+      this.failures = 0;
+      this.state = "closed";
+    }
+    onFailure() {
+      this.failures++;
+      this.lastFailure = Date.now();
+      if (this.failures >= this.failureThreshold) {
+        this.state = "open";
+      }
+    }
+  };
+  function createBatchCoalescer(batchFn, windowMs = 50, maxBatch = 50) {
+    let pending = /* @__PURE__ */ new Map();
+    let timer = null;
+    function flush() {
+      timer = null;
+      const batch = pending;
+      pending = /* @__PURE__ */ new Map();
+      const keys = [...batch.keys()];
+      batchFn(keys).then((results) => {
+        for (const [key, entries] of batch) {
+          const val = results.get(key);
+          for (const entry of entries) {
+            entry.resolve(val);
+          }
+        }
+      }).catch((err) => {
+        for (const entries of batch.values()) {
+          for (const entry of entries) {
+            entry.reject(err);
+          }
+        }
+      });
+    }
+    return function request(key) {
+      return new Promise((resolve, reject) => {
+        const entries = pending.get(key) || [];
+        entries.push({ resolve, reject });
+        pending.set(key, entries);
+        if (pending.size >= maxBatch) {
+          if (timer) clearTimeout(timer);
+          flush();
+        } else if (!timer) {
+          timer = setTimeout(flush, windowMs);
+        }
+      });
+    };
+  }
+
   // src/services/spotify-api.ts
   var STORAGE_PREFIX = "listening-stats:";
   var QUEUE_DELAY_MS = 300;
@@ -239,13 +331,22 @@
   function setCache2(key, data) {
     cache2.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS2 });
   }
+  var PRIORITY_ORDER = { high: 0, normal: 1, low: 2 };
   var queue = [];
   var draining = false;
-  function enqueue(fn) {
-    return new Promise((resolve, reject) => {
-      queue.push({ fn, resolve, reject });
+  var inflight = /* @__PURE__ */ new Map();
+  var circuitBreaker = new CircuitBreaker(5, 6e4);
+  function enqueueWithPriority(key, fn, priority = "normal") {
+    const existing = inflight.get(key);
+    if (existing) return existing;
+    const promise = new Promise((resolve, reject) => {
+      queue.push({ key, fn, resolve, reject, priority });
+      queue.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
       if (!draining) drainQueue();
     });
+    inflight.set(key, promise);
+    promise.finally(() => inflight.delete(key));
+    return promise;
   }
   async function drainQueue() {
     draining = true;
@@ -256,10 +357,10 @@
       }
       const item = queue.shift();
       try {
-        const result = await item.fn();
+        const result = await circuitBreaker.execute(() => item.fn());
         item.resolve(result);
       } catch (error) {
-        if (error?.message?.includes("429") || error?.status === 429) {
+        if (error?.message?.includes("429") || error?.status === 429 || error?.statusCode === 429) {
           setRateLimit(error);
         }
         item.reject(error);
@@ -273,27 +374,34 @@
   async function apiFetch(url) {
     const cached = getCached2(url);
     if (cached) return cached;
-    return enqueue(async () => {
+    return enqueueWithPriority(url, async () => {
       let response;
       try {
         response = await Spicetify.CosmosAsync.get(url);
       } catch (err) {
         if (err?.status === 429 || String(err?.message || "").includes("429")) {
           setRateLimit(err);
+          throw new ApiError(
+            err?.message || "Rate limited",
+            429,
+            true
+          );
         }
-        throw err;
+        const status = err?.status;
+        throw new ApiError(
+          err?.message || "API request failed",
+          status,
+          status !== void 0 && (status === 429 || status >= 500)
+        );
       }
       if (!response) {
-        throw new Error("Empty API response");
+        throw new ApiError("Empty API response", void 0, false);
       }
       if (response.error) {
         const status = response.error.status;
-        const err = new Error(
-          response.error.message || `Spotify API error ${status}`
-        );
-        err.status = status;
+        const message = response.error.message || `Spotify API error ${status}`;
         if (status === 429) setRateLimit(response);
-        throw err;
+        throw new ApiError(message, status, status === 429 || status >= 500);
       }
       setCache2(url, response);
       return response;
@@ -368,6 +476,17 @@
       releaseSearchSlot();
     }
   }
+  async function searchTrack(trackName, artistName) {
+    const cacheKey = `s:t:${artistName}|||${trackName}`;
+    return throttledSearch(cacheKey, async () => {
+      const q = encodeURIComponent(`track:${trackName} artist:${artistName}`);
+      const resp = await Spicetify.CosmosAsync.get(
+        `https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`
+      );
+      const item = resp?.tracks?.items?.[0];
+      return { uri: item?.uri, imageUrl: item?.album?.images?.[0]?.url };
+    });
+  }
   async function searchArtist(artistName) {
     const cacheKey = `s:a:${artistName}`;
     return throttledSearch(cacheKey, async () => {
@@ -376,6 +495,17 @@
         `https://api.spotify.com/v1/search?q=${q}&type=artist&limit=1`
       );
       const item = resp?.artists?.items?.[0];
+      return { uri: item?.uri, imageUrl: item?.images?.[0]?.url };
+    });
+  }
+  async function searchAlbum(albumName, artistName) {
+    const cacheKey = `s:al:${artistName}|||${albumName}`;
+    return throttledSearch(cacheKey, async () => {
+      const q = encodeURIComponent(`album:${albumName} artist:${artistName}`);
+      const resp = await Spicetify.CosmosAsync.get(
+        `https://api.spotify.com/v1/search?q=${q}&type=album&limit=1`
+      );
+      const item = resp?.albums?.items?.[0];
       return { uri: item?.uri, imageUrl: item?.images?.[0]?.url };
     });
   }
@@ -399,6 +529,29 @@
     }
     return results;
   }
+  var artistCoalescer = createBatchCoalescer(
+    async (ids) => {
+      const results = /* @__PURE__ */ new Map();
+      for (let i = 0; i < ids.length; i += MAX_BATCH) {
+        const chunk = ids.slice(i, i + MAX_BATCH);
+        try {
+          const response = await apiFetch(
+            `https://api.spotify.com/v1/artists?ids=${chunk.join(",")}`
+          );
+          if (response?.artists) {
+            for (const artist of response.artists.filter(Boolean)) {
+              if (artist.id) results.set(artist.id, artist);
+            }
+          }
+        } catch (error) {
+          console.warn("[ListeningStats] Artist batch fetch failed:", error);
+        }
+      }
+      return results;
+    },
+    50,
+    MAX_BATCH
+  );
 
   // node_modules/idb/build/index.js
   var instanceOfAny = (object, constructors) => constructors.some((c) => object instanceof c);
@@ -550,6 +703,17 @@
     });
     return openPromise;
   }
+  function deleteDB(name, { blocked } = {}) {
+    const request = indexedDB.deleteDatabase(name);
+    if (blocked) {
+      request.addEventListener("blocked", (event) => blocked(
+        // Casting due to https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/1405
+        event.oldVersion,
+        event
+      ));
+    }
+    return wrap(request).then(() => void 0);
+  }
   var readMethods = ["get", "getKey", "getAll", "getAllKeys", "count"];
   var writeMethods = ["put", "add", "delete", "clear"];
   var cachedMethods = /* @__PURE__ */ new Map();
@@ -637,32 +801,222 @@
 
   // src/services/storage.ts
   var DB_NAME = "listening-stats";
-  var DB_VERSION = 3;
+  var DB_VERSION = 4;
   var STORE_NAME = "playEvents";
+  var BACKUP_LS_KEY = "listening-stats:migration-backup";
+  var BACKUP_VERSION_KEY = "listening-stats:migration-version";
+  var BACKUP_DB_NAME = "listening-stats-backup";
   var dbPromise = null;
+  async function backupBeforeMigration() {
+    let events = [];
+    try {
+      const currentDb = await openDB(DB_NAME);
+      const version = currentDb.version;
+      if (currentDb.objectStoreNames.contains(STORE_NAME)) {
+        events = await currentDb.getAll(STORE_NAME);
+      }
+      currentDb.close();
+      if (events.length === 0) {
+        return events;
+      }
+      localStorage.setItem(BACKUP_VERSION_KEY, String(version));
+      try {
+        const json = JSON.stringify(events);
+        localStorage.setItem(BACKUP_LS_KEY, json);
+        console.log(`[ListeningStats] Backed up ${events.length} events to localStorage`);
+      } catch (e) {
+        if (e?.name === "QuotaExceededError" || e?.code === 22) {
+          console.warn("[ListeningStats] localStorage full, using IndexedDB backup");
+          localStorage.removeItem(BACKUP_LS_KEY);
+          try {
+            await deleteDB(BACKUP_DB_NAME);
+          } catch {
+          }
+          const backupDb = await openDB(BACKUP_DB_NAME, 1, {
+            upgrade(db) {
+              db.createObjectStore("backup");
+            }
+          });
+          await backupDb.put("backup", events, "events");
+          backupDb.close();
+          console.log(`[ListeningStats] Backed up ${events.length} events to IndexedDB`);
+        } else {
+          throw e;
+        }
+      }
+    } catch (e) {
+      console.error("[ListeningStats] Backup failed:", e);
+    }
+    return events;
+  }
+  async function restoreFromBackup() {
+    let events = null;
+    try {
+      const json = localStorage.getItem(BACKUP_LS_KEY);
+      if (json) {
+        events = JSON.parse(json);
+      }
+    } catch {
+    }
+    if (!events) {
+      try {
+        const backupDb = await openDB(BACKUP_DB_NAME, 1, {
+          upgrade(db) {
+            if (!db.objectStoreNames.contains("backup")) {
+              db.createObjectStore("backup");
+            }
+          }
+        });
+        events = await backupDb.get("backup", "events");
+        backupDb.close();
+      } catch {
+      }
+    }
+    if (events && events.length > 0) {
+      try {
+        const db = await openDB(DB_NAME);
+        if (db.objectStoreNames.contains(STORE_NAME)) {
+          const tx = db.transaction(STORE_NAME, "readwrite");
+          await tx.store.clear();
+          for (const event of events) {
+            await tx.store.add(event);
+          }
+          await tx.done;
+          console.log(`[ListeningStats] Restored ${events.length} events from backup`);
+        }
+        db.close();
+      } catch (e) {
+        console.error("[ListeningStats] Restore failed:", e);
+      }
+    }
+    await cleanupBackup();
+  }
+  async function cleanupBackup() {
+    try {
+      localStorage.removeItem(BACKUP_LS_KEY);
+    } catch {
+    }
+    try {
+      localStorage.removeItem(BACKUP_VERSION_KEY);
+    } catch {
+    }
+    try {
+      await deleteDB(BACKUP_DB_NAME);
+    } catch {
+    }
+  }
   function getDB() {
     if (!dbPromise) {
-      dbPromise = openDB(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion) {
-          if (db.objectStoreNames.contains(STORE_NAME) && oldVersion < 3) {
-            db.deleteObjectStore(STORE_NAME);
-          }
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-            const store = db.createObjectStore(STORE_NAME, {
+      dbPromise = initDB();
+    }
+    return dbPromise;
+  }
+  async function initDB() {
+    let needsBackup = false;
+    let oldDbVersion = 0;
+    try {
+      const existingDb = await openDB(DB_NAME);
+      oldDbVersion = existingDb.version;
+      existingDb.close();
+      needsBackup = oldDbVersion < DB_VERSION && oldDbVersion > 0;
+    } catch {
+      needsBackup = false;
+    }
+    if (needsBackup) {
+      await backupBeforeMigration();
+    }
+    try {
+      const db = await openDB(DB_NAME, DB_VERSION, {
+        upgrade(db2, oldVersion, _newVersion, transaction) {
+          if (oldVersion < 1) {
+            const store = db2.createObjectStore(STORE_NAME, {
               keyPath: "id",
               autoIncrement: true
             });
             store.createIndex("by-startedAt", "startedAt");
             store.createIndex("by-trackUri", "trackUri");
             store.createIndex("by-artistUri", "artistUri");
+            store.createIndex("by-type", "type");
+          }
+          if (oldVersion >= 1 && oldVersion < 3) {
+            const store = transaction.objectStore(STORE_NAME);
+            if (!store.indexNames.contains("by-startedAt")) {
+              store.createIndex("by-startedAt", "startedAt");
+            }
+            if (!store.indexNames.contains("by-trackUri")) {
+              store.createIndex("by-trackUri", "trackUri");
+            }
+            if (!store.indexNames.contains("by-artistUri")) {
+              store.createIndex("by-artistUri", "artistUri");
+            }
+          }
+          if (oldVersion >= 1 && oldVersion < 4) {
+            const store = transaction.objectStore(STORE_NAME);
+            if (!store.indexNames.contains("by-type")) {
+              store.createIndex("by-type", "type");
+            }
           }
         }
       });
+      if (needsBackup) {
+        await cleanupBackup();
+        Spicetify?.showNotification?.("Database updated successfully");
+        console.log(`[ListeningStats] Migration from v${oldDbVersion} to v${DB_VERSION} complete`);
+      }
+      const dedupDone = localStorage.getItem("listening-stats:dedup-done");
+      if (!dedupDone) {
+        const removed = await runDedup(db);
+        if (removed > 0) {
+          Spicetify?.showNotification?.(`Cleaned up ${removed} duplicate entries`);
+        }
+        localStorage.setItem("listening-stats:dedup-done", "1");
+      }
+      return db;
+    } catch (e) {
+      console.error("[ListeningStats] Migration failed, attempting rollback:", e);
+      if (needsBackup) {
+        await restoreFromBackup();
+      }
+      const fallbackDb = await openDB(DB_NAME);
+      console.log(`[ListeningStats] Opened fallback DB at v${fallbackDb.version}`);
+      return fallbackDb;
     }
-    return dbPromise;
+  }
+  async function runDedup(db) {
+    try {
+      const allEvents = await db.getAll(STORE_NAME);
+      const seen = /* @__PURE__ */ new Set();
+      const duplicateIds = [];
+      for (const event of allEvents) {
+        const key = `${event.trackUri}:${event.startedAt}`;
+        if (seen.has(key)) {
+          duplicateIds.push(event.id);
+        } else {
+          seen.add(key);
+        }
+      }
+      if (duplicateIds.length > 0) {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        for (const id of duplicateIds) {
+          tx.store.delete(id);
+        }
+        await tx.done;
+        console.log(`[ListeningStats] Removed ${duplicateIds.length} duplicate events`);
+      }
+      return duplicateIds.length;
+    } catch (e) {
+      console.error("[ListeningStats] Dedup failed:", e);
+      return 0;
+    }
   }
   async function addPlayEvent(event) {
     const db = await getDB();
+    const range = IDBKeyRange.only(event.startedAt);
+    const existing = await db.getAllFromIndex(STORE_NAME, "by-startedAt", range);
+    if (existing.some((e) => e.trackUri === event.trackUri)) {
+      console.warn("[ListeningStats] Duplicate event blocked:", event.trackName);
+      return;
+    }
     await db.add(STORE_NAME, event);
   }
   async function getPlayEventsByTimeRange(start, end) {
@@ -683,8 +1037,9 @@
   // src/services/tracker.ts
   var STORAGE_KEY2 = "listening-stats:pollingData";
   var LOGGING_KEY = "listening-stats:logging";
-  var SKIP_THRESHOLD_MS = 3e4;
   var STATS_UPDATED_EVENT = "listening-stats:updated";
+  var THRESHOLD_KEY = "listening-stats:playThreshold";
+  var DEFAULT_THRESHOLD_MS = 1e4;
   var activeProviderType = null;
   function isLoggingEnabled() {
     try {
@@ -692,6 +1047,17 @@
     } catch {
       return false;
     }
+  }
+  function getPlayThreshold() {
+    try {
+      const stored = localStorage.getItem(THRESHOLD_KEY);
+      if (stored) {
+        const val = parseInt(stored, 10);
+        if (val >= 0 && val <= 6e4) return val;
+      }
+    } catch {
+    }
+    return DEFAULT_THRESHOLD_MS;
   }
   function log(...args) {
     if (isLoggingEnabled()) console.log("[ListeningStats]", ...args);
@@ -759,12 +1125,15 @@
   var accumulatedPlayTime = 0;
   var isPlaying = false;
   var currentTrackDuration = 0;
+  var lastProgressMs = 0;
+  var progressHandler = null;
   function handleSongChange() {
     if (currentTrackUri && playStartTime !== null) {
       const totalPlayedMs = accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
       const data = getPollingData();
       data.totalPlays++;
-      const skipped = totalPlayedMs < SKIP_THRESHOLD_MS && currentTrackDuration > SKIP_THRESHOLD_MS;
+      const threshold = getPlayThreshold();
+      const skipped = totalPlayedMs < threshold && currentTrackDuration > threshold;
       if (skipped) {
         data.skipEvents++;
       }
@@ -776,7 +1145,7 @@
           `(${Math.round(totalPlayedMs / 1e3)}s / ${Math.round(currentTrackDuration / 1e3)}s)`
         );
       }
-      writePlayEvent(totalPlayedMs);
+      writePlayEvent(totalPlayedMs, skipped);
     }
     const playerData = Spicetify.Player.data;
     if (playerData?.item) {
@@ -817,8 +1186,12 @@
       startedAt: Date.now()
     };
   }
-  function writePlayEvent(totalPlayedMs) {
+  function writePlayEvent(totalPlayedMs, skipped) {
     if (!previousTrackData) return;
+    if (skipped === void 0) {
+      const threshold = getPlayThreshold();
+      skipped = totalPlayedMs < threshold && previousTrackData.durationMs > threshold;
+    }
     const event = {
       trackUri: previousTrackData.trackUri,
       trackName: previousTrackData.trackName,
@@ -830,7 +1203,8 @@
       durationMs: previousTrackData.durationMs,
       playedMs: totalPlayedMs,
       startedAt: previousTrackData.startedAt,
-      endedAt: Date.now()
+      endedAt: Date.now(),
+      type: skipped ? "skip" : "play"
     };
     addPlayEvent(event).catch((err) => {
       console.warn("[ListeningStats] Failed to write play event:", err);
@@ -851,6 +1225,21 @@
       log("Resumed");
     }
   }
+  function handleProgress() {
+    const progress = Spicetify.Player.getProgress();
+    const duration = Spicetify.Player.getDuration();
+    const repeat = Spicetify.Player.getRepeat();
+    if (repeat === 2 && duration > 0) {
+      const wasNearEnd = lastProgressMs > duration * 0.9;
+      const nowNearStart = progress < duration * 0.1;
+      if (wasNearEnd && nowNearStart && currentTrackUri) {
+        log("Repeat-one loop detected, recording play");
+        handleSongChange();
+        captureCurrentTrackData();
+      }
+    }
+    lastProgressMs = progress;
+  }
   var pollIntervalId = null;
   var activeSongChangeHandler = null;
   function initPoller(providerType) {
@@ -861,16 +1250,23 @@
     if (win.__lsPauseHandler) {
       Spicetify.Player.removeEventListener("onplaypause", win.__lsPauseHandler);
     }
+    if (win.__lsProgressHandler) {
+      Spicetify.Player.removeEventListener("onprogress", win.__lsProgressHandler);
+    }
     activeProviderType = providerType;
     captureCurrentTrackData();
     activeSongChangeHandler = () => {
+      lastProgressMs = 0;
       handleSongChange();
       captureCurrentTrackData();
     };
     Spicetify.Player.addEventListener("songchange", activeSongChangeHandler);
     Spicetify.Player.addEventListener("onplaypause", handlePlayPause);
+    progressHandler = handleProgress;
+    Spicetify.Player.addEventListener("onprogress", progressHandler);
     win.__lsSongHandler = activeSongChangeHandler;
     win.__lsPauseHandler = handlePlayPause;
+    win.__lsProgressHandler = progressHandler;
     const playerData = Spicetify.Player.data;
     if (playerData?.item) {
       currentTrackUri = playerData.item.uri;
@@ -885,9 +1281,15 @@
       activeSongChangeHandler = null;
     }
     Spicetify.Player.removeEventListener("onplaypause", handlePlayPause);
+    if (progressHandler) {
+      Spicetify.Player.removeEventListener("onprogress", progressHandler);
+      progressHandler = null;
+    }
     const win = window;
     win.__lsSongHandler = null;
     win.__lsPauseHandler = null;
+    win.__lsProgressHandler = null;
+    lastProgressMs = 0;
     if (pollIntervalId !== null) {
       clearInterval(pollIntervalId);
       pollIntervalId = null;
@@ -944,6 +1346,26 @@
     needsImage.forEach((a, i) => {
       if (results[i].uri && !a.artistUri) a.artistUri = results[i].uri;
       if (results[i].imageUrl) a.artistImage = results[i].imageUrl;
+    });
+  }
+  async function enrichTrackUris(tracks) {
+    const needsUri = tracks.filter((t) => !t.trackUri);
+    if (needsUri.length === 0) return;
+    const results = await Promise.all(
+      needsUri.map((t) => searchTrack(t.trackName, t.artistName))
+    );
+    needsUri.forEach((t, i) => {
+      if (results[i].uri) t.trackUri = results[i].uri;
+    });
+  }
+  async function enrichAlbumUris(albums) {
+    const needsUri = albums.filter((a) => !a.albumUri);
+    if (needsUri.length === 0) return;
+    const results = await Promise.all(
+      needsUri.map((a) => searchAlbum(a.albumName, a.artistName))
+    );
+    needsUri.forEach((a, i) => {
+      if (results[i].uri) a.albumUri = results[i].uri;
     });
   }
   async function calculateRecentStats() {
@@ -1029,6 +1451,8 @@
       playCount: a.count
     }));
     await enrichArtistImages(topArtists);
+    await enrichTrackUris(topTracks);
+    await enrichAlbumUris(topAlbums);
     const hourlyDistribution = new Array(24).fill(0);
     for (const t of recentTracks) {
       const hour = new Date(t.playedAt).getHours();
@@ -1123,6 +1547,8 @@
       playCount: a.playCount
     }));
     await enrichArtistImages(topArtists);
+    await enrichTrackUris(topTracks);
+    await enrichAlbumUris(topAlbums);
     const recentTracks = (Array.isArray(recentLfm) ? recentLfm : []).filter((t) => !t.nowPlaying).map((t) => ({
       trackUri: "",
       trackName: t.name,
@@ -1425,6 +1851,10 @@
     configCache2 = null;
     return null;
   }
+  function saveConfig(config) {
+    configCache2 = config;
+    localStorage.setItem(STORAGE_KEY3, JSON.stringify(config));
+  }
   var cache3 = /* @__PURE__ */ new Map();
   function getCached3(key) {
     const entry = cache3.get(key);
@@ -1452,6 +1882,22 @@
     const data = await response.json();
     setCache3(url, data);
     return data;
+  }
+  async function validateUser2(username) {
+    const data = await statsfmFetch(
+      `/users/${encodeURIComponent(username)}`
+    );
+    const item = data.item || data;
+    if (!item || !item.customId) {
+      throw new Error("User not found");
+    }
+    return {
+      id: item.id,
+      customId: item.customId,
+      displayName: item.displayName || item.customId,
+      image: item.image || void 0,
+      isPlus: !!item.isPlus
+    };
   }
   function getUsername() {
     const config = getConfig2();
@@ -1492,14 +1938,37 @@
     );
     return data.items || [];
   }
-  async function getStreamStats() {
-    const data = await statsfmFetch(`/users/${getUsername()}/streams/stats`);
+  async function getStreamStats(range) {
+    const data = await statsfmFetch(
+      `/users/${getUsername()}/streams/stats?range=${range}`
+    );
     const item = data.items || data;
     return {
       durationMs: item.durationMs || 0,
       count: item.count || 0,
       cardinality: item.cardinality || { tracks: 0, artists: 0, albums: 0 }
     };
+  }
+  async function getDateStats(range, timeZoneOffset) {
+    const tz = timeZoneOffset ?? -(/* @__PURE__ */ new Date()).getTimezoneOffset();
+    const data = await statsfmFetch(
+      `/users/${getUsername()}/streams/stats/dates?range=${range}&timeZoneOffset=${tz}`
+    );
+    const item = data.items || data;
+    return { hours: item.hours || {} };
+  }
+  async function refreshPlusStatus() {
+    const config = getConfig2();
+    if (!config?.username) return false;
+    try {
+      const info = await validateUser2(config.username);
+      if (info.isPlus !== (config.isPlus ?? false)) {
+        saveConfig({ ...config, isPlus: info.isPlus });
+        return true;
+      }
+    } catch {
+    }
+    return false;
   }
   function extractSpotifyUri(externalIds, type) {
     const ids = externalIds?.spotify;
@@ -1510,26 +1979,51 @@
   }
 
   // src/services/providers/statsfm.ts
-  var PERIODS3 = ["weeks", "months", "lifetime"];
-  var PERIOD_LABELS3 = {
+  var FREE_PERIODS = ["weeks", "months", "lifetime"];
+  var FREE_LABELS = {
+    weeks: "4 Weeks",
+    months: "6 Months",
+    lifetime: "Lifetime"
+  };
+  var PLUS_PERIODS = ["today", "days", "weeks", "months", "lifetime"];
+  var PLUS_LABELS = {
+    today: "Today",
+    days: "This Week",
     weeks: "4 Weeks",
     months: "6 Months",
     lifetime: "Lifetime"
   };
   function createStatsfmProvider() {
+    const config = getConfig2();
+    const isPlus = config?.isPlus ?? false;
+    const periods = isPlus ? [...PLUS_PERIODS] : [...FREE_PERIODS];
+    const periodLabels = isPlus ? { ...PLUS_LABELS } : { ...FREE_LABELS };
     return {
       type: "statsfm",
-      periods: [...PERIODS3],
-      periodLabels: PERIOD_LABELS3,
+      periods,
+      periodLabels,
       defaultPeriod: "weeks",
       init() {
         initPoller("statsfm");
+        refreshPlusStatus().catch(() => {
+        });
       },
       destroy() {
         destroyPoller();
       },
       async calculateStats(period) {
-        return calculateStatsfmStats(period);
+        try {
+          return await calculateStatsfmStats(period);
+        } catch (err) {
+          if (err?.message?.includes("400") && (period === "today" || period === "days")) {
+            const cfg = getConfig2();
+            if (cfg) {
+              saveConfig({ ...cfg, isPlus: false });
+            }
+            return calculateStatsfmStats("weeks");
+          }
+          throw err;
+        }
       }
     };
   }
@@ -1540,18 +2034,20 @@
       topAlbumsRaw,
       topGenresRaw,
       recentRaw,
-      streamStats
+      streamStats,
+      dateStats
     ] = await Promise.all([
       getTopTracks2(range, 50),
       getTopArtists2(range, 50),
       getTopAlbums2(range, 50),
       getTopGenres(range, 20),
       getRecentStreams(50).catch(() => []),
-      getStreamStats().catch(() => ({
+      getStreamStats(range).catch(() => ({
         durationMs: 0,
         count: 0,
         cardinality: { tracks: 0, artists: 0, albums: 0 }
-      }))
+      })),
+      getDateStats(range).catch(() => ({ hours: {} }))
     ]);
     const pollingData = getPollingData();
     const topTracks = topTracksRaw.slice(0, 10).map((item, i) => ({
@@ -1622,10 +2118,20 @@
       genres[g.genre.tag] = g.streams ?? g.position;
     }
     const topGenres = topGenresRaw.slice(0, 10).map((g) => ({ genre: g.genre.tag, count: g.streams ?? g.position }));
-    const hourlyDistribution = new Array(24).fill(0);
-    for (const t of recentTracks) {
-      const hour = new Date(t.playedAt).getHours();
-      hourlyDistribution[hour]++;
+    let hourlyDistribution = new Array(24).fill(0);
+    const hasDateStats = Object.keys(dateStats.hours).length > 0;
+    if (hasDateStats) {
+      for (const [hour, stat] of Object.entries(dateStats.hours)) {
+        const h = parseInt(hour, 10);
+        if (h >= 0 && h < 24) {
+          hourlyDistribution[h] = stat.count;
+        }
+      }
+    } else {
+      for (const t of recentTracks) {
+        const hour = new Date(t.playedAt).getHours();
+        hourlyDistribution[hour]++;
+      }
     }
     const uniqueTrackCount = streamStats.cardinality?.tracks || new Set(
       topTracksRaw.map(

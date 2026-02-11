@@ -1,4 +1,6 @@
-import { formatHour, formatMinutes } from "../utils";
+import { formatHour } from "../format";
+import { formatMinutes } from "../utils";
+import { PortalTooltip } from "./PortalTooltip";
 
 interface ActivityChartProps {
   hourlyDistribution: number[];
@@ -36,24 +38,21 @@ export function ActivityChart({
         {hourlyDistribution.map((val, hr) => {
           const h = val > 0 ? Math.max((val / max) * 100, 5) : 0;
           return (
-            <div
+            <PortalTooltip
               key={hr}
+              text={`${formatHour(hr)}: ${formatValue(val)}`}
               className={`activity-bar ${hr === peakHour && val > 0 ? "peak" : ""}`}
               style={{ height: `${h}%` }}
-            >
-              <div className="activity-bar-tooltip">
-                {formatHour(hr)}: {formatValue(val)}
-              </div>
-            </div>
+            />
           );
         })}
       </div>
       <div className="chart-labels">
-        <span>12am</span>
-        <span>6am</span>
-        <span>12pm</span>
-        <span>6pm</span>
-        <span>12am</span>
+        <span>{formatHour(0)}</span>
+        <span>{formatHour(6)}</span>
+        <span>{formatHour(12)}</span>
+        <span>{formatHour(18)}</span>
+        <span>{formatHour(0)}</span>
       </div>
     </div>
   );
