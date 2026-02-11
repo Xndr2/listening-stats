@@ -4,7 +4,7 @@ Author: Xndr2
 Source: https://github.com/Xndr2/listening-stats
 This script installs the Listening Stats Spicetify app.
 #>
-# Usage: iwr -useb 'https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1' | iex
+# Usage: iwr -useb 'https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1' -OutFile "$env:TEMP\ls-install.ps1"; & "$env:TEMP\ls-install.ps1"; Remove-Item "$env:TEMP\ls-install.ps1"
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

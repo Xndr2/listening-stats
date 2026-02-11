@@ -45,7 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.
 **Windows (PowerShell):**
 
 ```powershell
-iwr -useb 'https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1' | iex
+iwr -useb 'https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1' -OutFile "$env:TEMP\ls-install.ps1"; & "$env:TEMP\ls-install.ps1"; Remove-Item "$env:TEMP\ls-install.ps1"
 ```
 
 The installer will automatically:
