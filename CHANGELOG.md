@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.3.2
+
+### Added
+
+- Drag-and-drop section reordering — rearrange your dashboard layout, persists across restarts
+- Guided setup wizard with step-by-step provider tutorials for stats.fm and Last.fm
+- Feature walkthrough tour on first use, restartable from settings
+- stats.fm auto-detects free vs premium and shows the correct time periods
+- Formatted markdown changelog in update banner
+- Announcement banner under header, fetched from GitHub
+- Setup guide links for unconfigured providers in settings
+
+### Changed
+
+- Settings panel redesigned with collapsible categories (Data Source, Display, Layout, Advanced)
+- Advanced settings organized into Diagnostics, Export, and Danger Zone sub-sections
+- All numbers now display with locale-aware formatting (e.g. 64,143)
+- 24-hour time toggle in settings with instant updates across the app
+- Stat card tooltips explaining each metric on hover
+- Heart/like buttons visible on all tracks, disabled icon for tracks without Spotify URI
+- API resilience layer with priority queue, dedup, and circuit breaker for rate limiting
+- Clear error messaging distinguishing "no data" from "fetch failed"
+
+### Fixed
+
+- Fixed data loss when upgrading to a new version (IndexedDB migration now backs up and restores)
+- Fixed songs on repeat only counting once — each full play is now tracked separately
+- Fixed duplicate entries in recently played
+- Fixed stats.fm numbers not matching the website across different time periods
+- Fixed paid-to-artist estimate using lifetime data instead of selected period
+- Fixed activity chart not scoping to the selected time period
+- Fixed broken cover art under rate limiting — images now retry automatically
+- Fixed Last.fm cards not navigating to Spotify when clicked
+- Fixed tooltips rendering behind Spotify sidebar, now-playing bar, and top bar
+- Fixed tour freezing when cancelled and restarted mid-step
+- Fixed page scrolling away during tour transitions
+
 ## 1.2.41
 
 ### Added
