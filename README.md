@@ -6,10 +6,10 @@ A real-time listening statistics dashboard for Spotify, powered by Spicetify.
 ![Spicetify](https://img.shields.io/badge/spicetify-2.x-1DB954)
 ![Downloads](https://img.shields.io/github/downloads/Xndr2/listening-stats/total)
 
-![output](https://github.com/user-attachments/assets/6dae44fd-e1cf-4b3c-95f5-b22b50d30da1)
+<!-- ![output](https://github.com/user-attachments/assets/6dae44fd-e1cf-4b3c-95f5-b22b50d30da1) -->
 
 <!-- Old Image -->
-<!-- <img alt="image" src="https://github.com/user-attachments/assets/6bfdeb96-2e81-4ae0-9a41-1bf647bac215" /> -->
+<img alt="image" src="https://github.com/user-attachments/assets/6bfdeb96-2e81-4ae0-9a41-1bf647bac215" />
 
 ## Features
 
