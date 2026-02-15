@@ -3,10 +3,16 @@ const PREFS_CHANGED_EVENT = "listening-stats:prefs-changed";
 
 export interface UserPreferences {
   use24HourTime: boolean;
+  itemsPerSection: number;
+  genresPerSection: number;
+  hiddenSections: string[];
 }
 
 const DEFAULTS: UserPreferences = {
   use24HourTime: false,
+  itemsPerSection: 5,
+  genresPerSection: 5,
+  hiddenSections: [],
 };
 
 let cached: UserPreferences | null = null;

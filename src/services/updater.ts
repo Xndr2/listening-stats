@@ -4,7 +4,7 @@ const STORAGE_KEY = "listening-stats:lastUpdateCheck";
 declare const __APP_VERSION__: string;
 
 const INSTALL_CMD_LINUX = `curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.sh | bash`;
-const INSTALL_CMD_WINDOWS = `iwr -useb 'https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.ps1' -OutFile "$env:TEMP\\ls-install.ps1"; & "$env:TEMP\\ls-install.ps1"; Remove-Item "$env:TEMP\\ls-install.ps1"`;
+const INSTALL_CMD_WINDOWS = `irm https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.ps1 | iex`;
 
 export interface GitHubRelease {
   tag_name: string;

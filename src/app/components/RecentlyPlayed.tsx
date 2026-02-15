@@ -1,5 +1,5 @@
 import { RecentTrack } from "../../types";
-import { lazyNavigate, navigateToUri, timeAgo } from "../utils";
+import { navigateToUri, timeAgo } from "../utils";
 import { ImageWithRetry } from "./ImageWithRetry";
 
 interface RecentlyPlayedProps {
@@ -23,11 +23,7 @@ export function RecentlyPlayed({ recentTracks }: RecentlyPlayedProps) {
           <div
             key={`${t.trackUri || t.trackName}-${t.playedAt}`}
             className="recent-card"
-            onClick={() =>
-              t.trackUri
-                ? navigateToUri(t.trackUri)
-                : lazyNavigate("track", t.trackName, t.artistName)
-            }
+            onClick={() => t.trackUri && navigateToUri(t.trackUri)}
           >
             {t.albumArt ? (
               <ImageWithRetry src={t.albumArt} className="recent-art" />

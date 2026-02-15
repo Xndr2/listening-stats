@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.3.27
+
+### Added
+
+- **Top Genres section** — horizontal bar chart showing your most listened genres ranked by play count, with accent-colored fill bars and stagger animations (stats.fm provider)
+- **Section visibility toggles** — hide or show individual dashboard sections (Overview, Top Lists, Top Genres, Activity, Recently Played) from Settings > Display
+- **Items per section** — choose how many tracks, artists, and albums to show (3, 5, or 10)
+- **Genres per section** — choose how many genres to show (3, 5, or 10)
+- **Genre tour step** — guided tour now highlights the Top Genres section when using stats.fm
+- **Entrance animations** — genre bars fade in with staggered delays, activity chart bars grow upward with ripple effect
+
+### Changed
+
+- **Share cards redesigned** — both story and landscape cards now use full blurred backgrounds, larger album art with glow effects, bigger fonts, and a consistent ranked list layout. Landscape card increased to 1600x900 with 3-column layout. Story card shows 5 artists in ranked rows instead of 3 circular images
+- **Share card preview** enlarged for better visibility before sharing
+- **Reset to Default** now also resets hidden sections, items per section, and genres per section back to defaults
+- **Top list cards** no longer have fixed minimum height — they shrink to fit content when showing fewer items
+
+### Fixed
+
+- **IndexedDB fresh install crash** — opening the DB without an existing version no longer creates an empty v1 database
+- **Spotify API removal** — removed unused `lazyNavigate` and `getArtistsBatch` calls that could cause errors
+- **stats.fm promo popup** no longer shows after switching to stats.fm via settings
+- **Last.fm hourly chart** — ranked stats now populate hourly distribution from recent tracks instead of showing all zeros
+- **Local streak accuracy** — streak is now computed from all-time events instead of period-filtered events
+- **Settings modal stability** — changing display preferences no longer closes the settings panel
+- **Advanced settings spacing** — Export Data section now has proper border separator and consistent margins
+
 ## 1.3.2
 
 ### Added

@@ -284,7 +284,6 @@
   background: var(--background-tinted-base);
   border-radius: 16px;
   padding: 24px;
-  min-height: 400px;
   display: flex;
   flex-direction: column;
   flex: 1 1 300px;
@@ -497,6 +496,17 @@
   transition: background 0.15s ease;
   cursor: pointer;
   position: relative;
+  animation: barGrow 0.5s ease both;
+  transform-origin: bottom;
+}
+
+@keyframes barGrow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 
 .activity-bar.peak {
@@ -919,7 +929,6 @@
   padding: 24px;
   flex: 1 1 300px;
   min-width: 280px;
-  min-height: 400px;
 }
 
 .skeleton-list-title {
@@ -1865,7 +1874,13 @@
 
 /* --- Export buttons in settings --- */
 .settings-export {
-  margin-bottom: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-export .settings-section-title {
+  margin-bottom: 8px;
 }
 
 .share-modal-overlay {
@@ -1885,9 +1900,9 @@
   background: var(--background-elevated-base, #282828);
   border-radius: 16px;
   padding: 24px;
-  max-width: 480px;
+  max-width: 720px;
   width: 90%;
-  max-height: 85vh;
+  max-height: 90vh;
   overflow-y: auto;
 }
 
@@ -1992,6 +2007,18 @@
 .item-row:nth-child(6) {
   animation-delay: 0.18s;
 }
+.item-row:nth-child(7) {
+  animation-delay: 0.21s;
+}
+.item-row:nth-child(8) {
+  animation-delay: 0.24s;
+}
+.item-row:nth-child(9) {
+  animation-delay: 0.27s;
+}
+.item-row:nth-child(10) {
+  animation-delay: 0.3s;
+}
 
 .recent-card {
   animation: fadeInUp 0.3s ease both;
@@ -2065,6 +2092,153 @@
 
 .settings-toggle.active .settings-toggle-knob {
   transform: translateX(20px);
+}
+
+/* ===== Items Per Section Picker ===== */
+.settings-item-count-picker {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.settings-count-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--text-subdued);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.settings-count-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-base);
+}
+
+.settings-count-btn.active {
+  background: var(--ls-accent, #1db954);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ===== Section Visibility ===== */
+.settings-section-vis {
+  margin-bottom: 16px;
+}
+
+.settings-section-vis .settings-toggle-desc {
+  margin-bottom: 12px;
+}
+
+.settings-toggle-row.compact {
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.settings-vis-label {
+  font-size: 13px;
+  color: var(--text-base);
+}
+
+/* ===== Genre Chips ===== */
+/* ===== Genre Bars ===== */
+.genre-bars-section {
+  background: var(--background-tinted-base);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.genre-bars-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 16px;
+}
+
+.genre-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.genre-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: fadeInUp 0.3s ease both;
+}
+
+.genre-bar-row:nth-child(1) { animation-delay: 0.03s; }
+.genre-bar-row:nth-child(2) { animation-delay: 0.06s; }
+.genre-bar-row:nth-child(3) { animation-delay: 0.09s; }
+.genre-bar-row:nth-child(4) { animation-delay: 0.12s; }
+.genre-bar-row:nth-child(5) { animation-delay: 0.15s; }
+.genre-bar-row:nth-child(6) { animation-delay: 0.18s; }
+.genre-bar-row:nth-child(7) { animation-delay: 0.21s; }
+.genre-bar-row:nth-child(8) { animation-delay: 0.24s; }
+.genre-bar-row:nth-child(9) { animation-delay: 0.27s; }
+.genre-bar-row:nth-child(10) { animation-delay: 0.3s; }
+
+.genre-bar-rank {
+  width: 18px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-subdued);
+  flex-shrink: 0;
+}
+
+.genre-bar-track {
+  flex: 1;
+  position: relative;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.genre-bar-fill {
+  position: absolute;
+  inset: 0;
+  right: auto;
+  border-radius: 6px;
+  background: var(--ls-accent, var(--spice-button));
+  opacity: 0.25;
+  animation: barFillGrow 0.6s ease both;
+  transform-origin: left;
+}
+
+@keyframes barFillGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.genre-bar-name {
+  position: relative;
+  z-index: 1;
+  line-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-base);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.genre-bar-count {
+  flex-shrink: 0;
+  min-width: 36px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-subdued);
 }
 
 /* ===== Settings Danger Zone ===== */
@@ -2457,7 +2631,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
 }
 
 /* ===== Provider Setup Guide Links ===== */

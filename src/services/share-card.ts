@@ -364,46 +364,58 @@ function drawSectionHeader(
 // ── Pre-calculate story card height based on available data ──
 
 function calculateStoryHeight(stats: ListeningStats): number {
-  let y = 480; // hero section
-  y += 16; // divider gap
-  y += 58 + 12 + 58 + 28; // stats grid (2 rows + gaps + margin)
-  y += 16; // divider
+  const pad = 56;
+  let y = pad; // top padding
+
+  // Header (title + period + username)
+  y += 80;
+
+  // Hero art + track info
+  y += 260 + 100; // art size + text below
+
+  // Stats grid (2x3)
+  y += 68 + 10 + 68 + 32; // 2 rows + gap + margin
+
+  // Divider
+  y += 16;
 
   // Top tracks
+  const rowH = 68;
+  const headerH = 40;
   const trackCount = Math.min(5, stats.topTracks.length);
   if (trackCount > 0) {
-    y += 36 + 64 * trackCount + 16 + 24; // header + rows + panel pad + margin
+    y += headerH + rowH * trackCount + 28;
   }
 
   // Top artists
-  const artistCount = Math.min(3, stats.topArtists.length);
+  const artistCount = Math.min(5, stats.topArtists.length);
   if (artistCount > 0) {
-    y += 16 + 40 + 80 + 56; // divider + header + images + name/gap
+    y += 16 + headerH + rowH * artistCount + 28;
   }
 
   // Top albums
   const albumCount = Math.min(5, stats.topAlbums.length);
   if (albumCount > 0) {
-    y += 16 + 36 + 64 * albumCount + 16 + 24; // divider + header + rows + pad + margin
+    y += 16 + headerH + rowH * albumCount + 28;
   }
 
   // Hourly chart
   if (stats.hourlyDistribution.some((v) => v > 0)) {
-    y += 16 + 36 + 120 + 16; // divider + header + chart + margin
+    y += 16 + headerH + 140 + 20;
   }
 
   // Genre pills
   if (stats.topGenres.length > 0) {
-    y += 16 + 28 + 20; // divider + pills + margin
+    y += 16 + 36 + 20;
   }
 
   y += 48; // footer watermark
-  return Math.max(y, 800); // minimum height
+  return Math.max(y, 900);
 }
 
 const STORY_W = 1080;
-const LAND_W = 1200;
-const LAND_H = 675;
+const LAND_W = 1600;
+const LAND_H = 900;
 
 // ==================== STORY CARD (1080 x dynamic) ====================
 
@@ -419,7 +431,7 @@ async function generateStoryCard(
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
 
-  const pad = 52;
+  const pad = 56;
   const innerW = w - pad * 2;
   const rightEdge = w - pad;
 
@@ -431,71 +443,65 @@ async function generateStoryCard(
     if (heroImg) accent = extractDominantColor(heroImg);
   }
 
-  // ── Dark base ──
-  const baseBg = ctx.createLinearGradient(0, 0, 0, h);
-  baseBg.addColorStop(0, "#0c0c12");
-  baseBg.addColorStop(1, "#0a0a0f");
-  ctx.fillStyle = baseBg;
+  // ── Full blurred background ──
+  if (heroImg) {
+    drawBlurredBackground(ctx, heroImg, 0, 0, w, h, 60);
+  }
+  const baseOverlay = ctx.createLinearGradient(0, 0, 0, h);
+  baseOverlay.addColorStop(0, "rgba(8,8,14,0.78)");
+  baseOverlay.addColorStop(0.3, "rgba(8,8,14,0.88)");
+  baseOverlay.addColorStop(1, "rgba(8,8,14,0.94)");
+  ctx.fillStyle = baseOverlay;
   ctx.fillRect(0, 0, w, h);
 
-  // ── Hero Section (0–480) ──
-  const heroH = 480;
-  if (heroImg) {
-    drawBlurredBackground(ctx, heroImg, 0, 0, w, heroH, 50);
+  // ── Header ──
+  const username = getUsername(providerType);
+  let headerY = pad;
+
+  if (username) {
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = `500 ${16}px ${FONT}`;
+    ctx.fillText(`@${username}`, pad, headerY + 14);
+    headerY += 28;
   }
 
-  // Dark gradient overlay
-  const heroOverlay = ctx.createLinearGradient(0, 0, 0, heroH);
-  heroOverlay.addColorStop(0, "rgba(0,0,0,0.5)");
-  heroOverlay.addColorStop(0.7, "rgba(12,12,18,0.85)");
-  heroOverlay.addColorStop(1, "rgba(10,10,15,1)");
-  ctx.fillStyle = heroOverlay;
-  ctx.fillRect(0, 0, w, heroH);
-
-  // Username or default title
-  const username = getUsername(providerType);
   const title = username ? `${username}'s Stats` : "My Listening Stats";
   ctx.fillStyle = "#fff";
-  ctx.font = `bold ${42}px ${FONT}`;
-  ctx.fillText(truncateText(ctx, title, innerW), pad, 64);
+  ctx.font = `bold ${44}px ${FONT}`;
+  ctx.fillText(truncateText(ctx, title, innerW), pad, headerY + 38);
 
-  // Period pill
   const periodText = getPeriodDisplayName(period);
-  ctx.font = `600 ${15}px ${FONT}`;
+  ctx.font = `600 ${16}px ${FONT}`;
   const periodTextW = ctx.measureText(periodText).width;
-  const pillW = periodTextW + 20;
-  ctx.fillStyle = rgb(accent, 0.2);
-  fillRoundRect(ctx, pad, 78, pillW, 26, 13);
+  const pillW = periodTextW + 22;
+  ctx.fillStyle = rgb(accent, 0.25);
+  fillRoundRect(ctx, pad, headerY + 50, pillW, 28, 14);
   ctx.fillStyle = rgb(accent);
-  ctx.fillText(periodText, pad + 10, 96);
+  ctx.fillText(periodText, pad + 11, headerY + 69);
 
   const providerLabel = getProviderLabel(providerType);
   if (providerLabel) {
     ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.font = `${13}px ${FONT}`;
-    ctx.fillText(providerLabel, pad + pillW + 10, 96);
+    ctx.font = `${14}px ${FONT}`;
+    ctx.fillText(providerLabel, pad + pillW + 12, headerY + 69);
   }
 
-  // Large #1 album art centered
-  const artSize = 190;
+  headerY += 80;
+
+  // ── Hero: Large #1 album art ──
+  const artSize = 260;
   const artX = (w - artSize) / 2;
-  const artY = 128;
+  const artY = headerY;
+
   if (stats.topTracks[0]) {
-    const drew = await drawArt(
-      ctx,
-      stats.topTracks[0].albumArt,
-      artX,
-      artY,
-      artSize,
-      16,
-    );
+    const drew = await drawArt(ctx, stats.topTracks[0].albumArt, artX, artY, artSize, 16);
     if (!drew) drawPlaceholderArt(ctx, artX, artY, artSize, 16);
 
-    // Glow behind art
+    // Glow
     ctx.save();
     ctx.globalCompositeOperation = "destination-over";
     ctx.shadowColor = rgb(accent, 0.4);
-    ctx.shadowBlur = 40;
+    ctx.shadowBlur = 50;
     ctx.fillStyle = "rgba(0,0,0,0)";
     fillRoundRect(ctx, artX, artY, artSize, artSize, 16);
     ctx.restore();
@@ -503,291 +509,116 @@ async function generateStoryCard(
     // Track info
     ctx.textAlign = "center";
     ctx.fillStyle = "#fff";
-    ctx.font = `bold ${26}px ${FONT}`;
-    ctx.fillText(
-      truncateText(ctx, stats.topTracks[0].trackName, innerW - 40),
-      w / 2,
-      artY + artSize + 36,
-    );
+    ctx.font = `bold ${28}px ${FONT}`;
+    ctx.fillText(truncateText(ctx, stats.topTracks[0].trackName, innerW - 40), w / 2, artY + artSize + 40);
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.font = `${18}px ${FONT}`;
-    ctx.fillText(
-      truncateText(ctx, stats.topTracks[0].artistName, innerW - 40),
-      w / 2,
-      artY + artSize + 62,
-    );
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
-    ctx.font = `${14}px ${FONT}`;
-    ctx.fillText("#1 Most Played", w / 2, artY + artSize + 84);
+    ctx.fillText(truncateText(ctx, stats.topTracks[0].artistName, innerW - 40), w / 2, artY + artSize + 68);
+    ctx.fillStyle = rgb(accent, 0.7);
+    ctx.font = `600 ${14}px ${FONT}`;
+    ctx.fillText("#1 Most Played", w / 2, artY + artSize + 92);
     ctx.textAlign = "left";
   } else {
     drawPlaceholderArt(ctx, artX, artY, artSize, 16);
   }
 
-  // Accent divider below hero
-  drawAccentDivider(ctx, pad, heroH, innerW, accent);
-
-  // ── Stats Grid ──
-  let y = heroH + 16;
-  const gridGap = 12;
+  // ── Stats Grid (2x3) ──
+  let y = artY + artSize + 110;
+  const gridGap = 10;
   const cardW = (innerW - gridGap * 2) / 3;
-  const cardH = 58;
+  const cardH = 68;
 
-  drawStatCard(
-    ctx,
-    pad,
-    y,
-    cardW,
-    cardH,
-    formatDurationLong(stats.totalTimeMs),
-    "LISTENED",
-    accent,
-    true,
-  );
-  drawStatCard(
-    ctx,
-    pad + cardW + gridGap,
-    y,
-    cardW,
-    cardH,
-    `${stats.trackCount}`,
-    "PLAYS",
-    accent,
-  );
-  drawStatCard(
-    ctx,
-    pad + (cardW + gridGap) * 2,
-    y,
-    cardW,
-    cardH,
-    `${stats.uniqueTrackCount}`,
-    "UNIQUE TRACKS",
-    accent,
-  );
+  drawStatCard(ctx, pad, y, cardW, cardH, formatDurationLong(stats.totalTimeMs), "LISTENED", accent, true);
+  drawStatCard(ctx, pad + cardW + gridGap, y, cardW, cardH, `${stats.trackCount}`, "PLAYS", accent);
+  drawStatCard(ctx, pad + (cardW + gridGap) * 2, y, cardW, cardH, `${stats.uniqueTrackCount}`, "UNIQUE", accent);
 
   const row2Y = y + cardH + gridGap;
-  drawStatCard(
-    ctx,
-    pad,
-    row2Y,
-    cardW,
-    cardH,
-    `${stats.uniqueArtistCount}`,
-    "ARTISTS",
-    accent,
-  );
-  drawStatCard(
-    ctx,
-    pad + cardW + gridGap,
-    row2Y,
-    cardW,
-    cardH,
-    stats.streakDays > 0 ? `${stats.streakDays}d` : "-",
-    "STREAK",
-    accent,
-    stats.streakDays > 0,
-  );
-  drawStatCard(
-    ctx,
-    pad + (cardW + gridGap) * 2,
-    row2Y,
-    cardW,
-    cardH,
-    `${Math.round(stats.skipRate * 100)}%`,
-    "SKIP RATE",
-    accent,
-  );
+  drawStatCard(ctx, pad, row2Y, cardW, cardH, `${stats.uniqueArtistCount}`, "ARTISTS", accent);
+  drawStatCard(ctx, pad + cardW + gridGap, row2Y, cardW, cardH, stats.streakDays > 0 ? `${stats.streakDays}d` : "-", "STREAK", accent, stats.streakDays > 0);
+  drawStatCard(ctx, pad + (cardW + gridGap) * 2, row2Y, cardW, cardH, `${Math.round(stats.skipRate * 100)}%`, "SKIP RATE", accent);
 
-  y = row2Y + cardH + 28;
+  y = row2Y + cardH + 32;
 
-  // ── Top 5 Tracks ──
-  const trackCount = Math.min(5, stats.topTracks.length);
-  if (trackCount > 0) {
-    drawAccentDivider(ctx, pad, y, innerW, accent);
-    y += 16;
-    y = drawSectionHeader(ctx, "Top Tracks", pad, y, accent);
+  // ── Ranked list helper ──
+  const listArtSize = 56;
+  const listRowH = 68;
 
-    const trackArtSize = 52;
-    const trackRowH = 64;
+  async function drawStoryList(
+    items: Array<{ name: string; sub: string; art?: string; plays?: number; circular?: boolean }>,
+    startY: number,
+    sectionTitle: string,
+    maxItems: number,
+  ): Promise<number> {
+    drawAccentDivider(ctx, pad, startY, innerW, accent);
+    startY += 16;
+    startY = drawSectionHeader(ctx, sectionTitle, pad, startY, accent);
 
+    const count = Math.min(maxItems, items.length);
+
+    // Panel background
     ctx.fillStyle = "rgba(255,255,255,0.02)";
-    fillRoundRect(
-      ctx,
-      pad - 12,
-      y - 8,
-      innerW + 24,
-      trackRowH * trackCount + 16,
-      14,
-    );
+    fillRoundRect(ctx, pad - 12, startY - 8, innerW + 24, listRowH * count + 16, 14);
 
-    for (let i = 0; i < trackCount; i++) {
-      const t = stats.topTracks[i];
-      const rowY = y + i * trackRowH;
-      const artY2 = rowY + (trackRowH - trackArtSize) / 2;
+    for (let i = 0; i < count; i++) {
+      const item = items[i];
+      const rowY = startY + i * listRowH;
+      const artY2 = rowY + (listRowH - listArtSize) / 2;
+      const radius = item.circular ? listArtSize / 2 : 8;
 
-      const drew = await drawArt(ctx, t.albumArt, pad, artY2, trackArtSize, 8);
-      if (!drew) drawPlaceholderArt(ctx, pad, artY2, trackArtSize, 8);
+      const drew = await drawArt(ctx, item.art, pad, artY2, listArtSize, radius);
+      if (!drew) drawPlaceholderArt(ctx, pad, artY2, listArtSize, radius);
 
-      const textX = pad + trackArtSize + 14;
-      const centerY = rowY + trackRowH / 2;
+      const textX = pad + listArtSize + 16;
+      const centerY = rowY + listRowH / 2;
 
       ctx.fillStyle = rankColor(i);
-      ctx.font = `bold ${14}px ${FONT}`;
+      ctx.font = `bold ${15}px ${FONT}`;
       const rk = `${i + 1}`;
-      ctx.fillText(rk, textX, centerY - 8);
+      ctx.fillText(rk, textX, centerY - 9);
 
       const rkW = ctx.measureText(rk).width + 8;
       ctx.fillStyle = "#fff";
-      ctx.font = `600 ${15}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, t.trackName, rightEdge - textX - rkW - 90),
-        textX + rkW,
-        centerY - 8,
-      );
+      ctx.font = `600 ${16}px ${FONT}`;
+      ctx.fillText(truncateText(ctx, item.name, rightEdge - textX - rkW - (item.plays ? 90 : 10)), textX + rkW, centerY - 9);
 
       ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = `${12}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, t.artistName, rightEdge - textX - rkW - 90),
-        textX + rkW,
-        centerY + 10,
-      );
+      ctx.font = `${13}px ${FONT}`;
+      ctx.fillText(truncateText(ctx, item.sub, rightEdge - textX - rkW - (item.plays ? 90 : 10)), textX + rkW, centerY + 11);
 
-      if (t.playCount) {
+      if (item.plays) {
         ctx.fillStyle = rgb(accent);
-        ctx.font = `600 ${13}px ${FONT}`;
+        ctx.font = `600 ${14}px ${FONT}`;
         ctx.textAlign = "right";
-        ctx.fillText(`${t.playCount} plays`, rightEdge, centerY + 1);
+        ctx.fillText(`${item.plays} plays`, rightEdge, centerY + 1);
         ctx.textAlign = "left";
       }
     }
 
-    y += trackRowH * trackCount + 24;
+    return startY + listRowH * count + 28;
   }
 
-  // ── Top 3 Artists ──
-  const artistCount = Math.min(3, stats.topArtists.length);
-  if (artistCount > 0) {
-    drawAccentDivider(ctx, pad, y, innerW, accent);
-    y += 16;
-    y = drawSectionHeader(ctx, "Top Artists", pad, y, accent);
-    y += 4;
+  // ── Top 5 Tracks ──
+  if (stats.topTracks.length > 0) {
+    y = await drawStoryList(
+      stats.topTracks.map((t) => ({ name: t.trackName, sub: t.artistName, art: t.albumArt, plays: t.playCount })),
+      y, "Top Tracks", 5,
+    );
+  }
 
-    const artistImgSize = 80;
-    const colW = innerW / artistCount;
-
-    for (let i = 0; i < artistCount; i++) {
-      const a = stats.topArtists[i];
-      const cx = pad + colW * i + colW / 2;
-      const imgX = cx - artistImgSize / 2;
-
-      const drew = await drawArt(
-        ctx,
-        a.artistImage,
-        imgX,
-        y,
-        artistImgSize,
-        artistImgSize / 2,
-      );
-      if (!drew)
-        drawPlaceholderArt(ctx, imgX, y, artistImgSize, artistImgSize / 2);
-
-      // Rank medal
-      const medalR = 12;
-      const medalX = imgX + artistImgSize - medalR + 2;
-      const medalY = y + medalR - 2;
-      ctx.fillStyle = rankColor(i);
-      ctx.beginPath();
-      ctx.arc(medalX, medalY, medalR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#000";
-      ctx.font = `bold ${12}px ${FONT}`;
-      ctx.textAlign = "center";
-      ctx.fillText(`${i + 1}`, medalX, medalY + 4);
-
-      // Name
-      ctx.fillStyle = "#fff";
-      ctx.font = `600 ${14}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, a.artistName, colW - 16),
-        cx,
-        y + artistImgSize + 20,
-      );
-
-      if (a.playCount) {
-        ctx.fillStyle = "rgba(255,255,255,0.45)";
-        ctx.font = `${12}px ${FONT}`;
-        ctx.fillText(`${a.playCount} plays`, cx, y + artistImgSize + 38);
-      }
-      ctx.textAlign = "left";
-    }
-
-    y += artistImgSize + 56;
+  // ── Top 5 Artists ──
+  if (stats.topArtists.length > 0) {
+    y = await drawStoryList(
+      stats.topArtists.map((a) => ({ name: a.artistName, sub: a.playCount ? `${a.playCount} plays` : "", art: a.artistImage, circular: true })),
+      y, "Top Artists", 5,
+    );
   }
 
   // ── Top 5 Albums ──
-  const albumCount = Math.min(5, stats.topAlbums.length);
-  if (albumCount > 0) {
-    drawAccentDivider(ctx, pad, y, innerW, accent);
-    y += 16;
-    y = drawSectionHeader(ctx, "Top Albums", pad, y, accent);
-
-    const albumArtSize = 52;
-    const albumRowH = 64;
-
-    ctx.fillStyle = "rgba(255,255,255,0.02)";
-    fillRoundRect(
-      ctx,
-      pad - 12,
-      y - 8,
-      innerW + 24,
-      albumRowH * albumCount + 16,
-      14,
+  if (stats.topAlbums.length > 0) {
+    y = await drawStoryList(
+      stats.topAlbums.map((a) => ({ name: a.albumName, sub: a.artistName, art: a.albumArt, plays: a.playCount })),
+      y, "Top Albums", 5,
     );
-
-    for (let i = 0; i < albumCount; i++) {
-      const a = stats.topAlbums[i];
-      const rowY = y + i * albumRowH;
-      const artY2 = rowY + (albumRowH - albumArtSize) / 2;
-
-      const drew = await drawArt(ctx, a.albumArt, pad, artY2, albumArtSize, 8);
-      if (!drew) drawPlaceholderArt(ctx, pad, artY2, albumArtSize, 8);
-
-      const textX = pad + albumArtSize + 14;
-      const centerY = rowY + albumRowH / 2;
-
-      ctx.fillStyle = rankColor(i);
-      ctx.font = `bold ${14}px ${FONT}`;
-      const rk = `${i + 1}`;
-      ctx.fillText(rk, textX, centerY - 8);
-
-      const rkW = ctx.measureText(rk).width + 8;
-      ctx.fillStyle = "#fff";
-      ctx.font = `600 ${15}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, a.albumName, rightEdge - textX - rkW - 20),
-        textX + rkW,
-        centerY - 8,
-      );
-
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = `${12}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, a.artistName, rightEdge - textX - rkW - 20),
-        textX + rkW,
-        centerY + 10,
-      );
-
-      if (a.playCount) {
-        ctx.fillStyle = rgb(accent);
-        ctx.font = `600 ${13}px ${FONT}`;
-        ctx.textAlign = "right";
-        ctx.fillText(`${a.playCount} plays`, rightEdge, centerY + 1);
-        ctx.textAlign = "left";
-      }
-    }
-
-    y += albumRowH * albumCount + 24;
   }
 
   // ── Hourly Activity Chart ──
@@ -795,37 +626,23 @@ async function generateStoryCard(
     drawAccentDivider(ctx, pad, y, innerW, accent);
     y += 16;
 
-    // Section header with peak label
     ctx.fillStyle = rgb(accent);
     ctx.beginPath();
     ctx.arc(pad + 5, y + 12, 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#fff";
     ctx.font = `bold ${20}px ${FONT}`;
-    ctx.fillText("When I Listen", pad + 18, y + 18);
+    ctx.fillText("Activity by Hour", pad + 18, y + 18);
 
     ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.font = `${13}px ${FONT}`;
+    ctx.font = `${14}px ${FONT}`;
     ctx.textAlign = "right";
-    ctx.fillText(
-      `Peak: ${formatHourLabel(stats.peakHour)}`,
-      rightEdge - 8,
-      y + 18,
-    );
+    ctx.fillText(`Peak: ${formatHourLabel(stats.peakHour)}`, rightEdge, y + 18);
     ctx.textAlign = "left";
 
-    y += 36;
-    drawHourlyChart(
-      ctx,
-      stats.hourlyDistribution,
-      pad,
-      y,
-      innerW,
-      120,
-      accent,
-      stats.peakHour,
-    );
-    y += 120 + 16;
+    y += 40;
+    drawHourlyChart(ctx, stats.hourlyDistribution, pad, y, innerW, 140, accent, stats.peakHour);
+    y += 140 + 20;
   }
 
   // ── Genre Pills ──
@@ -837,7 +654,7 @@ async function generateStoryCard(
   }
 
   // ── Noise texture ──
-  drawNoiseTexture(ctx, 0, 0, w, h, 0.025);
+  drawNoiseTexture(ctx, 0, 0, w, h, 0.02);
 
   // ── Accent bar at top ──
   const topBar = ctx.createLinearGradient(0, 0, w, 0);
@@ -848,7 +665,7 @@ async function generateStoryCard(
 
   // ── Footer watermark ──
   ctx.fillStyle = "rgba(255,255,255,0.2)";
-  ctx.font = `${13}px ${FONT}`;
+  ctx.font = `${14}px ${FONT}`;
   ctx.textAlign = "center";
   ctx.fillText("Listening Stats for Spicetify", w / 2, h - 20);
   ctx.textAlign = "left";
@@ -856,7 +673,7 @@ async function generateStoryCard(
   return canvas;
 }
 
-// ==================== LANDSCAPE CARD (1200 x 675) ====================
+// ==================== LANDSCAPE CARD (1600 x 900) ====================
 
 async function generateLandscapeCard(
   stats: ListeningStats,
@@ -877,384 +694,287 @@ async function generateLandscapeCard(
     if (heroImg) accent = extractDominantColor(heroImg);
   }
 
-  // ── Dark base ──
-  ctx.fillStyle = "#0a0a0f";
+  // ── Full blurred background ──
+  if (heroImg) {
+    drawBlurredBackground(ctx, heroImg, 0, 0, w, h, 60);
+  }
+  const baseOverlay = ctx.createLinearGradient(0, 0, 0, h);
+  baseOverlay.addColorStop(0, "rgba(8,8,14,0.82)");
+  baseOverlay.addColorStop(1, "rgba(8,8,14,0.92)");
+  ctx.fillStyle = baseOverlay;
   ctx.fillRect(0, 0, w, h);
 
-  // ── Left Panel (0–420) ──
-  const leftW = 420;
-  if (heroImg) {
-    drawBlurredBackground(ctx, heroImg, 0, 0, leftW, h, 40);
-  }
-
-  const leftOverlay = ctx.createLinearGradient(0, 0, leftW, 0);
-  leftOverlay.addColorStop(0, "rgba(0,0,0,0.45)");
-  leftOverlay.addColorStop(0.8, "rgba(10,10,15,0.75)");
-  leftOverlay.addColorStop(1, "rgba(10,10,15,0.95)");
-  ctx.fillStyle = leftOverlay;
-  ctx.fillRect(0, 0, leftW, h);
-
-  // Vertical accent separator
-  ctx.fillStyle = rgb(accent, 0.3);
-  ctx.fillRect(leftW - 1, 0, 2, h);
-
-  // Username or title on left panel
+  const pad = 56;
+  const innerW = w - pad * 2;
   const username = getUsername(providerType);
-  const leftTitle = username ? `@${username}` : "";
-  if (leftTitle) {
+
+  // ── Left Panel (hero) ──
+  const leftW = 440;
+
+  // Username
+  let heroY = pad;
+  if (username) {
     ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.font = `500 ${14}px ${FONT}`;
-    ctx.textAlign = "center";
-    ctx.fillText(leftTitle, leftW / 2, 30);
-    ctx.textAlign = "left";
+    ctx.font = `500 ${16}px ${FONT}`;
+    ctx.fillText(`@${username}`, pad, heroY + 14);
+    heroY += 32;
   }
-
-  // Album art
-  const lArtSize = 170;
-  const lArtX = (leftW - lArtSize) / 2;
-  const lArtY = leftTitle ? 48 : 40;
-
-  if (stats.topTracks[0]) {
-    const drew = await drawArt(
-      ctx,
-      stats.topTracks[0].albumArt,
-      lArtX,
-      lArtY,
-      lArtSize,
-      12,
-    );
-    if (!drew) drawPlaceholderArt(ctx, lArtX, lArtY, lArtSize, 12);
-
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#fff";
-    ctx.font = `bold ${20}px ${FONT}`;
-    ctx.fillText(
-      truncateText(ctx, stats.topTracks[0].trackName, leftW - 48),
-      leftW / 2,
-      lArtY + lArtSize + 30,
-    );
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.font = `${14}px ${FONT}`;
-    ctx.fillText(
-      truncateText(ctx, stats.topTracks[0].artistName, leftW - 48),
-      leftW / 2,
-      lArtY + lArtSize + 52,
-    );
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
-    ctx.font = `${11}px ${FONT}`;
-    ctx.fillText("#1 Most Played", leftW / 2, lArtY + lArtSize + 70);
-    ctx.textAlign = "left";
-  } else {
-    drawPlaceholderArt(ctx, lArtX, lArtY, lArtSize, 12);
-  }
-
-  // 2x2 stat grid
-  const lStatY = 370;
-  const lStatW = 160;
-  const lStatH = 48;
-  const lStatGap = 10;
-  const lStatX = (leftW - lStatW * 2 - lStatGap) / 2;
-
-  drawStatCard(
-    ctx,
-    lStatX,
-    lStatY,
-    lStatW,
-    lStatH,
-    formatDuration(stats.totalTimeMs),
-    "LISTENED",
-    accent,
-    true,
-  );
-  drawStatCard(
-    ctx,
-    lStatX + lStatW + lStatGap,
-    lStatY,
-    lStatW,
-    lStatH,
-    `${stats.trackCount}`,
-    "PLAYS",
-    accent,
-  );
-  drawStatCard(
-    ctx,
-    lStatX,
-    lStatY + lStatH + lStatGap,
-    lStatW,
-    lStatH,
-    `${stats.uniqueArtistCount}`,
-    "ARTISTS",
-    accent,
-  );
-  drawStatCard(
-    ctx,
-    lStatX + lStatW + lStatGap,
-    lStatY + lStatH + lStatGap,
-    lStatW,
-    lStatH,
-    stats.streakDays > 0
-      ? `${stats.streakDays}d`
-      : `${Math.round(stats.skipRate * 100)}%`,
-    stats.streakDays > 0 ? "STREAK" : "SKIP RATE",
-    accent,
-    stats.streakDays > 0,
-  );
-
-  // Genre pills at bottom of left panel
-  if (stats.topGenres.length > 0) {
-    drawGenrePills(
-      ctx,
-      stats.topGenres,
-      lStatX,
-      lStatY + (lStatH + lStatGap) * 2 + 8,
-      leftW - lStatX * 2,
-      accent,
-    );
-  }
-
-  // ── Right Panel (420–1200) ──
-  const rPad = 32;
-  const rX = leftW + rPad;
-  const rInnerW = w - rX - rPad;
 
   // Title + period
-  const rTitle = username ? `${username}'s Stats` : "My Listening Stats";
+  const title = username ? `${username}'s Stats` : "My Listening Stats";
   ctx.fillStyle = "#fff";
-  ctx.font = `bold ${22}px ${FONT}`;
-  ctx.fillText(truncateText(ctx, rTitle, rInnerW - 120), rX, 32);
+  ctx.font = `bold ${32}px ${FONT}`;
+  ctx.fillText(truncateText(ctx, title, leftW - 20), pad, heroY + 28);
 
   const periodText = getPeriodDisplayName(period);
-  ctx.font = `600 ${12}px ${FONT}`;
+  ctx.font = `600 ${14}px ${FONT}`;
   const pTextW = ctx.measureText(periodText).width;
-  const pPillW = pTextW + 16;
-  ctx.fillStyle = rgb(accent, 0.2);
-  fillRoundRect(ctx, rX, 42, pPillW, 22, 11);
+  const pPillW = pTextW + 20;
+  ctx.fillStyle = rgb(accent, 0.25);
+  fillRoundRect(ctx, pad, heroY + 40, pPillW, 26, 13);
   ctx.fillStyle = rgb(accent);
-  ctx.fillText(periodText, rX + 8, 56);
+  ctx.fillText(periodText, pad + 10, heroY + 57);
 
   const providerLabel = getProviderLabel(providerType);
   if (providerLabel) {
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
-    ctx.font = `${11}px ${FONT}`;
-    ctx.fillText(providerLabel, rX + pPillW + 8, 56);
-  }
-
-  // Layout: top tracks on left half, artists+chart on right half
-  const rColW = (rInnerW - 20) / 2;
-  const rCol1X = rX;
-  const rCol2X = rX + rColW + 20;
-
-  // ── Right Column 1: Top 5 Tracks ──
-  let ry = 78;
-  ctx.fillStyle = rgb(accent);
-  ctx.beginPath();
-  ctx.arc(rCol1X + 4, ry + 6, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#fff";
-  ctx.font = `bold ${14}px ${FONT}`;
-  ctx.fillText("Top Tracks", rCol1X + 14, ry + 11);
-  ry += 22;
-
-  const rArtSize = 34;
-  const rRowH = 44;
-  const rTrackCount = Math.min(5, stats.topTracks.length);
-
-  for (let i = 0; i < rTrackCount; i++) {
-    const t = stats.topTracks[i];
-    const rowY = ry + i * rRowH;
-    const artY2 = rowY + (rRowH - rArtSize) / 2;
-
-    const drew = await drawArt(ctx, t.albumArt, rCol1X, artY2, rArtSize, 4);
-    if (!drew) drawPlaceholderArt(ctx, rCol1X, artY2, rArtSize, 4);
-
-    const textX = rCol1X + rArtSize + 8;
-    const centerY = rowY + rRowH / 2;
-    const maxTextW = rCol1X + rColW - textX - 4;
-
-    ctx.fillStyle = rankColor(i);
-    ctx.font = `bold ${11}px ${FONT}`;
-    const rk = `${i + 1}`;
-    ctx.fillText(rk, textX, centerY - 5);
-
-    const rkW = ctx.measureText(rk).width + 5;
-    ctx.fillStyle = "#fff";
-    ctx.font = `600 ${11}px ${FONT}`;
-    ctx.fillText(
-      truncateText(ctx, t.trackName, maxTextW - rkW),
-      textX + rkW,
-      centerY - 5,
-    );
-
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
-    ctx.font = `${9}px ${FONT}`;
-    const meta = t.playCount
-      ? `${t.artistName} \u2022 ${t.playCount}`
-      : t.artistName;
-    ctx.fillText(
-      truncateText(ctx, meta, maxTextW - rkW),
-      textX + rkW,
-      centerY + 8,
-    );
-  }
-
-  // Top 5 Albums below tracks
-  const rAlbumStart = ry + rRowH * rTrackCount + 12;
-  const rAlbumCount = Math.min(5, stats.topAlbums.length);
-  if (rAlbumCount > 0) {
-    let ay = rAlbumStart;
-    ctx.fillStyle = rgb(accent);
-    ctx.beginPath();
-    ctx.arc(rCol1X + 4, ay + 6, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = `bold ${14}px ${FONT}`;
-    ctx.fillText("Top Albums", rCol1X + 14, ay + 11);
-    ay += 22;
-
-    for (let i = 0; i < rAlbumCount; i++) {
-      const a = stats.topAlbums[i];
-      const rowY = ay + i * rRowH;
-      const artY2 = rowY + (rRowH - rArtSize) / 2;
-
-      const drew = await drawArt(ctx, a.albumArt, rCol1X, artY2, rArtSize, 4);
-      if (!drew) drawPlaceholderArt(ctx, rCol1X, artY2, rArtSize, 4);
-
-      const textX = rCol1X + rArtSize + 8;
-      const centerY = rowY + rRowH / 2;
-      const maxTextW = rCol1X + rColW - textX - 4;
-
-      ctx.fillStyle = rankColor(i);
-      ctx.font = `bold ${11}px ${FONT}`;
-      const rk = `${i + 1}`;
-      ctx.fillText(rk, textX, centerY - 5);
-
-      const rkW = ctx.measureText(rk).width + 5;
-      ctx.fillStyle = "#fff";
-      ctx.font = `600 ${11}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, a.albumName, maxTextW - rkW),
-        textX + rkW,
-        centerY - 5,
-      );
-
-      ctx.fillStyle = "rgba(255,255,255,0.45)";
-      ctx.font = `${9}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, a.artistName, maxTextW - rkW),
-        textX + rkW,
-        centerY + 8,
-      );
-    }
-  }
-
-  // ── Right Column 2: Artists + Chart ──
-  let ry2 = 78;
-  ctx.fillStyle = rgb(accent);
-  ctx.beginPath();
-  ctx.arc(rCol2X + 4, ry2 + 6, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#fff";
-  ctx.font = `bold ${14}px ${FONT}`;
-  ctx.fillText("Top Artists", rCol2X + 14, ry2 + 11);
-  ry2 += 22;
-
-  const rArtistImgSize = 34;
-  const rArtistCount = Math.min(5, stats.topArtists.length);
-
-  for (let i = 0; i < rArtistCount; i++) {
-    const a = stats.topArtists[i];
-    const rowY = ry2 + i * rRowH;
-    const imgY = rowY + (rRowH - rArtistImgSize) / 2;
-
-    const drew = await drawArt(
-      ctx,
-      a.artistImage,
-      rCol2X,
-      imgY,
-      rArtistImgSize,
-      rArtistImgSize / 2,
-    );
-    if (!drew)
-      drawPlaceholderArt(ctx, rCol2X, imgY, rArtistImgSize, rArtistImgSize / 2);
-
-    const textX = rCol2X + rArtistImgSize + 8;
-    const centerY = rowY + rRowH / 2;
-    const maxTextW = rCol2X + rColW - textX - 4;
-
-    ctx.fillStyle = rankColor(i);
-    ctx.font = `bold ${11}px ${FONT}`;
-    const rk = `${i + 1}`;
-    ctx.fillText(rk, textX, centerY - 1);
-
-    const rkW = ctx.measureText(rk).width + 5;
-    ctx.fillStyle = "#fff";
-    ctx.font = `600 ${12}px ${FONT}`;
-    ctx.fillText(
-      truncateText(ctx, a.artistName, maxTextW - rkW),
-      textX + rkW,
-      centerY - 1,
-    );
-
-    if (a.playCount) {
-      ctx.fillStyle = "rgba(255,255,255,0.4)";
-      ctx.font = `${9}px ${FONT}`;
-      ctx.fillText(`${a.playCount} plays`, textX + rkW, centerY + 12);
-    }
-  }
-
-  ry2 += rRowH * rArtistCount + 16;
-
-  // Hourly chart in right column 2
-  if (stats.hourlyDistribution.some((v) => v > 0)) {
-    ctx.fillStyle = rgb(accent);
-    ctx.beginPath();
-    ctx.arc(rCol2X + 4, ry2 + 6, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = `bold ${14}px ${FONT}`;
-    ctx.fillText("Activity", rCol2X + 14, ry2 + 11);
-
     ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.font = `${11}px ${FONT}`;
-    ctx.textAlign = "right";
+    ctx.font = `${13}px ${FONT}`;
+    ctx.fillText(providerLabel, pad + pPillW + 10, heroY + 57);
+  }
+
+  heroY += 80;
+
+  // Large #1 album art
+  const artSize = 220;
+  const artX = pad;
+  const artY = heroY;
+  if (stats.topTracks[0]) {
+    const drew = await drawArt(ctx, stats.topTracks[0].albumArt, artX, artY, artSize, 14);
+    if (!drew) drawPlaceholderArt(ctx, artX, artY, artSize, 14);
+
+    // Glow
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.shadowColor = rgb(accent, 0.35);
+    ctx.shadowBlur = 50;
+    ctx.fillStyle = "rgba(0,0,0,0)";
+    fillRoundRect(ctx, artX, artY, artSize, artSize, 14);
+    ctx.restore();
+
+    // Track info beside art
+    const infoX = artX + artSize + 24;
+    const infoMaxW = leftW - artSize - 24;
+    ctx.fillStyle = "#fff";
+    ctx.font = `bold ${22}px ${FONT}`;
     ctx.fillText(
-      `Peak: ${formatHourLabel(stats.peakHour)}`,
-      rCol2X + rColW,
-      ry2 + 11,
+      truncateText(ctx, stats.topTracks[0].trackName, infoMaxW),
+      infoX,
+      artY + 30,
     );
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = `${16}px ${FONT}`;
+    ctx.fillText(
+      truncateText(ctx, stats.topTracks[0].artistName, infoMaxW),
+      infoX,
+      artY + 56,
+    );
+    ctx.fillStyle = rgb(accent, 0.7);
+    ctx.font = `600 ${12}px ${FONT}`;
+    ctx.fillText("#1 Most Played", infoX, artY + 78);
+
+    // Play count if available
+    if (stats.topTracks[0].playCount) {
+      ctx.fillStyle = rgb(accent);
+      ctx.font = `bold ${36}px ${FONT}`;
+      ctx.fillText(`${stats.topTracks[0].playCount}`, infoX, artY + 130);
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.font = `500 ${13}px ${FONT}`;
+      ctx.fillText("plays", infoX, artY + 150);
+    }
+  } else {
+    drawPlaceholderArt(ctx, artX, artY, artSize, 14);
+  }
+
+  // Stats row below hero
+  const statY = artY + artSize + 28;
+  const statCardW = (leftW - 12) / 3;
+  const statCardH = 60;
+
+  drawStatCard(ctx, pad, statY, statCardW, statCardH, formatDuration(stats.totalTimeMs), "LISTENED", accent, true);
+  drawStatCard(ctx, pad + statCardW + 6, statY, statCardW, statCardH, `${stats.trackCount}`, "PLAYS", accent);
+  drawStatCard(ctx, pad + (statCardW + 6) * 2, statY, statCardW, statCardH, `${stats.uniqueArtistCount}`, "ARTISTS", accent);
+
+  const stat2Y = statY + statCardH + 8;
+  drawStatCard(ctx, pad, stat2Y, statCardW, statCardH, `${stats.uniqueTrackCount}`, "UNIQUE", accent);
+  drawStatCard(ctx, pad + statCardW + 6, stat2Y, statCardW, statCardH, stats.streakDays > 0 ? `${stats.streakDays}d` : "-", "STREAK", accent, stats.streakDays > 0);
+  drawStatCard(ctx, pad + (statCardW + 6) * 2, stat2Y, statCardW, statCardH, `${Math.round(stats.skipRate * 100)}%`, "SKIP RATE", accent);
+
+  // Genre pills below stats
+  if (stats.topGenres.length > 0) {
+    drawGenrePills(ctx, stats.topGenres, pad, stat2Y + statCardH + 16, leftW, accent);
+  }
+
+  // ── Right Panel: 3 columns ──
+  const rX = pad + leftW + 40;
+  const rInnerW = w - rX - pad;
+  const colGap = 24;
+  const colW = (rInnerW - colGap * 2) / 3;
+
+  const listArtSize = 44;
+  const listRowH = 56;
+  const listHeaderH = 32;
+
+  // Helper: draw a ranked list section
+  async function drawRankedList(
+    items: Array<{ name: string; sub: string; art?: string; plays?: number; circular?: boolean }>,
+    colX: number,
+    startY: number,
+    title: string,
+    maxItems: number,
+  ) {
+    // Section header
+    ctx.fillStyle = rgb(accent);
+    ctx.beginPath();
+    ctx.arc(colX + 5, startY + 8, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = `bold ${16}px ${FONT}`;
+    ctx.fillText(title, colX + 18, startY + 14);
+
+    let y = startY + listHeaderH;
+    const count = Math.min(maxItems, items.length);
+
+    // Panel background
+    ctx.fillStyle = "rgba(255,255,255,0.02)";
+    fillRoundRect(ctx, colX - 10, y - 6, colW + 20, listRowH * count + 12, 12);
+
+    for (let i = 0; i < count; i++) {
+      const item = items[i];
+      const rowY = y + i * listRowH;
+      const artY2 = rowY + (listRowH - listArtSize) / 2;
+      const radius = item.circular ? listArtSize / 2 : 6;
+
+      const drew = await drawArt(ctx, item.art, colX, artY2, listArtSize, radius);
+      if (!drew) drawPlaceholderArt(ctx, colX, artY2, listArtSize, radius);
+
+      const textX = colX + listArtSize + 12;
+      const centerY = rowY + listRowH / 2;
+      const maxTextW = colX + colW - textX;
+
+      // Rank
+      ctx.fillStyle = rankColor(i);
+      ctx.font = `bold ${13}px ${FONT}`;
+      const rk = `${i + 1}`;
+      ctx.fillText(rk, textX, centerY - 7);
+
+      const rkW = ctx.measureText(rk).width + 6;
+
+      // Name
+      ctx.fillStyle = "#fff";
+      ctx.font = `600 ${13}px ${FONT}`;
+      ctx.fillText(
+        truncateText(ctx, item.name, maxTextW - rkW),
+        textX + rkW,
+        centerY - 7,
+      );
+
+      // Sub line (artist or play count)
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.font = `${11}px ${FONT}`;
+      const subText = item.plays ? `${item.sub} \u2022 ${item.plays}` : item.sub;
+      ctx.fillText(
+        truncateText(ctx, subText, maxTextW - rkW),
+        textX + rkW,
+        centerY + 9,
+      );
+    }
+  }
+
+  const listStartY = pad;
+  const maxListItems = 5;
+
+  // Top Tracks
+  await drawRankedList(
+    stats.topTracks.map((t) => ({
+      name: t.trackName,
+      sub: t.artistName,
+      art: t.albumArt,
+      plays: t.playCount,
+    })),
+    rX,
+    listStartY,
+    "Top Tracks",
+    maxListItems,
+  );
+
+  // Top Artists
+  await drawRankedList(
+    stats.topArtists.map((a) => ({
+      name: a.artistName,
+      sub: a.playCount ? `${a.playCount} plays` : "",
+      art: a.artistImage,
+      circular: true,
+    })),
+    rX + colW + colGap,
+    listStartY,
+    "Top Artists",
+    maxListItems,
+  );
+
+  // Top Albums
+  await drawRankedList(
+    stats.topAlbums.map((a) => ({
+      name: a.albumName,
+      sub: a.artistName,
+      art: a.albumArt,
+      plays: a.playCount,
+    })),
+    rX + (colW + colGap) * 2,
+    listStartY,
+    "Top Albums",
+    maxListItems,
+  );
+
+  // ── Activity Chart (full width below lists) ──
+  const chartY = listStartY + listHeaderH + listRowH * maxListItems + 36;
+  if (stats.hourlyDistribution.some((v) => v > 0)) {
+    // Section header
+    ctx.fillStyle = rgb(accent);
+    ctx.beginPath();
+    ctx.arc(rX + 5, chartY + 8, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = `bold ${16}px ${FONT}`;
+    ctx.fillText("Activity by Hour", rX + 18, chartY + 14);
+
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.font = `${13}px ${FONT}`;
+    ctx.textAlign = "right";
+    ctx.fillText(`Peak: ${formatHourLabel(stats.peakHour)}`, rX + rInnerW, chartY + 14);
     ctx.textAlign = "left";
 
-    ry2 += 22;
-    const chartH = Math.min(h - ry2 - 30, 100);
-    if (chartH > 30) {
-      drawHourlyChart(
-        ctx,
-        stats.hourlyDistribution,
-        rCol2X,
-        ry2,
-        rColW,
-        chartH,
-        accent,
-        stats.peakHour,
-      );
+    const chartTopY = chartY + 28;
+    const chartH = h - chartTopY - 40;
+    if (chartH > 40) {
+      drawHourlyChart(ctx, stats.hourlyDistribution, rX, chartTopY, rInnerW, chartH, accent, stats.peakHour);
     }
   }
 
   // ── Noise texture ──
-  drawNoiseTexture(ctx, 0, 0, w, h, 0.02);
+  drawNoiseTexture(ctx, 0, 0, w, h, 0.018);
 
-  // Accent bar at top
+  // ── Accent bar at top ──
   const topBar = ctx.createLinearGradient(0, 0, w, 0);
   topBar.addColorStop(0, rgb(accent));
   topBar.addColorStop(1, rgb(accent, 0.3));
   ctx.fillStyle = topBar;
-  ctx.fillRect(0, 0, w, 3);
+  ctx.fillRect(0, 0, w, 4);
 
-  // Watermark
-  ctx.fillStyle = "rgba(255,255,255,0.15)";
-  ctx.font = `${11}px ${FONT}`;
+  // ── Watermark ──
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.font = `${13}px ${FONT}`;
   ctx.textAlign = "center";
-  ctx.fillText("Listening Stats for Spicetify", w / 2, h - 10);
+  ctx.fillText("Listening Stats for Spicetify", w / 2, h - 14);
   ctx.textAlign = "left";
 
   return canvas;

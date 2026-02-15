@@ -7,9 +7,9 @@ import {
   getPlayEventsByTimeRange,
   getAllPlayEvents,
   clearAllData,
+  resetDBPromise,
 } from "../storage";
-import { getArtistsBatch, isApiAvailable } from "../spotify-api";
-import { initPoller, destroyPoller, getPollingData } from "../tracker";
+import { initPoller, destroyPoller } from "../tracker";
 import type { TrackingProvider } from "./types";
 
 const PERIODS = ["today", "this_week", "this_month", "all_time"] as const;
@@ -29,16 +29,20 @@ export function createLocalProvider(): TrackingProvider {
     defaultPeriod: "today",
 
     init() {
+      resetDBPromise();
       initPoller("local");
     },
 
     destroy() {
       destroyPoller();
+      resetDBPromise();
     },
 
     async calculateStats(period: string): Promise<ListeningStats> {
       const events = await getEventsForPeriod(period);
-      return aggregateEvents(events);
+      // Streak is an all-time metric — fetch all events for it when not already all_time
+      const allEvents = period === "all_time" ? events : await getAllPlayEvents();
+      return aggregateEvents(events, allEvents);
     },
 
     clearData() {
@@ -84,10 +88,11 @@ async function getEventsForPeriod(period: string): Promise<PlayEvent[]> {
   return getPlayEventsByTimeRange(start, end);
 }
 
-async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
-  const pollingData = getPollingData();
+async function aggregateEvents(events: PlayEvent[], allEvents: PlayEvent[]): Promise<ListeningStats> {
+  // Separate completed plays from skips — rankings use only completed plays
+  const completedEvents = events.filter(e => e.type !== "skip");
 
-  // Top tracks by play count
+  // Top tracks by play count (completed plays only)
   const trackMap = new Map<
     string,
     {
@@ -99,7 +104,7 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
       totalMs: number;
     }
   >();
-  for (const e of events) {
+  for (const e of completedEvents) {
     const existing = trackMap.get(e.trackUri);
     if (existing) {
       existing.count++;
@@ -128,7 +133,7 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
       playCount: t.count,
     }));
 
-  // Top artists by play count
+  // Top artists by play count (completed plays only)
   const artistMap = new Map<
     string,
     {
@@ -137,7 +142,7 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
       count: number;
     }
   >();
-  for (const e of events) {
+  for (const e of completedEvents) {
     const key = e.artistUri || e.artistName;
     const existing = artistMap.get(key);
     if (existing) {
@@ -154,35 +159,15 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  // Fetch artist details for images and genres (only if Spotify API is available)
-  const artistIds = topArtistAggregated
-    .map((a) => a.artistUri?.split(":")[2])
-    .filter(Boolean);
-  let artistDetails: any[] = [];
-  if (artistIds.length > 0 && isApiAvailable()) {
-    try {
-      artistDetails = await getArtistsBatch(artistIds);
-    } catch {
-      /* graceful degradation without images */
-    }
-  }
-  const artistDetailMap = new Map(
-    artistDetails.map((a) => [`spotify:artist:${a.id}`, a]),
-  );
+  const topArtists = topArtistAggregated.map((a, i) => ({
+    artistUri: a.artistUri,
+    artistName: a.artistName,
+    rank: i + 1,
+    genres: [] as string[],
+    playCount: a.count,
+  }));
 
-  const topArtists = topArtistAggregated.map((a, i) => {
-    const detail = artistDetailMap.get(a.artistUri);
-    return {
-      artistUri: a.artistUri,
-      artistName: a.artistName,
-      artistImage: detail?.images?.[0]?.url,
-      rank: i + 1,
-      genres: (detail?.genres || []) as string[],
-      playCount: a.count,
-    };
-  });
-
-  // Top albums
+  // Top albums (completed plays only)
   const albumMap = new Map<
     string,
     {
@@ -193,7 +178,7 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
       trackCount: number;
     }
   >();
-  for (const e of events) {
+  for (const e of completedEvents) {
     const existing = albumMap.get(e.albumUri);
     if (existing) {
       existing.trackCount++;
@@ -250,26 +235,26 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
     playedAt: new Date(e.startedAt).toISOString(),
   }));
 
-  // Unique counts
-  const uniqueTrackUris = new Set(events.map((e) => e.trackUri));
+  // Unique counts (completed plays only)
+  const uniqueTrackUris = new Set(completedEvents.map((e) => e.trackUri));
   const uniqueArtistUris = new Set(
-    events.map((e) => e.artistUri).filter(Boolean),
+    completedEvents.map((e) => e.artistUri).filter(Boolean),
   );
 
-  // Activity dates for streak
-  const dateSet = new Set(
+  // Days listened: distinct days in the selected period
+  const periodDates = new Set(
     events.map((e) => new Date(e.startedAt).toISOString().split("T")[0]),
   );
 
+  // Streak: consecutive days from today using ALL events (cross-period metric)
+  const allDates = Array.from(new Set(
+    allEvents.map((e) => new Date(e.startedAt).toISOString().split("T")[0]),
+  ));
+
   const totalTimeMs = events.reduce((sum, e) => sum + e.playedMs, 0);
 
-  // Skip rate from events: tracks played < 30s with duration > 30s
-  let skipEvents = 0;
-  for (const e of events) {
-    if (e.playedMs < 30000 && e.durationMs > 30000) {
-      skipEvents++;
-    }
-  }
+  // Skip rate from event type (set by tracker based on play threshold)
+  const skipEvents = events.length - completedEvents.length;
 
   return {
     totalTimeMs,
@@ -284,10 +269,10 @@ async function aggregateEvents(events: PlayEvent[]): Promise<ListeningStats> {
     recentTracks,
     genres,
     topGenres,
-    streakDays: calculateStreak(Array.from(dateSet)),
+    streakDays: calculateStreak(allDates),
     newArtistsCount: 0,
     skipRate: events.length > 0 ? skipEvents / events.length : 0,
-    listenedDays: dateSet.size,
+    listenedDays: periodDates.size,
     lastfmConnected: false,
   };
 }

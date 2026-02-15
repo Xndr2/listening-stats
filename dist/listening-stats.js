@@ -189,370 +189,6 @@
     }
   }
 
-  // src/services/api-resilience.ts
-  var ApiError = class extends Error {
-    constructor(message, statusCode, retryable = false) {
-      super(message);
-      this.statusCode = statusCode;
-      this.retryable = retryable;
-      this.name = "ApiError";
-    }
-  };
-  var CircuitBreaker = class {
-    constructor(failureThreshold = 5, resetTimeoutMs = 6e4) {
-      this.failureThreshold = failureThreshold;
-      this.resetTimeoutMs = resetTimeoutMs;
-      this.state = "closed";
-      this.failures = 0;
-      this.lastFailure = 0;
-    }
-    async execute(fn) {
-      if (this.state === "open") {
-        if (Date.now() - this.lastFailure >= this.resetTimeoutMs) {
-          this.state = "half_open";
-        } else {
-          throw new ApiError(
-            "Circuit open: API temporarily unavailable",
-            void 0,
-            true
-          );
-        }
-      }
-      try {
-        const result = await fn();
-        this.onSuccess();
-        return result;
-      } catch (error) {
-        this.onFailure();
-        throw error;
-      }
-    }
-    reset() {
-      this.failures = 0;
-      this.state = "closed";
-    }
-    onSuccess() {
-      this.failures = 0;
-      this.state = "closed";
-    }
-    onFailure() {
-      this.failures++;
-      this.lastFailure = Date.now();
-      if (this.failures >= this.failureThreshold) {
-        this.state = "open";
-      }
-    }
-  };
-  function createBatchCoalescer(batchFn, windowMs = 50, maxBatch = 50) {
-    let pending = /* @__PURE__ */ new Map();
-    let timer = null;
-    function flush() {
-      timer = null;
-      const batch = pending;
-      pending = /* @__PURE__ */ new Map();
-      const keys = [...batch.keys()];
-      batchFn(keys).then((results) => {
-        for (const [key, entries] of batch) {
-          const val = results.get(key);
-          for (const entry of entries) {
-            entry.resolve(val);
-          }
-        }
-      }).catch((err) => {
-        for (const entries of batch.values()) {
-          for (const entry of entries) {
-            entry.reject(err);
-          }
-        }
-      });
-    }
-    return function request(key) {
-      return new Promise((resolve, reject) => {
-        const entries = pending.get(key) || [];
-        entries.push({ resolve, reject });
-        pending.set(key, entries);
-        if (pending.size >= maxBatch) {
-          if (timer) clearTimeout(timer);
-          flush();
-        } else if (!timer) {
-          timer = setTimeout(flush, windowMs);
-        }
-      });
-    };
-  }
-
-  // src/services/spotify-api.ts
-  var STORAGE_PREFIX = "listening-stats:";
-  var QUEUE_DELAY_MS = 300;
-  var MAX_BATCH = 50;
-  var CACHE_TTL_MS2 = 3e5;
-  var DEFAULT_BACKOFF_MS = 6e4;
-  var MAX_BACKOFF_MS = 6e5;
-  var rateLimitedUntil = 0;
-  try {
-    const stored = localStorage.getItem(`${STORAGE_PREFIX}rateLimitedUntil`);
-    if (stored) {
-      const val = parseInt(stored, 10);
-      rateLimitedUntil = Date.now() >= val ? 0 : val;
-      if (rateLimitedUntil === 0) {
-        localStorage.removeItem(`${STORAGE_PREFIX}rateLimitedUntil`);
-      }
-    }
-  } catch {
-  }
-  function isApiAvailable() {
-    return Date.now() >= rateLimitedUntil;
-  }
-  function setRateLimit(error) {
-    let backoffMs = DEFAULT_BACKOFF_MS;
-    const retryAfterRaw = error?.headers?.["retry-after"] ?? error?.body?.["Retry-After"] ?? error?.headers?.["Retry-After"];
-    if (retryAfterRaw != null) {
-      const parsed = parseInt(String(retryAfterRaw), 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        backoffMs = Math.min(parsed * 1e3, MAX_BACKOFF_MS);
-      }
-    }
-    rateLimitedUntil = Date.now() + backoffMs;
-    localStorage.setItem(
-      `${STORAGE_PREFIX}rateLimitedUntil`,
-      rateLimitedUntil.toString()
-    );
-  }
-  var cache2 = /* @__PURE__ */ new Map();
-  function getCached2(key) {
-    const entry = cache2.get(key);
-    if (!entry) return null;
-    if (Date.now() >= entry.expiresAt) {
-      cache2.delete(key);
-      return null;
-    }
-    return entry.data;
-  }
-  function setCache2(key, data) {
-    cache2.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS2 });
-  }
-  var PRIORITY_ORDER = { high: 0, normal: 1, low: 2 };
-  var queue = [];
-  var draining = false;
-  var inflight = /* @__PURE__ */ new Map();
-  var circuitBreaker = new CircuitBreaker(5, 6e4);
-  function enqueueWithPriority(key, fn, priority = "normal") {
-    const existing = inflight.get(key);
-    if (existing) return existing;
-    const promise = new Promise((resolve, reject) => {
-      queue.push({ key, fn, resolve, reject, priority });
-      queue.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
-      if (!draining) drainQueue();
-    });
-    inflight.set(key, promise);
-    promise.finally(() => inflight.delete(key));
-    return promise;
-  }
-  async function drainQueue() {
-    draining = true;
-    while (queue.length > 0) {
-      if (!isApiAvailable()) {
-        const waitMs = rateLimitedUntil - Date.now();
-        await new Promise((r) => setTimeout(r, waitMs));
-      }
-      const item = queue.shift();
-      try {
-        const result = await circuitBreaker.execute(() => item.fn());
-        item.resolve(result);
-      } catch (error) {
-        if (error?.message?.includes("429") || error?.status === 429 || error?.statusCode === 429) {
-          setRateLimit(error);
-        }
-        item.reject(error);
-      }
-      if (queue.length > 0) {
-        await new Promise((r) => setTimeout(r, QUEUE_DELAY_MS));
-      }
-    }
-    draining = false;
-  }
-  async function apiFetch(url) {
-    const cached = getCached2(url);
-    if (cached) return cached;
-    return enqueueWithPriority(url, async () => {
-      let response;
-      try {
-        response = await Spicetify.CosmosAsync.get(url);
-      } catch (err) {
-        if (err?.status === 429 || String(err?.message || "").includes("429")) {
-          setRateLimit(err);
-          throw new ApiError(
-            err?.message || "Rate limited",
-            429,
-            true
-          );
-        }
-        const status = err?.status;
-        throw new ApiError(
-          err?.message || "API request failed",
-          status,
-          status !== void 0 && (status === 429 || status >= 500)
-        );
-      }
-      if (!response) {
-        throw new ApiError("Empty API response", void 0, false);
-      }
-      if (response.error) {
-        const status = response.error.status;
-        const message = response.error.message || `Spotify API error ${status}`;
-        if (status === 429) setRateLimit(response);
-        throw new ApiError(message, status, status === 429 || status >= 500);
-      }
-      setCache2(url, response);
-      return response;
-    });
-  }
-  var SEARCH_CACHE_KEY = "listening-stats:searchCache";
-  var SEARCH_CACHE_MAX = 500;
-  var searchCache = /* @__PURE__ */ new Map();
-  try {
-    const stored = localStorage.getItem(SEARCH_CACHE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      for (const [k, v] of Object.entries(parsed)) {
-        searchCache.set(k, v);
-      }
-    }
-  } catch {
-  }
-  var persistTimer = null;
-  function schedulePersistSearchCache() {
-    if (persistTimer) return;
-    persistTimer = setTimeout(() => {
-      persistTimer = null;
-      try {
-        const obj = {};
-        let count = 0;
-        for (const [k, v] of searchCache) {
-          if (v.uri || v.imageUrl) {
-            obj[k] = v;
-            if (++count >= SEARCH_CACHE_MAX) break;
-          }
-        }
-        localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(obj));
-      } catch {
-      }
-    }, 2e3);
-  }
-  var SEARCH_CONCURRENCY = 2;
-  var SEARCH_DELAY_MS = 150;
-  var activeSearchCount = 0;
-  var searchWaiters = [];
-  async function acquireSearchSlot() {
-    if (activeSearchCount < SEARCH_CONCURRENCY) {
-      activeSearchCount++;
-      return;
-    }
-    await new Promise((resolve) => searchWaiters.push(resolve));
-  }
-  function releaseSearchSlot() {
-    setTimeout(() => {
-      activeSearchCount--;
-      if (searchWaiters.length > 0) {
-        activeSearchCount++;
-        searchWaiters.shift()();
-      }
-    }, SEARCH_DELAY_MS);
-  }
-  async function throttledSearch(cacheKey, fetchFn) {
-    if (searchCache.has(cacheKey)) return searchCache.get(cacheKey);
-    await acquireSearchSlot();
-    try {
-      if (searchCache.has(cacheKey)) return searchCache.get(cacheKey);
-      const result = await fetchFn();
-      searchCache.set(cacheKey, result);
-      schedulePersistSearchCache();
-      return result;
-    } catch {
-      const empty = {};
-      searchCache.set(cacheKey, empty);
-      return empty;
-    } finally {
-      releaseSearchSlot();
-    }
-  }
-  async function searchTrack(trackName, artistName) {
-    const cacheKey = `s:t:${artistName}|||${trackName}`;
-    return throttledSearch(cacheKey, async () => {
-      const q = encodeURIComponent(`track:${trackName} artist:${artistName}`);
-      const resp = await Spicetify.CosmosAsync.get(
-        `https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`
-      );
-      const item = resp?.tracks?.items?.[0];
-      return { uri: item?.uri, imageUrl: item?.album?.images?.[0]?.url };
-    });
-  }
-  async function searchArtist(artistName) {
-    const cacheKey = `s:a:${artistName}`;
-    return throttledSearch(cacheKey, async () => {
-      const q = encodeURIComponent(`artist:${artistName}`);
-      const resp = await Spicetify.CosmosAsync.get(
-        `https://api.spotify.com/v1/search?q=${q}&type=artist&limit=1`
-      );
-      const item = resp?.artists?.items?.[0];
-      return { uri: item?.uri, imageUrl: item?.images?.[0]?.url };
-    });
-  }
-  async function searchAlbum(albumName, artistName) {
-    const cacheKey = `s:al:${artistName}|||${albumName}`;
-    return throttledSearch(cacheKey, async () => {
-      const q = encodeURIComponent(`album:${albumName} artist:${artistName}`);
-      const resp = await Spicetify.CosmosAsync.get(
-        `https://api.spotify.com/v1/search?q=${q}&type=album&limit=1`
-      );
-      const item = resp?.albums?.items?.[0];
-      return { uri: item?.uri, imageUrl: item?.images?.[0]?.url };
-    });
-  }
-  async function getArtistsBatch(artistIds) {
-    const unique = [...new Set(artistIds)].filter(Boolean);
-    if (unique.length === 0) return [];
-    const results = [];
-    for (let i = 0; i < unique.length; i += MAX_BATCH) {
-      const chunk = unique.slice(i, i + MAX_BATCH);
-      const ids = chunk.join(",");
-      try {
-        const response = await apiFetch(
-          `https://api.spotify.com/v1/artists?ids=${ids}`
-        );
-        if (response?.artists) {
-          results.push(...response.artists.filter(Boolean));
-        }
-      } catch (error) {
-        console.warn("[ListeningStats] Artist batch fetch failed:", error);
-      }
-    }
-    return results;
-  }
-  var artistCoalescer = createBatchCoalescer(
-    async (ids) => {
-      const results = /* @__PURE__ */ new Map();
-      for (let i = 0; i < ids.length; i += MAX_BATCH) {
-        const chunk = ids.slice(i, i + MAX_BATCH);
-        try {
-          const response = await apiFetch(
-            `https://api.spotify.com/v1/artists?ids=${chunk.join(",")}`
-          );
-          if (response?.artists) {
-            for (const artist of response.artists.filter(Boolean)) {
-              if (artist.id) results.set(artist.id, artist);
-            }
-          }
-        } catch (error) {
-          console.warn("[ListeningStats] Artist batch fetch failed:", error);
-        }
-      }
-      return results;
-    },
-    50,
-    MAX_BATCH
-  );
-
   // node_modules/idb/build/index.js
   var instanceOfAny = (object, constructors) => constructors.some((c) => object instanceof c);
   var idbProxyableTypes;
@@ -905,22 +541,44 @@
     } catch {
     }
   }
-  function getDB() {
+  function resetDBPromise() {
+    dbPromise = null;
+  }
+  async function getDB() {
     if (!dbPromise) {
       dbPromise = initDB();
     }
-    return dbPromise;
+    try {
+      const db = await dbPromise;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        dbPromise = initDB();
+        return dbPromise;
+      }
+      return db;
+    } catch {
+      dbPromise = initDB();
+      return dbPromise;
+    }
   }
   async function initDB() {
     let needsBackup = false;
     let oldDbVersion = 0;
     try {
-      const existingDb = await openDB(DB_NAME);
-      oldDbVersion = existingDb.version;
-      existingDb.close();
-      needsBackup = oldDbVersion < DB_VERSION && oldDbVersion > 0;
+      const databases = await indexedDB.databases();
+      const existing = databases.find((db) => db.name === DB_NAME);
+      if (existing && existing.version) {
+        oldDbVersion = existing.version;
+        needsBackup = oldDbVersion < DB_VERSION;
+      }
     } catch {
-      needsBackup = false;
+      try {
+        const existingDb = await openDB(DB_NAME);
+        oldDbVersion = existingDb.version;
+        existingDb.close();
+        needsBackup = oldDbVersion < DB_VERSION && oldDbVersion > 0;
+      } catch {
+        needsBackup = false;
+      }
     }
     if (needsBackup) {
       await backupBeforeMigration();
@@ -928,7 +586,7 @@
     try {
       const db = await openDB(DB_NAME, DB_VERSION, {
         upgrade(db2, oldVersion, _newVersion, transaction) {
-          if (oldVersion < 1) {
+          if (!db2.objectStoreNames.contains(STORE_NAME)) {
             const store = db2.createObjectStore(STORE_NAME, {
               keyPath: "id",
               autoIncrement: true
@@ -937,8 +595,7 @@
             store.createIndex("by-trackUri", "trackUri");
             store.createIndex("by-artistUri", "artistUri");
             store.createIndex("by-type", "type");
-          }
-          if (oldVersion >= 1 && oldVersion < 3) {
+          } else {
             const store = transaction.objectStore(STORE_NAME);
             if (!store.indexNames.contains("by-startedAt")) {
               store.createIndex("by-startedAt", "startedAt");
@@ -949,9 +606,6 @@
             if (!store.indexNames.contains("by-artistUri")) {
               store.createIndex("by-artistUri", "artistUri");
             }
-          }
-          if (oldVersion >= 1 && oldVersion < 4) {
-            const store = transaction.objectStore(STORE_NAME);
             if (!store.indexNames.contains("by-type")) {
               store.createIndex("by-type", "type");
             }
@@ -1015,9 +669,10 @@
     const existing = await db.getAllFromIndex(STORE_NAME, "by-startedAt", range);
     if (existing.some((e) => e.trackUri === event.trackUri)) {
       console.warn("[ListeningStats] Duplicate event blocked:", event.trackName);
-      return;
+      return false;
     }
     await db.add(STORE_NAME, event);
+    return true;
   }
   async function getPlayEventsByTimeRange(start, end) {
     const db = await getDB();
@@ -1031,6 +686,7 @@
   async function clearAllData() {
     const db = await getDB();
     await db.clear(STORE_NAME);
+    resetDBPromise();
     console.log("[ListeningStats] IndexedDB data cleared");
   }
 
@@ -1127,17 +783,11 @@
   var currentTrackDuration = 0;
   var lastProgressMs = 0;
   var progressHandler = null;
-  function handleSongChange() {
+  async function handleSongChange() {
     if (currentTrackUri && playStartTime !== null) {
       const totalPlayedMs = accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
-      const data = getPollingData();
-      data.totalPlays++;
       const threshold = getPlayThreshold();
       const skipped = totalPlayedMs < threshold && currentTrackDuration > threshold;
-      if (skipped) {
-        data.skipEvents++;
-      }
-      savePollingData(data);
       if (previousTrackData) {
         log(
           skipped ? "Skipped:" : "Tracked:",
@@ -1145,7 +795,7 @@
           `(${Math.round(totalPlayedMs / 1e3)}s / ${Math.round(currentTrackDuration / 1e3)}s)`
         );
       }
-      writePlayEvent(totalPlayedMs, skipped);
+      await writePlayEvent(totalPlayedMs, skipped);
     }
     const playerData = Spicetify.Player.data;
     if (playerData?.item) {
@@ -1186,7 +836,7 @@
       startedAt: Date.now()
     };
   }
-  function writePlayEvent(totalPlayedMs, skipped) {
+  async function writePlayEvent(totalPlayedMs, skipped) {
     if (!previousTrackData) return;
     if (skipped === void 0) {
       const threshold = getPlayThreshold();
@@ -1206,11 +856,23 @@
       endedAt: Date.now(),
       type: skipped ? "skip" : "play"
     };
-    addPlayEvent(event).catch((err) => {
+    try {
+      const written = await addPlayEvent(event);
+      if (written) {
+        const data = getPollingData();
+        data.totalPlays++;
+        if (skipped) {
+          data.skipEvents++;
+        }
+        savePollingData(data);
+        if (activeProviderType === "local") {
+          emitStatsUpdated();
+        }
+      } else {
+        log("Dedup guard blocked duplicate event, polling data unchanged");
+      }
+    } catch (err) {
       console.warn("[ListeningStats] Failed to write play event:", err);
-    });
-    if (activeProviderType === "local") {
-      emitStatsUpdated();
     }
   }
   function handlePlayPause() {
@@ -1337,37 +999,6 @@
       }
     };
   }
-  async function enrichArtistImages(artists) {
-    const needsImage = artists.filter((a) => !a.artistImage);
-    if (needsImage.length === 0) return;
-    const results = await Promise.all(
-      needsImage.map((a) => searchArtist(a.artistName))
-    );
-    needsImage.forEach((a, i) => {
-      if (results[i].uri && !a.artistUri) a.artistUri = results[i].uri;
-      if (results[i].imageUrl) a.artistImage = results[i].imageUrl;
-    });
-  }
-  async function enrichTrackUris(tracks) {
-    const needsUri = tracks.filter((t) => !t.trackUri);
-    if (needsUri.length === 0) return;
-    const results = await Promise.all(
-      needsUri.map((t) => searchTrack(t.trackName, t.artistName))
-    );
-    needsUri.forEach((t, i) => {
-      if (results[i].uri) t.trackUri = results[i].uri;
-    });
-  }
-  async function enrichAlbumUris(albums) {
-    const needsUri = albums.filter((a) => !a.albumUri);
-    if (needsUri.length === 0) return;
-    const results = await Promise.all(
-      needsUri.map((a) => searchAlbum(a.albumName, a.artistName))
-    );
-    needsUri.forEach((a, i) => {
-      if (results[i].uri) a.albumUri = results[i].uri;
-    });
-  }
   async function calculateRecentStats() {
     const [recentLfm, userInfo] = await Promise.all([
       getRecentTracks(50),
@@ -1450,9 +1081,6 @@
       trackCount: a.count,
       playCount: a.count
     }));
-    await enrichArtistImages(topArtists);
-    await enrichTrackUris(topTracks);
-    await enrichAlbumUris(topAlbums);
     const hourlyDistribution = new Array(24).fill(0);
     for (const t of recentTracks) {
       const hour = new Date(t.playedAt).getHours();
@@ -1546,9 +1174,6 @@
       trackCount: 0,
       playCount: a.playCount
     }));
-    await enrichArtistImages(topArtists);
-    await enrichTrackUris(topTracks);
-    await enrichAlbumUris(topAlbums);
     const recentTracks = (Array.isArray(recentLfm) ? recentLfm : []).filter((t) => !t.nowPlaying).map((t) => ({
       trackUri: "",
       trackName: t.name,
@@ -1561,6 +1186,10 @@
       playedAt: t.playedAt
     }));
     const hourlyDistribution = new Array(24).fill(0);
+    for (const t of recentTracks) {
+      const hour = new Date(t.playedAt).getHours();
+      hourlyDistribution[hour]++;
+    }
     const totalPlays = lfmTracks.reduce((sum, t) => sum + t.playCount, 0);
     const totalTimeMs = lfmTracks.reduce(
       (sum, t) => sum + (t.durationSecs || 210) * 1e3 * t.playCount,
@@ -1581,7 +1210,7 @@
       topAlbums,
       hourlyDistribution,
       hourlyUnit: "plays",
-      peakHour: 0,
+      peakHour: hourlyDistribution.indexOf(Math.max(...hourlyDistribution)),
       recentTracks,
       genres: {},
       topGenres: [],
@@ -1625,14 +1254,17 @@
       periodLabels: PERIOD_LABELS2,
       defaultPeriod: "today",
       init() {
+        resetDBPromise();
         initPoller("local");
       },
       destroy() {
         destroyPoller();
+        resetDBPromise();
       },
       async calculateStats(period) {
         const events = await getEventsForPeriod(period);
-        return aggregateEvents(events);
+        const allEvents = period === "all_time" ? events : await getAllPlayEvents();
+        return aggregateEvents(events, allEvents);
       },
       clearData() {
         clearAllData();
@@ -1672,10 +1304,10 @@
     const { start, end } = getTimeRange(period);
     return getPlayEventsByTimeRange(start, end);
   }
-  async function aggregateEvents(events) {
-    const pollingData = getPollingData();
+  async function aggregateEvents(events, allEvents) {
+    const completedEvents = events.filter((e) => e.type !== "skip");
     const trackMap = /* @__PURE__ */ new Map();
-    for (const e of events) {
+    for (const e of completedEvents) {
       const existing = trackMap.get(e.trackUri);
       if (existing) {
         existing.count++;
@@ -1701,7 +1333,7 @@
       playCount: t.count
     }));
     const artistMap = /* @__PURE__ */ new Map();
-    for (const e of events) {
+    for (const e of completedEvents) {
       const key = e.artistUri || e.artistName;
       const existing = artistMap.get(key);
       if (existing) {
@@ -1715,30 +1347,15 @@
       }
     }
     const topArtistAggregated = Array.from(artistMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
-    const artistIds = topArtistAggregated.map((a) => a.artistUri?.split(":")[2]).filter(Boolean);
-    let artistDetails = [];
-    if (artistIds.length > 0 && isApiAvailable()) {
-      try {
-        artistDetails = await getArtistsBatch(artistIds);
-      } catch {
-      }
-    }
-    const artistDetailMap = new Map(
-      artistDetails.map((a) => [`spotify:artist:${a.id}`, a])
-    );
-    const topArtists = topArtistAggregated.map((a, i) => {
-      const detail = artistDetailMap.get(a.artistUri);
-      return {
-        artistUri: a.artistUri,
-        artistName: a.artistName,
-        artistImage: detail?.images?.[0]?.url,
-        rank: i + 1,
-        genres: detail?.genres || [],
-        playCount: a.count
-      };
-    });
+    const topArtists = topArtistAggregated.map((a, i) => ({
+      artistUri: a.artistUri,
+      artistName: a.artistName,
+      rank: i + 1,
+      genres: [],
+      playCount: a.count
+    }));
     const albumMap = /* @__PURE__ */ new Map();
-    for (const e of events) {
+    for (const e of completedEvents) {
       const existing = albumMap.get(e.albumUri);
       if (existing) {
         existing.trackCount++;
@@ -1782,20 +1399,18 @@
       durationMs: e.durationMs,
       playedAt: new Date(e.startedAt).toISOString()
     }));
-    const uniqueTrackUris = new Set(events.map((e) => e.trackUri));
+    const uniqueTrackUris = new Set(completedEvents.map((e) => e.trackUri));
     const uniqueArtistUris = new Set(
-      events.map((e) => e.artistUri).filter(Boolean)
+      completedEvents.map((e) => e.artistUri).filter(Boolean)
     );
-    const dateSet = new Set(
+    const periodDates = new Set(
       events.map((e) => new Date(e.startedAt).toISOString().split("T")[0])
     );
+    const allDates = Array.from(new Set(
+      allEvents.map((e) => new Date(e.startedAt).toISOString().split("T")[0])
+    ));
     const totalTimeMs = events.reduce((sum, e) => sum + e.playedMs, 0);
-    let skipEvents = 0;
-    for (const e of events) {
-      if (e.playedMs < 3e4 && e.durationMs > 3e4) {
-        skipEvents++;
-      }
-    }
+    const skipEvents = events.length - completedEvents.length;
     return {
       totalTimeMs,
       trackCount: events.length,
@@ -1809,10 +1424,10 @@
       recentTracks,
       genres,
       topGenres,
-      streakDays: calculateStreak2(Array.from(dateSet)),
+      streakDays: calculateStreak2(allDates),
       newArtistsCount: 0,
       skipRate: events.length > 0 ? skipEvents / events.length : 0,
-      listenedDays: dateSet.size,
+      listenedDays: periodDates.size,
       lastfmConnected: false
     };
   }
@@ -1836,7 +1451,7 @@
   // src/services/statsfm.ts
   var API_BASE = "https://api.stats.fm/api/v1";
   var STORAGE_KEY3 = "listening-stats:statsfm";
-  var CACHE_TTL_MS3 = 12e4;
+  var CACHE_TTL_MS2 = 12e4;
   var configCache2 = void 0;
   function getConfig2() {
     if (configCache2 !== void 0) return configCache2;
@@ -1855,21 +1470,21 @@
     configCache2 = config;
     localStorage.setItem(STORAGE_KEY3, JSON.stringify(config));
   }
-  var cache3 = /* @__PURE__ */ new Map();
-  function getCached3(key) {
-    const entry = cache3.get(key);
+  var cache2 = /* @__PURE__ */ new Map();
+  function getCached2(key) {
+    const entry = cache2.get(key);
     if (!entry || Date.now() >= entry.expiresAt) {
-      cache3.delete(key);
+      cache2.delete(key);
       return null;
     }
     return entry.data;
   }
-  function setCache3(key, data) {
-    cache3.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS3 });
+  function setCache2(key, data) {
+    cache2.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS2 });
   }
   async function statsfmFetch(path) {
     const url = `${API_BASE}${path}`;
-    const cached = getCached3(url);
+    const cached = getCached2(url);
     if (cached) return cached;
     const response = await fetch(url);
     if (!response.ok) {
@@ -1880,7 +1495,7 @@
       throw new Error(`stats.fm API error: ${response.status}`);
     }
     const data = await response.json();
-    setCache3(url, data);
+    setCache2(url, data);
     return data;
   }
   async function validateUser2(username) {
@@ -1985,10 +1600,9 @@
     months: "6 Months",
     lifetime: "Lifetime"
   };
-  var PLUS_PERIODS = ["today", "days", "weeks", "months", "lifetime"];
+  var PLUS_PERIODS = ["today", "weeks", "months", "lifetime"];
   var PLUS_LABELS = {
     today: "Today",
-    days: "This Week",
     weeks: "4 Weeks",
     months: "6 Months",
     lifetime: "Lifetime"
@@ -2012,18 +1626,7 @@
         destroyPoller();
       },
       async calculateStats(period) {
-        try {
-          return await calculateStatsfmStats(period);
-        } catch (err) {
-          if (err?.message?.includes("400") && (period === "today" || period === "days")) {
-            const cfg = getConfig2();
-            if (cfg) {
-              saveConfig({ ...cfg, isPlus: false });
-            }
-            return calculateStatsfmStats("weeks");
-          }
-          throw err;
-        }
+        return calculateStatsfmStats(period);
       }
     };
   }

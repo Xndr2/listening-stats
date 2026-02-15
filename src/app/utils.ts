@@ -1,33 +1,9 @@
-import {
-  searchTrack,
-  searchArtist,
-  searchAlbum,
-} from "../services/spotify-api";
-
 export function navigateToUri(uri: string): void {
   if (uri && Spicetify.Platform?.History) {
     const [, type, id] = uri.split(":");
     if (type && id) {
       Spicetify.Platform.History.push(`/${type}/${id}`);
     }
-  }
-}
-
-export async function lazyNavigate(
-  type: "track" | "artist" | "album",
-  name: string,
-  artistName?: string,
-): Promise<void> {
-  let result;
-  if (type === "track") {
-    result = await searchTrack(name, artistName || "");
-  } else if (type === "artist") {
-    result = await searchArtist(name);
-  } else {
-    result = await searchAlbum(name, artistName || "");
-  }
-  if (result?.uri) {
-    navigateToUri(result.uri);
   }
 }
 

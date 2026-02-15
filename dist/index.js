@@ -277,7 +277,8 @@ var ListeningStatsApp = (() => {
     deduplicateExistingEvents: () => deduplicateExistingEvents,
     getAllPlayEvents: () => getAllPlayEvents,
     getDB: () => getDB,
-    getPlayEventsByTimeRange: () => getPlayEventsByTimeRange
+    getPlayEventsByTimeRange: () => getPlayEventsByTimeRange,
+    resetDBPromise: () => resetDBPromise
   });
   async function backupBeforeMigration() {
     let events = [];
@@ -377,22 +378,44 @@ var ListeningStatsApp = (() => {
     } catch {
     }
   }
-  function getDB() {
+  function resetDBPromise() {
+    dbPromise = null;
+  }
+  async function getDB() {
     if (!dbPromise) {
       dbPromise = initDB();
     }
-    return dbPromise;
+    try {
+      const db = await dbPromise;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        dbPromise = initDB();
+        return dbPromise;
+      }
+      return db;
+    } catch {
+      dbPromise = initDB();
+      return dbPromise;
+    }
   }
   async function initDB() {
     let needsBackup = false;
     let oldDbVersion = 0;
     try {
-      const existingDb = await openDB(DB_NAME);
-      oldDbVersion = existingDb.version;
-      existingDb.close();
-      needsBackup = oldDbVersion < DB_VERSION && oldDbVersion > 0;
+      const databases = await indexedDB.databases();
+      const existing = databases.find((db) => db.name === DB_NAME);
+      if (existing && existing.version) {
+        oldDbVersion = existing.version;
+        needsBackup = oldDbVersion < DB_VERSION;
+      }
     } catch {
-      needsBackup = false;
+      try {
+        const existingDb = await openDB(DB_NAME);
+        oldDbVersion = existingDb.version;
+        existingDb.close();
+        needsBackup = oldDbVersion < DB_VERSION && oldDbVersion > 0;
+      } catch {
+        needsBackup = false;
+      }
     }
     if (needsBackup) {
       await backupBeforeMigration();
@@ -400,7 +423,7 @@ var ListeningStatsApp = (() => {
     try {
       const db = await openDB(DB_NAME, DB_VERSION, {
         upgrade(db2, oldVersion, _newVersion, transaction) {
-          if (oldVersion < 1) {
+          if (!db2.objectStoreNames.contains(STORE_NAME)) {
             const store = db2.createObjectStore(STORE_NAME, {
               keyPath: "id",
               autoIncrement: true
@@ -409,8 +432,7 @@ var ListeningStatsApp = (() => {
             store.createIndex("by-trackUri", "trackUri");
             store.createIndex("by-artistUri", "artistUri");
             store.createIndex("by-type", "type");
-          }
-          if (oldVersion >= 1 && oldVersion < 3) {
+          } else {
             const store = transaction.objectStore(STORE_NAME);
             if (!store.indexNames.contains("by-startedAt")) {
               store.createIndex("by-startedAt", "startedAt");
@@ -421,9 +443,6 @@ var ListeningStatsApp = (() => {
             if (!store.indexNames.contains("by-artistUri")) {
               store.createIndex("by-artistUri", "artistUri");
             }
-          }
-          if (oldVersion >= 1 && oldVersion < 4) {
-            const store = transaction.objectStore(STORE_NAME);
             if (!store.indexNames.contains("by-type")) {
               store.createIndex("by-type", "type");
             }
@@ -487,9 +506,10 @@ var ListeningStatsApp = (() => {
     const existing = await db.getAllFromIndex(STORE_NAME, "by-startedAt", range);
     if (existing.some((e) => e.trackUri === event.trackUri)) {
       console.warn("[ListeningStats] Duplicate event blocked:", event.trackName);
-      return;
+      return false;
     }
     await db.add(STORE_NAME, event);
+    return true;
   }
   async function deduplicateExistingEvents() {
     const db = await getDB();
@@ -507,6 +527,7 @@ var ListeningStatsApp = (() => {
   async function clearAllData() {
     const db = await getDB();
     await db.clear(STORE_NAME);
+    resetDBPromise();
     console.log("[ListeningStats] IndexedDB data cleared");
   }
   var DB_NAME, DB_VERSION, STORE_NAME, BACKUP_LS_KEY, BACKUP_VERSION_KEY, BACKUP_DB_NAME, dbPromise;
@@ -625,7 +646,10 @@ var ListeningStatsApp = (() => {
   var PREFS_KEY = "listening-stats:preferences";
   var PREFS_CHANGED_EVENT = "listening-stats:prefs-changed";
   var DEFAULTS = {
-    use24HourTime: false
+    use24HourTime: false,
+    itemsPerSection: 5,
+    genresPerSection: 5,
+    hiddenSections: []
   };
   var cached = null;
   function getPreferences() {
@@ -863,286 +887,6 @@ var ListeningStatsApp = (() => {
     }
   }
 
-  // src/services/spotify-api.ts
-  var STORAGE_PREFIX = "listening-stats:";
-  var QUEUE_DELAY_MS = 300;
-  var MAX_BATCH = 50;
-  var CACHE_TTL_MS2 = 3e5;
-  var DEFAULT_BACKOFF_MS = 6e4;
-  var MAX_BACKOFF_MS = 6e5;
-  var rateLimitedUntil = 0;
-  try {
-    const stored = localStorage.getItem(`${STORAGE_PREFIX}rateLimitedUntil`);
-    if (stored) {
-      const val = parseInt(stored, 10);
-      rateLimitedUntil = Date.now() >= val ? 0 : val;
-      if (rateLimitedUntil === 0) {
-        localStorage.removeItem(`${STORAGE_PREFIX}rateLimitedUntil`);
-      }
-    }
-  } catch {
-  }
-  function isApiAvailable() {
-    return Date.now() >= rateLimitedUntil;
-  }
-  function resetRateLimit() {
-    rateLimitedUntil = 0;
-    localStorage.removeItem(`${STORAGE_PREFIX}rateLimitedUntil`);
-    circuitBreaker.reset();
-  }
-  function setRateLimit(error) {
-    let backoffMs = DEFAULT_BACKOFF_MS;
-    const retryAfterRaw = error?.headers?.["retry-after"] ?? error?.body?.["Retry-After"] ?? error?.headers?.["Retry-After"];
-    if (retryAfterRaw != null) {
-      const parsed = parseInt(String(retryAfterRaw), 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        backoffMs = Math.min(parsed * 1e3, MAX_BACKOFF_MS);
-      }
-    }
-    rateLimitedUntil = Date.now() + backoffMs;
-    localStorage.setItem(
-      `${STORAGE_PREFIX}rateLimitedUntil`,
-      rateLimitedUntil.toString()
-    );
-  }
-  var cache2 = /* @__PURE__ */ new Map();
-  function getCached2(key) {
-    const entry = cache2.get(key);
-    if (!entry) return null;
-    if (Date.now() >= entry.expiresAt) {
-      cache2.delete(key);
-      return null;
-    }
-    return entry.data;
-  }
-  function setCache2(key, data) {
-    cache2.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS2 });
-  }
-  function clearApiCaches() {
-    cache2.clear();
-  }
-  var PRIORITY_ORDER = { high: 0, normal: 1, low: 2 };
-  var queue = [];
-  var draining = false;
-  var inflight = /* @__PURE__ */ new Map();
-  var circuitBreaker = new CircuitBreaker(5, 6e4);
-  function enqueueWithPriority(key, fn, priority = "normal") {
-    const existing = inflight.get(key);
-    if (existing) return existing;
-    const promise = new Promise((resolve, reject) => {
-      queue.push({ key, fn, resolve, reject, priority });
-      queue.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
-      if (!draining) drainQueue();
-    });
-    inflight.set(key, promise);
-    promise.finally(() => inflight.delete(key));
-    return promise;
-  }
-  async function drainQueue() {
-    draining = true;
-    while (queue.length > 0) {
-      if (!isApiAvailable()) {
-        const waitMs = rateLimitedUntil - Date.now();
-        await new Promise((r) => setTimeout(r, waitMs));
-      }
-      const item = queue.shift();
-      try {
-        const result = await circuitBreaker.execute(() => item.fn());
-        item.resolve(result);
-      } catch (error) {
-        if (error?.message?.includes("429") || error?.status === 429 || error?.statusCode === 429) {
-          setRateLimit(error);
-        }
-        item.reject(error);
-      }
-      if (queue.length > 0) {
-        await new Promise((r) => setTimeout(r, QUEUE_DELAY_MS));
-      }
-    }
-    draining = false;
-  }
-  async function apiFetch(url) {
-    const cached2 = getCached2(url);
-    if (cached2) return cached2;
-    return enqueueWithPriority(url, async () => {
-      let response;
-      try {
-        response = await Spicetify.CosmosAsync.get(url);
-      } catch (err) {
-        if (err?.status === 429 || String(err?.message || "").includes("429")) {
-          setRateLimit(err);
-          throw new ApiError(
-            err?.message || "Rate limited",
-            429,
-            true
-          );
-        }
-        const status = err?.status;
-        throw new ApiError(
-          err?.message || "API request failed",
-          status,
-          status !== void 0 && (status === 429 || status >= 500)
-        );
-      }
-      if (!response) {
-        throw new ApiError("Empty API response", void 0, false);
-      }
-      if (response.error) {
-        const status = response.error.status;
-        const message = response.error.message || `Spotify API error ${status}`;
-        if (status === 429) setRateLimit(response);
-        throw new ApiError(message, status, status === 429 || status >= 500);
-      }
-      setCache2(url, response);
-      return response;
-    });
-  }
-  var SEARCH_CACHE_KEY = "listening-stats:searchCache";
-  var SEARCH_CACHE_MAX = 500;
-  var searchCache = /* @__PURE__ */ new Map();
-  try {
-    const stored = localStorage.getItem(SEARCH_CACHE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      for (const [k, v] of Object.entries(parsed)) {
-        searchCache.set(k, v);
-      }
-    }
-  } catch {
-  }
-  var persistTimer = null;
-  function schedulePersistSearchCache() {
-    if (persistTimer) return;
-    persistTimer = setTimeout(() => {
-      persistTimer = null;
-      try {
-        const obj = {};
-        let count = 0;
-        for (const [k, v] of searchCache) {
-          if (v.uri || v.imageUrl) {
-            obj[k] = v;
-            if (++count >= SEARCH_CACHE_MAX) break;
-          }
-        }
-        localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(obj));
-      } catch {
-      }
-    }, 2e3);
-  }
-  var SEARCH_CONCURRENCY = 2;
-  var SEARCH_DELAY_MS = 150;
-  var activeSearchCount = 0;
-  var searchWaiters = [];
-  async function acquireSearchSlot() {
-    if (activeSearchCount < SEARCH_CONCURRENCY) {
-      activeSearchCount++;
-      return;
-    }
-    await new Promise((resolve) => searchWaiters.push(resolve));
-  }
-  function releaseSearchSlot() {
-    setTimeout(() => {
-      activeSearchCount--;
-      if (searchWaiters.length > 0) {
-        activeSearchCount++;
-        searchWaiters.shift()();
-      }
-    }, SEARCH_DELAY_MS);
-  }
-  async function throttledSearch(cacheKey, fetchFn) {
-    if (searchCache.has(cacheKey)) return searchCache.get(cacheKey);
-    await acquireSearchSlot();
-    try {
-      if (searchCache.has(cacheKey)) return searchCache.get(cacheKey);
-      const result = await fetchFn();
-      searchCache.set(cacheKey, result);
-      schedulePersistSearchCache();
-      return result;
-    } catch {
-      const empty = {};
-      searchCache.set(cacheKey, empty);
-      return empty;
-    } finally {
-      releaseSearchSlot();
-    }
-  }
-  async function searchTrack(trackName, artistName) {
-    const cacheKey = `s:t:${artistName}|||${trackName}`;
-    return throttledSearch(cacheKey, async () => {
-      const q = encodeURIComponent(`track:${trackName} artist:${artistName}`);
-      const resp = await Spicetify.CosmosAsync.get(
-        `https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`
-      );
-      const item = resp?.tracks?.items?.[0];
-      return { uri: item?.uri, imageUrl: item?.album?.images?.[0]?.url };
-    });
-  }
-  async function searchArtist(artistName) {
-    const cacheKey = `s:a:${artistName}`;
-    return throttledSearch(cacheKey, async () => {
-      const q = encodeURIComponent(`artist:${artistName}`);
-      const resp = await Spicetify.CosmosAsync.get(
-        `https://api.spotify.com/v1/search?q=${q}&type=artist&limit=1`
-      );
-      const item = resp?.artists?.items?.[0];
-      return { uri: item?.uri, imageUrl: item?.images?.[0]?.url };
-    });
-  }
-  async function searchAlbum(albumName, artistName) {
-    const cacheKey = `s:al:${artistName}|||${albumName}`;
-    return throttledSearch(cacheKey, async () => {
-      const q = encodeURIComponent(`album:${albumName} artist:${artistName}`);
-      const resp = await Spicetify.CosmosAsync.get(
-        `https://api.spotify.com/v1/search?q=${q}&type=album&limit=1`
-      );
-      const item = resp?.albums?.items?.[0];
-      return { uri: item?.uri, imageUrl: item?.images?.[0]?.url };
-    });
-  }
-  async function getArtistsBatch(artistIds) {
-    const unique = [...new Set(artistIds)].filter(Boolean);
-    if (unique.length === 0) return [];
-    const results = [];
-    for (let i = 0; i < unique.length; i += MAX_BATCH) {
-      const chunk = unique.slice(i, i + MAX_BATCH);
-      const ids = chunk.join(",");
-      try {
-        const response = await apiFetch(
-          `https://api.spotify.com/v1/artists?ids=${ids}`
-        );
-        if (response?.artists) {
-          results.push(...response.artists.filter(Boolean));
-        }
-      } catch (error) {
-        console.warn("[ListeningStats] Artist batch fetch failed:", error);
-      }
-    }
-    return results;
-  }
-  var artistCoalescer = createBatchCoalescer(
-    async (ids) => {
-      const results = /* @__PURE__ */ new Map();
-      for (let i = 0; i < ids.length; i += MAX_BATCH) {
-        const chunk = ids.slice(i, i + MAX_BATCH);
-        try {
-          const response = await apiFetch(
-            `https://api.spotify.com/v1/artists?ids=${chunk.join(",")}`
-          );
-          if (response?.artists) {
-            for (const artist of response.artists.filter(Boolean)) {
-              if (artist.id) results.set(artist.id, artist);
-            }
-          }
-        } catch (error) {
-          console.warn("[ListeningStats] Artist batch fetch failed:", error);
-        }
-      }
-      return results;
-    },
-    50,
-    MAX_BATCH
-  );
-
   // src/services/tracker.ts
   init_storage();
   var STORAGE_KEY2 = "listening-stats:pollingData";
@@ -1252,17 +996,11 @@ var ListeningStatsApp = (() => {
   var currentTrackDuration = 0;
   var lastProgressMs = 0;
   var progressHandler = null;
-  function handleSongChange() {
+  async function handleSongChange() {
     if (currentTrackUri && playStartTime !== null) {
       const totalPlayedMs = accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
-      const data = getPollingData();
-      data.totalPlays++;
       const threshold = getPlayThreshold();
       const skipped = totalPlayedMs < threshold && currentTrackDuration > threshold;
-      if (skipped) {
-        data.skipEvents++;
-      }
-      savePollingData(data);
       if (previousTrackData) {
         log(
           skipped ? "Skipped:" : "Tracked:",
@@ -1270,7 +1008,7 @@ var ListeningStatsApp = (() => {
           `(${Math.round(totalPlayedMs / 1e3)}s / ${Math.round(currentTrackDuration / 1e3)}s)`
         );
       }
-      writePlayEvent(totalPlayedMs, skipped);
+      await writePlayEvent(totalPlayedMs, skipped);
     }
     const playerData = Spicetify.Player.data;
     if (playerData?.item) {
@@ -1311,7 +1049,7 @@ var ListeningStatsApp = (() => {
       startedAt: Date.now()
     };
   }
-  function writePlayEvent(totalPlayedMs, skipped) {
+  async function writePlayEvent(totalPlayedMs, skipped) {
     if (!previousTrackData) return;
     if (skipped === void 0) {
       const threshold = getPlayThreshold();
@@ -1331,11 +1069,23 @@ var ListeningStatsApp = (() => {
       endedAt: Date.now(),
       type: skipped ? "skip" : "play"
     };
-    addPlayEvent(event).catch((err) => {
+    try {
+      const written = await addPlayEvent(event);
+      if (written) {
+        const data = getPollingData();
+        data.totalPlays++;
+        if (skipped) {
+          data.skipEvents++;
+        }
+        savePollingData(data);
+        if (activeProviderType === "local") {
+          emitStatsUpdated();
+        }
+      } else {
+        log("Dedup guard blocked duplicate event, polling data unchanged");
+      }
+    } catch (err) {
       console.warn("[ListeningStats] Failed to write play event:", err);
-    });
-    if (activeProviderType === "local") {
-      emitStatsUpdated();
     }
   }
   function handlePlayPause() {
@@ -1462,37 +1212,6 @@ var ListeningStatsApp = (() => {
       }
     };
   }
-  async function enrichArtistImages(artists) {
-    const needsImage = artists.filter((a) => !a.artistImage);
-    if (needsImage.length === 0) return;
-    const results = await Promise.all(
-      needsImage.map((a) => searchArtist(a.artistName))
-    );
-    needsImage.forEach((a, i) => {
-      if (results[i].uri && !a.artistUri) a.artistUri = results[i].uri;
-      if (results[i].imageUrl) a.artistImage = results[i].imageUrl;
-    });
-  }
-  async function enrichTrackUris(tracks) {
-    const needsUri = tracks.filter((t) => !t.trackUri);
-    if (needsUri.length === 0) return;
-    const results = await Promise.all(
-      needsUri.map((t) => searchTrack(t.trackName, t.artistName))
-    );
-    needsUri.forEach((t, i) => {
-      if (results[i].uri) t.trackUri = results[i].uri;
-    });
-  }
-  async function enrichAlbumUris(albums) {
-    const needsUri = albums.filter((a) => !a.albumUri);
-    if (needsUri.length === 0) return;
-    const results = await Promise.all(
-      needsUri.map((a) => searchAlbum(a.albumName, a.artistName))
-    );
-    needsUri.forEach((a, i) => {
-      if (results[i].uri) a.albumUri = results[i].uri;
-    });
-  }
   async function calculateRecentStats() {
     const [recentLfm, userInfo] = await Promise.all([
       getRecentTracks(50),
@@ -1575,9 +1294,6 @@ var ListeningStatsApp = (() => {
       trackCount: a.count,
       playCount: a.count
     }));
-    await enrichArtistImages(topArtists);
-    await enrichTrackUris(topTracks);
-    await enrichAlbumUris(topAlbums);
     const hourlyDistribution = new Array(24).fill(0);
     for (const t of recentTracks) {
       const hour = new Date(t.playedAt).getHours();
@@ -1671,9 +1387,6 @@ var ListeningStatsApp = (() => {
       trackCount: 0,
       playCount: a.playCount
     }));
-    await enrichArtistImages(topArtists);
-    await enrichTrackUris(topTracks);
-    await enrichAlbumUris(topAlbums);
     const recentTracks = (Array.isArray(recentLfm) ? recentLfm : []).filter((t) => !t.nowPlaying).map((t) => ({
       trackUri: "",
       trackName: t.name,
@@ -1686,6 +1399,10 @@ var ListeningStatsApp = (() => {
       playedAt: t.playedAt
     }));
     const hourlyDistribution = new Array(24).fill(0);
+    for (const t of recentTracks) {
+      const hour = new Date(t.playedAt).getHours();
+      hourlyDistribution[hour]++;
+    }
     const totalPlays = lfmTracks.reduce((sum, t) => sum + t.playCount, 0);
     const totalTimeMs = lfmTracks.reduce(
       (sum, t) => sum + (t.durationSecs || 210) * 1e3 * t.playCount,
@@ -1706,7 +1423,7 @@ var ListeningStatsApp = (() => {
       topAlbums,
       hourlyDistribution,
       hourlyUnit: "plays",
-      peakHour: 0,
+      peakHour: hourlyDistribution.indexOf(Math.max(...hourlyDistribution)),
       recentTracks,
       genres: {},
       topGenres: [],
@@ -1751,14 +1468,17 @@ var ListeningStatsApp = (() => {
       periodLabels: PERIOD_LABELS2,
       defaultPeriod: "today",
       init() {
+        resetDBPromise();
         initPoller("local");
       },
       destroy() {
         destroyPoller();
+        resetDBPromise();
       },
       async calculateStats(period) {
         const events = await getEventsForPeriod(period);
-        return aggregateEvents(events);
+        const allEvents = period === "all_time" ? events : await getAllPlayEvents();
+        return aggregateEvents(events, allEvents);
       },
       clearData() {
         clearAllData();
@@ -1798,10 +1518,10 @@ var ListeningStatsApp = (() => {
     const { start, end } = getTimeRange(period);
     return getPlayEventsByTimeRange(start, end);
   }
-  async function aggregateEvents(events) {
-    const pollingData = getPollingData();
+  async function aggregateEvents(events, allEvents) {
+    const completedEvents = events.filter((e) => e.type !== "skip");
     const trackMap = /* @__PURE__ */ new Map();
-    for (const e of events) {
+    for (const e of completedEvents) {
       const existing = trackMap.get(e.trackUri);
       if (existing) {
         existing.count++;
@@ -1827,7 +1547,7 @@ var ListeningStatsApp = (() => {
       playCount: t.count
     }));
     const artistMap = /* @__PURE__ */ new Map();
-    for (const e of events) {
+    for (const e of completedEvents) {
       const key = e.artistUri || e.artistName;
       const existing = artistMap.get(key);
       if (existing) {
@@ -1841,30 +1561,15 @@ var ListeningStatsApp = (() => {
       }
     }
     const topArtistAggregated = Array.from(artistMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
-    const artistIds = topArtistAggregated.map((a) => a.artistUri?.split(":")[2]).filter(Boolean);
-    let artistDetails = [];
-    if (artistIds.length > 0 && isApiAvailable()) {
-      try {
-        artistDetails = await getArtistsBatch(artistIds);
-      } catch {
-      }
-    }
-    const artistDetailMap = new Map(
-      artistDetails.map((a) => [`spotify:artist:${a.id}`, a])
-    );
-    const topArtists = topArtistAggregated.map((a, i) => {
-      const detail = artistDetailMap.get(a.artistUri);
-      return {
-        artistUri: a.artistUri,
-        artistName: a.artistName,
-        artistImage: detail?.images?.[0]?.url,
-        rank: i + 1,
-        genres: detail?.genres || [],
-        playCount: a.count
-      };
-    });
+    const topArtists = topArtistAggregated.map((a, i) => ({
+      artistUri: a.artistUri,
+      artistName: a.artistName,
+      rank: i + 1,
+      genres: [],
+      playCount: a.count
+    }));
     const albumMap = /* @__PURE__ */ new Map();
-    for (const e of events) {
+    for (const e of completedEvents) {
       const existing = albumMap.get(e.albumUri);
       if (existing) {
         existing.trackCount++;
@@ -1908,20 +1613,18 @@ var ListeningStatsApp = (() => {
       durationMs: e.durationMs,
       playedAt: new Date(e.startedAt).toISOString()
     }));
-    const uniqueTrackUris = new Set(events.map((e) => e.trackUri));
+    const uniqueTrackUris = new Set(completedEvents.map((e) => e.trackUri));
     const uniqueArtistUris = new Set(
-      events.map((e) => e.artistUri).filter(Boolean)
+      completedEvents.map((e) => e.artistUri).filter(Boolean)
     );
-    const dateSet = new Set(
+    const periodDates = new Set(
       events.map((e) => new Date(e.startedAt).toISOString().split("T")[0])
     );
+    const allDates = Array.from(new Set(
+      allEvents.map((e) => new Date(e.startedAt).toISOString().split("T")[0])
+    ));
     const totalTimeMs = events.reduce((sum, e) => sum + e.playedMs, 0);
-    let skipEvents = 0;
-    for (const e of events) {
-      if (e.playedMs < 3e4 && e.durationMs > 3e4) {
-        skipEvents++;
-      }
-    }
+    const skipEvents = events.length - completedEvents.length;
     return {
       totalTimeMs,
       trackCount: events.length,
@@ -1935,10 +1638,10 @@ var ListeningStatsApp = (() => {
       recentTracks,
       genres,
       topGenres,
-      streakDays: calculateStreak2(Array.from(dateSet)),
+      streakDays: calculateStreak2(allDates),
       newArtistsCount: 0,
       skipRate: events.length > 0 ? skipEvents / events.length : 0,
-      listenedDays: dateSet.size,
+      listenedDays: periodDates.size,
       lastfmConnected: false
     };
   }
@@ -1962,7 +1665,7 @@ var ListeningStatsApp = (() => {
   // src/services/statsfm.ts
   var API_BASE = "https://api.stats.fm/api/v1";
   var STORAGE_KEY3 = "listening-stats:statsfm";
-  var CACHE_TTL_MS3 = 12e4;
+  var CACHE_TTL_MS2 = 12e4;
   var configCache2 = void 0;
   function getConfig2() {
     if (configCache2 !== void 0) return configCache2;
@@ -1989,24 +1692,24 @@ var ListeningStatsApp = (() => {
     const config = getConfig2();
     return !!config?.username;
   }
-  var cache3 = /* @__PURE__ */ new Map();
-  function getCached3(key) {
-    const entry = cache3.get(key);
+  var cache2 = /* @__PURE__ */ new Map();
+  function getCached2(key) {
+    const entry = cache2.get(key);
     if (!entry || Date.now() >= entry.expiresAt) {
-      cache3.delete(key);
+      cache2.delete(key);
       return null;
     }
     return entry.data;
   }
-  function setCache3(key, data) {
-    cache3.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS3 });
+  function setCache2(key, data) {
+    cache2.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS2 });
   }
   function clearStatsfmCache() {
-    cache3.clear();
+    cache2.clear();
   }
   async function statsfmFetch(path) {
     const url = `${API_BASE}${path}`;
-    const cached2 = getCached3(url);
+    const cached2 = getCached2(url);
     if (cached2) return cached2;
     const response = await fetch(url);
     if (!response.ok) {
@@ -2017,7 +1720,7 @@ var ListeningStatsApp = (() => {
       throw new Error(`stats.fm API error: ${response.status}`);
     }
     const data = await response.json();
-    setCache3(url, data);
+    setCache2(url, data);
     return data;
   }
   async function validateUser2(username) {
@@ -2122,10 +1825,9 @@ var ListeningStatsApp = (() => {
     months: "6 Months",
     lifetime: "Lifetime"
   };
-  var PLUS_PERIODS = ["today", "days", "weeks", "months", "lifetime"];
+  var PLUS_PERIODS = ["today", "weeks", "months", "lifetime"];
   var PLUS_LABELS = {
     today: "Today",
-    days: "This Week",
     weeks: "4 Weeks",
     months: "6 Months",
     lifetime: "Lifetime"
@@ -2149,18 +1851,7 @@ var ListeningStatsApp = (() => {
         destroyPoller();
       },
       async calculateStats(period) {
-        try {
-          return await calculateStatsfmStats(period);
-        } catch (err) {
-          if (err?.message?.includes("400") && (period === "today" || period === "days")) {
-            const cfg = getConfig2();
-            if (cfg) {
-              saveConfig2({ ...cfg, isPlus: false });
-            }
-            return calculateStatsfmStats("weeks");
-          }
-          throw err;
-        }
+        return calculateStatsfmStats(period);
       }
     };
   }
@@ -2427,10 +2118,10 @@ var ListeningStatsApp = (() => {
   var GITHUB_REPO = "Xndr2/listening-stats";
   var STORAGE_KEY5 = "listening-stats:lastUpdateCheck";
   var INSTALL_CMD_LINUX = `curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.sh | bash`;
-  var INSTALL_CMD_WINDOWS = `iwr -useb 'https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.ps1' | iex`;
+  var INSTALL_CMD_WINDOWS = `irm https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.ps1 | iex`;
   function getCurrentVersion() {
     try {
-      return "1.3.1";
+      return "1.3.26";
     } catch {
       return "0.0.0";
     }
@@ -2767,6 +2458,176 @@ var ListeningStatsApp = (() => {
     downloadFile(lines.join("\n"), filename, "text/csv");
   }
 
+  // src/services/spotify-api.ts
+  var STORAGE_PREFIX = "listening-stats:";
+  var QUEUE_DELAY_MS = 300;
+  var MAX_BATCH = 50;
+  var CACHE_TTL_MS3 = 3e5;
+  var DEFAULT_BACKOFF_MS = 6e4;
+  var MAX_BACKOFF_MS = 6e5;
+  var rateLimitedUntil = 0;
+  try {
+    const stored = localStorage.getItem(`${STORAGE_PREFIX}rateLimitedUntil`);
+    if (stored) {
+      const val = parseInt(stored, 10);
+      rateLimitedUntil = Date.now() >= val ? 0 : val;
+      if (rateLimitedUntil === 0) {
+        localStorage.removeItem(`${STORAGE_PREFIX}rateLimitedUntil`);
+      }
+    }
+  } catch {
+  }
+  function isApiAvailable() {
+    return Date.now() >= rateLimitedUntil;
+  }
+  function resetRateLimit() {
+    rateLimitedUntil = 0;
+    localStorage.removeItem(`${STORAGE_PREFIX}rateLimitedUntil`);
+    circuitBreaker.reset();
+  }
+  function setRateLimit(error) {
+    let backoffMs = DEFAULT_BACKOFF_MS;
+    const retryAfterRaw = error?.headers?.["retry-after"] ?? error?.body?.["Retry-After"] ?? error?.headers?.["Retry-After"];
+    if (retryAfterRaw != null) {
+      const parsed = parseInt(String(retryAfterRaw), 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        backoffMs = Math.min(parsed * 1e3, MAX_BACKOFF_MS);
+      }
+    }
+    rateLimitedUntil = Date.now() + backoffMs;
+    localStorage.setItem(
+      `${STORAGE_PREFIX}rateLimitedUntil`,
+      rateLimitedUntil.toString()
+    );
+  }
+  var cache3 = /* @__PURE__ */ new Map();
+  function getCached3(key) {
+    const entry = cache3.get(key);
+    if (!entry) return null;
+    if (Date.now() >= entry.expiresAt) {
+      cache3.delete(key);
+      return null;
+    }
+    return entry.data;
+  }
+  function setCache3(key, data) {
+    cache3.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS3 });
+  }
+  function clearApiCaches() {
+    cache3.clear();
+  }
+  var PRIORITY_ORDER = { high: 0, normal: 1, low: 2 };
+  var queue = [];
+  var draining = false;
+  var inflight = /* @__PURE__ */ new Map();
+  var circuitBreaker = new CircuitBreaker(5, 6e4);
+  function enqueueWithPriority(key, fn, priority = "normal") {
+    const existing = inflight.get(key);
+    if (existing) return existing;
+    const promise = new Promise((resolve, reject) => {
+      queue.push({ key, fn, resolve, reject, priority });
+      queue.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
+      if (!draining) drainQueue();
+    });
+    inflight.set(key, promise);
+    promise.finally(() => inflight.delete(key));
+    return promise;
+  }
+  async function drainQueue() {
+    draining = true;
+    while (queue.length > 0) {
+      if (!isApiAvailable()) {
+        const waitMs = rateLimitedUntil - Date.now();
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+      const item = queue.shift();
+      try {
+        const result = await circuitBreaker.execute(() => item.fn());
+        item.resolve(result);
+      } catch (error) {
+        if (error?.message?.includes("429") || error?.status === 429 || error?.statusCode === 429) {
+          setRateLimit(error);
+        }
+        item.reject(error);
+      }
+      if (queue.length > 0) {
+        await new Promise((r) => setTimeout(r, QUEUE_DELAY_MS));
+      }
+    }
+    draining = false;
+  }
+  async function apiFetch(url) {
+    const cached2 = getCached3(url);
+    if (cached2) return cached2;
+    return enqueueWithPriority(url, async () => {
+      let response;
+      try {
+        response = await Spicetify.CosmosAsync.get(url);
+      } catch (err) {
+        if (err?.status === 429 || String(err?.message || "").includes("429")) {
+          setRateLimit(err);
+          throw new ApiError(
+            err?.message || "Rate limited",
+            429,
+            true
+          );
+        }
+        const status = err?.status;
+        throw new ApiError(
+          err?.message || "API request failed",
+          status,
+          status !== void 0 && (status === 429 || status >= 500)
+        );
+      }
+      if (!response) {
+        throw new ApiError("Empty API response", void 0, false);
+      }
+      if (response.error) {
+        const status = response.error.status;
+        const message = response.error.message || `Spotify API error ${status}`;
+        if (status === 429) setRateLimit(response);
+        throw new ApiError(message, status, status === 429 || status >= 500);
+      }
+      setCache3(url, response);
+      return response;
+    });
+  }
+  var SEARCH_CACHE_KEY = "listening-stats:searchCache";
+  var searchCache = /* @__PURE__ */ new Map();
+  try {
+    const stored = localStorage.getItem(SEARCH_CACHE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      for (const [k, v] of Object.entries(parsed)) {
+        searchCache.set(k, v);
+      }
+    }
+  } catch {
+  }
+  var artistCoalescer = createBatchCoalescer(
+    async (ids) => {
+      const results = /* @__PURE__ */ new Map();
+      for (let i = 0; i < ids.length; i += MAX_BATCH) {
+        const chunk = ids.slice(i, i + MAX_BATCH);
+        try {
+          const response = await apiFetch(
+            `https://api.spotify.com/v1/artists?ids=${chunk.join(",")}`
+          );
+          if (response?.artists) {
+            for (const artist of response.artists.filter(Boolean)) {
+              if (artist.id) results.set(artist.id, artist);
+            }
+          }
+        } catch (error) {
+          console.warn("[ListeningStats] Artist batch fetch failed:", error);
+        }
+      }
+      return results;
+    },
+    50,
+    MAX_BATCH
+  );
+
   // src/app/components/SettingsPanel.tsx
   init_storage();
   var { useState } = Spicetify.React;
@@ -2814,7 +2675,11 @@ var ListeningStatsApp = (() => {
     const sfmConnected = isConnected2();
     const sfmConfig = getConfig2();
     const [loggingOn, setLoggingOn] = useState(isLoggingEnabled());
-    const [use24h, setUse24h] = useState(getPreferences().use24HourTime);
+    const prefs = getPreferences();
+    const [use24h, setUse24h] = useState(prefs.use24HourTime);
+    const [itemCount, setItemCount] = useState(prefs.itemsPerSection);
+    const [genreCount, setGenreCount] = useState(prefs.genresPerSection);
+    const [hiddenSections, setHiddenSections] = useState(prefs.hiddenSections);
     const switchProvider = (type) => {
       activateProvider(type);
       setShowProviderPicker(false);
@@ -3070,7 +2935,49 @@ var ListeningStatsApp = (() => {
         }
       },
       /* @__PURE__ */ Spicetify.React.createElement("span", { className: "settings-toggle-knob" })
-    ))), /* @__PURE__ */ Spicetify.React.createElement(SettingsCategory, { title: "Layout" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-info" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Card Order"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Drag section headers on the main page to reorder cards.")), /* @__PURE__ */ Spicetify.React.createElement(
+    )), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-info" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Items per section"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Number of tracks, artists, and albums shown in each list")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-item-count-picker" }, [3, 5, 10].map((n) => /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        key: n,
+        className: `settings-count-btn ${itemCount === n ? "active" : ""}`,
+        onClick: () => {
+          setPreference("itemsPerSection", n);
+          setItemCount(n);
+        }
+      },
+      n
+    )))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-info" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Genres shown"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Number of genres displayed in the Top Genres section")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-item-count-picker" }, [3, 5, 10].map((n) => /* @__PURE__ */ Spicetify.React.createElement(
+      "button",
+      {
+        key: n,
+        className: `settings-count-btn ${genreCount === n ? "active" : ""}`,
+        onClick: () => {
+          setPreference("genresPerSection", n);
+          setGenreCount(n);
+        }
+      },
+      n
+    )))), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-section-vis" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Visible sections"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Toggle which sections appear on the dashboard"), [
+      { id: "overview", label: "Overview" },
+      { id: "toplists", label: "Top Lists" },
+      { id: "genres", label: "Top Genres" },
+      { id: "activity", label: "Activity Chart" },
+      { id: "recent", label: "Recently Played" }
+    ].map(({ id, label }) => {
+      const isHidden = hiddenSections.includes(id);
+      return /* @__PURE__ */ Spicetify.React.createElement("div", { key: id, className: "settings-toggle-row compact" }, /* @__PURE__ */ Spicetify.React.createElement("span", { className: "settings-vis-label" }, label), /* @__PURE__ */ Spicetify.React.createElement(
+        "button",
+        {
+          className: `settings-toggle ${!isHidden ? "active" : ""}`,
+          onClick: () => {
+            const next = isHidden ? hiddenSections.filter((s) => s !== id) : [...hiddenSections, id];
+            setPreference("hiddenSections", next);
+            setHiddenSections(next);
+          }
+        },
+        /* @__PURE__ */ Spicetify.React.createElement("span", { className: "settings-toggle-knob" })
+      ));
+    }))), /* @__PURE__ */ Spicetify.React.createElement(SettingsCategory, { title: "Layout" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-row" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "settings-toggle-info" }, /* @__PURE__ */ Spicetify.React.createElement("h4", { className: "settings-section-title" }, "Card Order"), /* @__PURE__ */ Spicetify.React.createElement("p", { className: "settings-toggle-desc" }, "Drag section headers on the main page to reorder cards.")), /* @__PURE__ */ Spicetify.React.createElement(
       "button",
       {
         className: "footer-btn",
@@ -3078,6 +2985,12 @@ var ListeningStatsApp = (() => {
           window.dispatchEvent(
             new CustomEvent("listening-stats:reset-layout")
           );
+          setPreference("hiddenSections", []);
+          setHiddenSections([]);
+          setPreference("itemsPerSection", 5);
+          setItemCount(5);
+          setPreference("genresPerSection", 5);
+          setGenreCount(5);
           Spicetify.showNotification("Layout reset to default");
         }
       },
@@ -3214,6 +3127,7 @@ var ListeningStatsApp = (() => {
               localStorage.removeItem("listening-stats:preferences");
               localStorage.removeItem("listening-stats:tour-seen");
               localStorage.removeItem("listening-stats:tour-version");
+              localStorage.removeItem("listening-stats:card-order");
             } catch {
             }
             onReset?.();
@@ -3231,19 +3145,6 @@ var ListeningStatsApp = (() => {
       if (type && id) {
         Spicetify.Platform.History.push(`/${type}/${id}`);
       }
-    }
-  }
-  async function lazyNavigate(type, name, artistName) {
-    let result;
-    if (type === "track") {
-      result = await searchTrack(name, artistName || "");
-    } else if (type === "artist") {
-      result = await searchArtist(name);
-    } else {
-      result = await searchAlbum(name, artistName || "");
-    }
-    if (result?.uri) {
-      navigateToUri(result.uri);
     }
   }
   async function toggleLike(trackUri, isLiked) {
@@ -3486,13 +3387,13 @@ var ListeningStatsApp = (() => {
     showLikeButtons = true,
     period = ""
   }) {
-    const itemCount = 6;
+    const itemCount = getPreferences().itemsPerSection;
     return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "top-lists-section" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "top-list" }, /* @__PURE__ */ Spicetify.React.createElement("div", { className: "top-list-header" }, /* @__PURE__ */ Spicetify.React.createElement("h3", { className: "top-list-title" }, /* @__PURE__ */ Spicetify.React.createElement("span", { dangerouslySetInnerHTML: { __html: Icons.music } }), "Top Tracks")), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-list" }, stats.topTracks.slice(0, itemCount).map((t, i) => /* @__PURE__ */ Spicetify.React.createElement(
       "div",
       {
         key: t.trackUri || `track-${i}`,
         className: "item-row",
-        onClick: () => t.trackUri ? navigateToUri(t.trackUri) : lazyNavigate("track", t.trackName, t.artistName)
+        onClick: () => t.trackUri && navigateToUri(t.trackUri)
       },
       /* @__PURE__ */ Spicetify.React.createElement("span", { className: `item-rank ${getRankClass(i)}` }, i + 1),
       t.albumArt ? /* @__PURE__ */ Spicetify.React.createElement(ImageWithRetry, { src: t.albumArt, className: "item-art" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-art placeholder" }),
@@ -3520,7 +3421,7 @@ var ListeningStatsApp = (() => {
         {
           key: a.artistUri || a.artistName,
           className: "item-row",
-          onClick: () => a.artistUri ? navigateToUri(a.artistUri) : lazyNavigate("artist", a.artistName)
+          onClick: () => a.artistUri && navigateToUri(a.artistUri)
         },
         /* @__PURE__ */ Spicetify.React.createElement("span", { className: `item-rank ${getRankClass(i)}` }, i + 1),
         a.artistImage ? /* @__PURE__ */ Spicetify.React.createElement(
@@ -3538,7 +3439,7 @@ var ListeningStatsApp = (() => {
       {
         key: a.albumUri || `album-${i}`,
         className: "item-row",
-        onClick: () => a.albumUri ? navigateToUri(a.albumUri) : lazyNavigate("album", a.albumName, a.artistName)
+        onClick: () => a.albumUri && navigateToUri(a.albumUri)
       },
       /* @__PURE__ */ Spicetify.React.createElement("span", { className: `item-rank ${getRankClass(i)}` }, i + 1),
       a.albumArt ? /* @__PURE__ */ Spicetify.React.createElement(ImageWithRetry, { src: a.albumArt, className: "item-art" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "item-art placeholder" }),
@@ -3558,7 +3459,7 @@ var ListeningStatsApp = (() => {
       {
         key: `${t.trackUri || t.trackName}-${t.playedAt}`,
         className: "recent-card",
-        onClick: () => t.trackUri ? navigateToUri(t.trackUri) : lazyNavigate("track", t.trackName, t.artistName)
+        onClick: () => t.trackUri && navigateToUri(t.trackUri)
       },
       t.albumArt ? /* @__PURE__ */ Spicetify.React.createElement(ImageWithRetry, { src: t.albumArt, className: "recent-art" }) : /* @__PURE__ */ Spicetify.React.createElement("div", { className: "recent-art placeholder" }),
       /* @__PURE__ */ Spicetify.React.createElement("div", { className: "recent-name" }, t.trackName),
@@ -3866,7 +3767,7 @@ var ListeningStatsApp = (() => {
           key: hr,
           text: `${formatHour(hr)}: ${formatValue(val)}`,
           className: `activity-bar ${hr === peakHour && val > 0 ? "peak" : ""}`,
-          style: { height: `${h}%` }
+          style: { height: `${h}%`, animationDelay: `${hr * 0.02}s` }
         }
       );
     })), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "chart-labels" }, /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(0)), /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(6)), /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(12)), /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(18)), /* @__PURE__ */ Spicetify.React.createElement("span", null, formatHour(0))));
@@ -4166,6 +4067,24 @@ var ListeningStatsApp = (() => {
     );
   }
 
+  // src/app/components/GenreChips.tsx
+  function GenreChips({ topGenres }) {
+    if (topGenres.length === 0) return null;
+    const limit = getPreferences().genresPerSection;
+    const genres = topGenres.slice(0, limit);
+    const maxCount = genres[0]?.count || 1;
+    return /* @__PURE__ */ Spicetify.React.createElement("div", { className: "genre-bars-section" }, /* @__PURE__ */ Spicetify.React.createElement("h3", { className: "genre-bars-title" }, "Top Genres"), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "genre-bars" }, genres.map((g, i) => {
+      const pct = g.count / maxCount * 100;
+      return /* @__PURE__ */ Spicetify.React.createElement("div", { key: g.genre, className: "genre-bar-row" }, /* @__PURE__ */ Spicetify.React.createElement("span", { className: "genre-bar-rank" }, i + 1), /* @__PURE__ */ Spicetify.React.createElement("div", { className: "genre-bar-track" }, /* @__PURE__ */ Spicetify.React.createElement(
+        "div",
+        {
+          className: "genre-bar-fill",
+          style: { width: `${pct}%`, animationDelay: `${0.1 + i * 0.04}s` }
+        }
+      ), /* @__PURE__ */ Spicetify.React.createElement("span", { className: "genre-bar-name" }, g.genre)), /* @__PURE__ */ Spicetify.React.createElement("span", { className: "genre-bar-count" }, g.count));
+    })));
+  }
+
   // src/app/components/Header.tsx
   var { useState: useState8, useEffect: useEffect6, useRef: useRef5 } = Spicetify.React;
   var PROVIDER_NAMES2 = {
@@ -4450,34 +4369,38 @@ var ListeningStatsApp = (() => {
     return y + 36;
   }
   function calculateStoryHeight(stats) {
-    let y = 480;
+    const pad = 56;
+    let y = pad;
+    y += 80;
+    y += 260 + 100;
+    y += 68 + 10 + 68 + 32;
     y += 16;
-    y += 58 + 12 + 58 + 28;
-    y += 16;
+    const rowH = 68;
+    const headerH = 40;
     const trackCount = Math.min(5, stats.topTracks.length);
     if (trackCount > 0) {
-      y += 36 + 64 * trackCount + 16 + 24;
+      y += headerH + rowH * trackCount + 28;
     }
-    const artistCount = Math.min(3, stats.topArtists.length);
+    const artistCount = Math.min(5, stats.topArtists.length);
     if (artistCount > 0) {
-      y += 16 + 40 + 80 + 56;
+      y += 16 + headerH + rowH * artistCount + 28;
     }
     const albumCount = Math.min(5, stats.topAlbums.length);
     if (albumCount > 0) {
-      y += 16 + 36 + 64 * albumCount + 16 + 24;
+      y += 16 + headerH + rowH * albumCount + 28;
     }
     if (stats.hourlyDistribution.some((v) => v > 0)) {
-      y += 16 + 36 + 120 + 16;
+      y += 16 + headerH + 140 + 20;
     }
     if (stats.topGenres.length > 0) {
-      y += 16 + 28 + 20;
+      y += 16 + 36 + 20;
     }
     y += 48;
-    return Math.max(y, 800);
+    return Math.max(y, 900);
   }
   var STORY_W = 1080;
-  var LAND_W = 1200;
-  var LAND_H = 675;
+  var LAND_W = 1600;
+  var LAND_H = 900;
   async function generateStoryCard(stats, period, providerType) {
     const w = STORY_W;
     const h = calculateStoryHeight(stats);
@@ -4485,7 +4408,7 @@ var ListeningStatsApp = (() => {
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
-    const pad = 52;
+    const pad = 56;
     const innerW = w - pad * 2;
     const rightEdge = w - pad;
     let accent = GREEN;
@@ -4494,305 +4417,143 @@ var ListeningStatsApp = (() => {
       heroImg = await loadImage(stats.topTracks[0].albumArt);
       if (heroImg) accent = extractDominantColor(heroImg);
     }
-    const baseBg = ctx.createLinearGradient(0, 0, 0, h);
-    baseBg.addColorStop(0, "#0c0c12");
-    baseBg.addColorStop(1, "#0a0a0f");
-    ctx.fillStyle = baseBg;
-    ctx.fillRect(0, 0, w, h);
-    const heroH = 480;
     if (heroImg) {
-      drawBlurredBackground(ctx, heroImg, 0, 0, w, heroH, 50);
+      drawBlurredBackground(ctx, heroImg, 0, 0, w, h, 60);
     }
-    const heroOverlay = ctx.createLinearGradient(0, 0, 0, heroH);
-    heroOverlay.addColorStop(0, "rgba(0,0,0,0.5)");
-    heroOverlay.addColorStop(0.7, "rgba(12,12,18,0.85)");
-    heroOverlay.addColorStop(1, "rgba(10,10,15,1)");
-    ctx.fillStyle = heroOverlay;
-    ctx.fillRect(0, 0, w, heroH);
+    const baseOverlay = ctx.createLinearGradient(0, 0, 0, h);
+    baseOverlay.addColorStop(0, "rgba(8,8,14,0.78)");
+    baseOverlay.addColorStop(0.3, "rgba(8,8,14,0.88)");
+    baseOverlay.addColorStop(1, "rgba(8,8,14,0.94)");
+    ctx.fillStyle = baseOverlay;
+    ctx.fillRect(0, 0, w, h);
     const username = getUsername2(providerType);
+    let headerY = pad;
+    if (username) {
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = `500 ${16}px ${FONT}`;
+      ctx.fillText(`@${username}`, pad, headerY + 14);
+      headerY += 28;
+    }
     const title = username ? `${username}'s Stats` : "My Listening Stats";
     ctx.fillStyle = "#fff";
-    ctx.font = `bold ${42}px ${FONT}`;
-    ctx.fillText(truncateText(ctx, title, innerW), pad, 64);
+    ctx.font = `bold ${44}px ${FONT}`;
+    ctx.fillText(truncateText(ctx, title, innerW), pad, headerY + 38);
     const periodText = getPeriodDisplayName(period);
-    ctx.font = `600 ${15}px ${FONT}`;
+    ctx.font = `600 ${16}px ${FONT}`;
     const periodTextW = ctx.measureText(periodText).width;
-    const pillW = periodTextW + 20;
-    ctx.fillStyle = rgb(accent, 0.2);
-    fillRoundRect(ctx, pad, 78, pillW, 26, 13);
+    const pillW = periodTextW + 22;
+    ctx.fillStyle = rgb(accent, 0.25);
+    fillRoundRect(ctx, pad, headerY + 50, pillW, 28, 14);
     ctx.fillStyle = rgb(accent);
-    ctx.fillText(periodText, pad + 10, 96);
+    ctx.fillText(periodText, pad + 11, headerY + 69);
     const providerLabel = getProviderLabel(providerType);
     if (providerLabel) {
       ctx.fillStyle = "rgba(255,255,255,0.35)";
-      ctx.font = `${13}px ${FONT}`;
-      ctx.fillText(providerLabel, pad + pillW + 10, 96);
+      ctx.font = `${14}px ${FONT}`;
+      ctx.fillText(providerLabel, pad + pillW + 12, headerY + 69);
     }
-    const artSize = 190;
+    headerY += 80;
+    const artSize = 260;
     const artX = (w - artSize) / 2;
-    const artY = 128;
+    const artY = headerY;
     if (stats.topTracks[0]) {
-      const drew = await drawArt(
-        ctx,
-        stats.topTracks[0].albumArt,
-        artX,
-        artY,
-        artSize,
-        16
-      );
+      const drew = await drawArt(ctx, stats.topTracks[0].albumArt, artX, artY, artSize, 16);
       if (!drew) drawPlaceholderArt(ctx, artX, artY, artSize, 16);
       ctx.save();
       ctx.globalCompositeOperation = "destination-over";
       ctx.shadowColor = rgb(accent, 0.4);
-      ctx.shadowBlur = 40;
+      ctx.shadowBlur = 50;
       ctx.fillStyle = "rgba(0,0,0,0)";
       fillRoundRect(ctx, artX, artY, artSize, artSize, 16);
       ctx.restore();
       ctx.textAlign = "center";
       ctx.fillStyle = "#fff";
-      ctx.font = `bold ${26}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, stats.topTracks[0].trackName, innerW - 40),
-        w / 2,
-        artY + artSize + 36
-      );
+      ctx.font = `bold ${28}px ${FONT}`;
+      ctx.fillText(truncateText(ctx, stats.topTracks[0].trackName, innerW - 40), w / 2, artY + artSize + 40);
       ctx.fillStyle = "rgba(255,255,255,0.6)";
       ctx.font = `${18}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, stats.topTracks[0].artistName, innerW - 40),
-        w / 2,
-        artY + artSize + 62
-      );
-      ctx.fillStyle = "rgba(255,255,255,0.3)";
-      ctx.font = `${14}px ${FONT}`;
-      ctx.fillText("#1 Most Played", w / 2, artY + artSize + 84);
+      ctx.fillText(truncateText(ctx, stats.topTracks[0].artistName, innerW - 40), w / 2, artY + artSize + 68);
+      ctx.fillStyle = rgb(accent, 0.7);
+      ctx.font = `600 ${14}px ${FONT}`;
+      ctx.fillText("#1 Most Played", w / 2, artY + artSize + 92);
       ctx.textAlign = "left";
     } else {
       drawPlaceholderArt(ctx, artX, artY, artSize, 16);
     }
-    drawAccentDivider(ctx, pad, heroH, innerW, accent);
-    let y = heroH + 16;
-    const gridGap = 12;
+    let y = artY + artSize + 110;
+    const gridGap = 10;
     const cardW = (innerW - gridGap * 2) / 3;
-    const cardH = 58;
-    drawStatCard(
-      ctx,
-      pad,
-      y,
-      cardW,
-      cardH,
-      formatDurationLong(stats.totalTimeMs),
-      "LISTENED",
-      accent,
-      true
-    );
-    drawStatCard(
-      ctx,
-      pad + cardW + gridGap,
-      y,
-      cardW,
-      cardH,
-      `${stats.trackCount}`,
-      "PLAYS",
-      accent
-    );
-    drawStatCard(
-      ctx,
-      pad + (cardW + gridGap) * 2,
-      y,
-      cardW,
-      cardH,
-      `${stats.uniqueTrackCount}`,
-      "UNIQUE TRACKS",
-      accent
-    );
+    const cardH = 68;
+    drawStatCard(ctx, pad, y, cardW, cardH, formatDurationLong(stats.totalTimeMs), "LISTENED", accent, true);
+    drawStatCard(ctx, pad + cardW + gridGap, y, cardW, cardH, `${stats.trackCount}`, "PLAYS", accent);
+    drawStatCard(ctx, pad + (cardW + gridGap) * 2, y, cardW, cardH, `${stats.uniqueTrackCount}`, "UNIQUE", accent);
     const row2Y = y + cardH + gridGap;
-    drawStatCard(
-      ctx,
-      pad,
-      row2Y,
-      cardW,
-      cardH,
-      `${stats.uniqueArtistCount}`,
-      "ARTISTS",
-      accent
-    );
-    drawStatCard(
-      ctx,
-      pad + cardW + gridGap,
-      row2Y,
-      cardW,
-      cardH,
-      stats.streakDays > 0 ? `${stats.streakDays}d` : "-",
-      "STREAK",
-      accent,
-      stats.streakDays > 0
-    );
-    drawStatCard(
-      ctx,
-      pad + (cardW + gridGap) * 2,
-      row2Y,
-      cardW,
-      cardH,
-      `${Math.round(stats.skipRate * 100)}%`,
-      "SKIP RATE",
-      accent
-    );
-    y = row2Y + cardH + 28;
-    const trackCount = Math.min(5, stats.topTracks.length);
-    if (trackCount > 0) {
-      drawAccentDivider(ctx, pad, y, innerW, accent);
-      y += 16;
-      y = drawSectionHeader(ctx, "Top Tracks", pad, y, accent);
-      const trackArtSize = 52;
-      const trackRowH = 64;
+    drawStatCard(ctx, pad, row2Y, cardW, cardH, `${stats.uniqueArtistCount}`, "ARTISTS", accent);
+    drawStatCard(ctx, pad + cardW + gridGap, row2Y, cardW, cardH, stats.streakDays > 0 ? `${stats.streakDays}d` : "-", "STREAK", accent, stats.streakDays > 0);
+    drawStatCard(ctx, pad + (cardW + gridGap) * 2, row2Y, cardW, cardH, `${Math.round(stats.skipRate * 100)}%`, "SKIP RATE", accent);
+    y = row2Y + cardH + 32;
+    const listArtSize = 56;
+    const listRowH = 68;
+    async function drawStoryList(items, startY, sectionTitle, maxItems) {
+      drawAccentDivider(ctx, pad, startY, innerW, accent);
+      startY += 16;
+      startY = drawSectionHeader(ctx, sectionTitle, pad, startY, accent);
+      const count = Math.min(maxItems, items.length);
       ctx.fillStyle = "rgba(255,255,255,0.02)";
-      fillRoundRect(
-        ctx,
-        pad - 12,
-        y - 8,
-        innerW + 24,
-        trackRowH * trackCount + 16,
-        14
-      );
-      for (let i = 0; i < trackCount; i++) {
-        const t = stats.topTracks[i];
-        const rowY = y + i * trackRowH;
-        const artY2 = rowY + (trackRowH - trackArtSize) / 2;
-        const drew = await drawArt(ctx, t.albumArt, pad, artY2, trackArtSize, 8);
-        if (!drew) drawPlaceholderArt(ctx, pad, artY2, trackArtSize, 8);
-        const textX = pad + trackArtSize + 14;
-        const centerY = rowY + trackRowH / 2;
+      fillRoundRect(ctx, pad - 12, startY - 8, innerW + 24, listRowH * count + 16, 14);
+      for (let i = 0; i < count; i++) {
+        const item = items[i];
+        const rowY = startY + i * listRowH;
+        const artY2 = rowY + (listRowH - listArtSize) / 2;
+        const radius = item.circular ? listArtSize / 2 : 8;
+        const drew = await drawArt(ctx, item.art, pad, artY2, listArtSize, radius);
+        if (!drew) drawPlaceholderArt(ctx, pad, artY2, listArtSize, radius);
+        const textX = pad + listArtSize + 16;
+        const centerY = rowY + listRowH / 2;
         ctx.fillStyle = rankColor(i);
-        ctx.font = `bold ${14}px ${FONT}`;
+        ctx.font = `bold ${15}px ${FONT}`;
         const rk = `${i + 1}`;
-        ctx.fillText(rk, textX, centerY - 8);
+        ctx.fillText(rk, textX, centerY - 9);
         const rkW = ctx.measureText(rk).width + 8;
         ctx.fillStyle = "#fff";
-        ctx.font = `600 ${15}px ${FONT}`;
-        ctx.fillText(
-          truncateText(ctx, t.trackName, rightEdge - textX - rkW - 90),
-          textX + rkW,
-          centerY - 8
-        );
+        ctx.font = `600 ${16}px ${FONT}`;
+        ctx.fillText(truncateText(ctx, item.name, rightEdge - textX - rkW - (item.plays ? 90 : 10)), textX + rkW, centerY - 9);
         ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.font = `${12}px ${FONT}`;
-        ctx.fillText(
-          truncateText(ctx, t.artistName, rightEdge - textX - rkW - 90),
-          textX + rkW,
-          centerY + 10
-        );
-        if (t.playCount) {
+        ctx.font = `${13}px ${FONT}`;
+        ctx.fillText(truncateText(ctx, item.sub, rightEdge - textX - rkW - (item.plays ? 90 : 10)), textX + rkW, centerY + 11);
+        if (item.plays) {
           ctx.fillStyle = rgb(accent);
-          ctx.font = `600 ${13}px ${FONT}`;
+          ctx.font = `600 ${14}px ${FONT}`;
           ctx.textAlign = "right";
-          ctx.fillText(`${t.playCount} plays`, rightEdge, centerY + 1);
+          ctx.fillText(`${item.plays} plays`, rightEdge, centerY + 1);
           ctx.textAlign = "left";
         }
       }
-      y += trackRowH * trackCount + 24;
+      return startY + listRowH * count + 28;
     }
-    const artistCount = Math.min(3, stats.topArtists.length);
-    if (artistCount > 0) {
-      drawAccentDivider(ctx, pad, y, innerW, accent);
-      y += 16;
-      y = drawSectionHeader(ctx, "Top Artists", pad, y, accent);
-      y += 4;
-      const artistImgSize = 80;
-      const colW = innerW / artistCount;
-      for (let i = 0; i < artistCount; i++) {
-        const a = stats.topArtists[i];
-        const cx = pad + colW * i + colW / 2;
-        const imgX = cx - artistImgSize / 2;
-        const drew = await drawArt(
-          ctx,
-          a.artistImage,
-          imgX,
-          y,
-          artistImgSize,
-          artistImgSize / 2
-        );
-        if (!drew)
-          drawPlaceholderArt(ctx, imgX, y, artistImgSize, artistImgSize / 2);
-        const medalR = 12;
-        const medalX = imgX + artistImgSize - medalR + 2;
-        const medalY = y + medalR - 2;
-        ctx.fillStyle = rankColor(i);
-        ctx.beginPath();
-        ctx.arc(medalX, medalY, medalR, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#000";
-        ctx.font = `bold ${12}px ${FONT}`;
-        ctx.textAlign = "center";
-        ctx.fillText(`${i + 1}`, medalX, medalY + 4);
-        ctx.fillStyle = "#fff";
-        ctx.font = `600 ${14}px ${FONT}`;
-        ctx.fillText(
-          truncateText(ctx, a.artistName, colW - 16),
-          cx,
-          y + artistImgSize + 20
-        );
-        if (a.playCount) {
-          ctx.fillStyle = "rgba(255,255,255,0.45)";
-          ctx.font = `${12}px ${FONT}`;
-          ctx.fillText(`${a.playCount} plays`, cx, y + artistImgSize + 38);
-        }
-        ctx.textAlign = "left";
-      }
-      y += artistImgSize + 56;
-    }
-    const albumCount = Math.min(5, stats.topAlbums.length);
-    if (albumCount > 0) {
-      drawAccentDivider(ctx, pad, y, innerW, accent);
-      y += 16;
-      y = drawSectionHeader(ctx, "Top Albums", pad, y, accent);
-      const albumArtSize = 52;
-      const albumRowH = 64;
-      ctx.fillStyle = "rgba(255,255,255,0.02)";
-      fillRoundRect(
-        ctx,
-        pad - 12,
-        y - 8,
-        innerW + 24,
-        albumRowH * albumCount + 16,
-        14
+    if (stats.topTracks.length > 0) {
+      y = await drawStoryList(
+        stats.topTracks.map((t) => ({ name: t.trackName, sub: t.artistName, art: t.albumArt, plays: t.playCount })),
+        y,
+        "Top Tracks",
+        5
       );
-      for (let i = 0; i < albumCount; i++) {
-        const a = stats.topAlbums[i];
-        const rowY = y + i * albumRowH;
-        const artY2 = rowY + (albumRowH - albumArtSize) / 2;
-        const drew = await drawArt(ctx, a.albumArt, pad, artY2, albumArtSize, 8);
-        if (!drew) drawPlaceholderArt(ctx, pad, artY2, albumArtSize, 8);
-        const textX = pad + albumArtSize + 14;
-        const centerY = rowY + albumRowH / 2;
-        ctx.fillStyle = rankColor(i);
-        ctx.font = `bold ${14}px ${FONT}`;
-        const rk = `${i + 1}`;
-        ctx.fillText(rk, textX, centerY - 8);
-        const rkW = ctx.measureText(rk).width + 8;
-        ctx.fillStyle = "#fff";
-        ctx.font = `600 ${15}px ${FONT}`;
-        ctx.fillText(
-          truncateText(ctx, a.albumName, rightEdge - textX - rkW - 20),
-          textX + rkW,
-          centerY - 8
-        );
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.font = `${12}px ${FONT}`;
-        ctx.fillText(
-          truncateText(ctx, a.artistName, rightEdge - textX - rkW - 20),
-          textX + rkW,
-          centerY + 10
-        );
-        if (a.playCount) {
-          ctx.fillStyle = rgb(accent);
-          ctx.font = `600 ${13}px ${FONT}`;
-          ctx.textAlign = "right";
-          ctx.fillText(`${a.playCount} plays`, rightEdge, centerY + 1);
-          ctx.textAlign = "left";
-        }
-      }
-      y += albumRowH * albumCount + 24;
+    }
+    if (stats.topArtists.length > 0) {
+      y = await drawStoryList(
+        stats.topArtists.map((a) => ({ name: a.artistName, sub: a.playCount ? `${a.playCount} plays` : "", art: a.artistImage, circular: true })),
+        y,
+        "Top Artists",
+        5
+      );
+    }
+    if (stats.topAlbums.length > 0) {
+      y = await drawStoryList(
+        stats.topAlbums.map((a) => ({ name: a.albumName, sub: a.artistName, art: a.albumArt, plays: a.playCount })),
+        y,
+        "Top Albums",
+        5
+      );
     }
     if (stats.hourlyDistribution.some((v) => v > 0)) {
       drawAccentDivider(ctx, pad, y, innerW, accent);
@@ -4803,28 +4564,15 @@ var ListeningStatsApp = (() => {
       ctx.fill();
       ctx.fillStyle = "#fff";
       ctx.font = `bold ${20}px ${FONT}`;
-      ctx.fillText("When I Listen", pad + 18, y + 18);
+      ctx.fillText("Activity by Hour", pad + 18, y + 18);
       ctx.fillStyle = "rgba(255,255,255,0.4)";
-      ctx.font = `${13}px ${FONT}`;
+      ctx.font = `${14}px ${FONT}`;
       ctx.textAlign = "right";
-      ctx.fillText(
-        `Peak: ${formatHourLabel(stats.peakHour)}`,
-        rightEdge - 8,
-        y + 18
-      );
+      ctx.fillText(`Peak: ${formatHourLabel(stats.peakHour)}`, rightEdge, y + 18);
       ctx.textAlign = "left";
-      y += 36;
-      drawHourlyChart(
-        ctx,
-        stats.hourlyDistribution,
-        pad,
-        y,
-        innerW,
-        120,
-        accent,
-        stats.peakHour
-      );
-      y += 120 + 16;
+      y += 40;
+      drawHourlyChart(ctx, stats.hourlyDistribution, pad, y, innerW, 140, accent, stats.peakHour);
+      y += 140 + 20;
     }
     if (stats.topGenres.length > 0) {
       drawAccentDivider(ctx, pad, y, innerW, accent);
@@ -4832,14 +4580,14 @@ var ListeningStatsApp = (() => {
       drawGenrePills(ctx, stats.topGenres, pad, y, innerW, accent);
       y += 44;
     }
-    drawNoiseTexture(ctx, 0, 0, w, h, 0.025);
+    drawNoiseTexture(ctx, 0, 0, w, h, 0.02);
     const topBar = ctx.createLinearGradient(0, 0, w, 0);
     topBar.addColorStop(0, rgb(accent));
     topBar.addColorStop(1, rgb(accent, 0.3));
     ctx.fillStyle = topBar;
     ctx.fillRect(0, 0, w, 4);
     ctx.fillStyle = "rgba(255,255,255,0.2)";
-    ctx.font = `${13}px ${FONT}`;
+    ctx.font = `${14}px ${FONT}`;
     ctx.textAlign = "center";
     ctx.fillText("Listening Stats for Spicetify", w / 2, h - 20);
     ctx.textAlign = "left";
@@ -4858,318 +4606,219 @@ var ListeningStatsApp = (() => {
       heroImg = await loadImage(stats.topTracks[0].albumArt);
       if (heroImg) accent = extractDominantColor(heroImg);
     }
-    ctx.fillStyle = "#0a0a0f";
-    ctx.fillRect(0, 0, w, h);
-    const leftW = 420;
     if (heroImg) {
-      drawBlurredBackground(ctx, heroImg, 0, 0, leftW, h, 40);
+      drawBlurredBackground(ctx, heroImg, 0, 0, w, h, 60);
     }
-    const leftOverlay = ctx.createLinearGradient(0, 0, leftW, 0);
-    leftOverlay.addColorStop(0, "rgba(0,0,0,0.45)");
-    leftOverlay.addColorStop(0.8, "rgba(10,10,15,0.75)");
-    leftOverlay.addColorStop(1, "rgba(10,10,15,0.95)");
-    ctx.fillStyle = leftOverlay;
-    ctx.fillRect(0, 0, leftW, h);
-    ctx.fillStyle = rgb(accent, 0.3);
-    ctx.fillRect(leftW - 1, 0, 2, h);
+    const baseOverlay = ctx.createLinearGradient(0, 0, 0, h);
+    baseOverlay.addColorStop(0, "rgba(8,8,14,0.82)");
+    baseOverlay.addColorStop(1, "rgba(8,8,14,0.92)");
+    ctx.fillStyle = baseOverlay;
+    ctx.fillRect(0, 0, w, h);
+    const pad = 56;
+    const innerW = w - pad * 2;
     const username = getUsername2(providerType);
-    const leftTitle = username ? `@${username}` : "";
-    if (leftTitle) {
+    const leftW = 440;
+    let heroY = pad;
+    if (username) {
       ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = `500 ${14}px ${FONT}`;
-      ctx.textAlign = "center";
-      ctx.fillText(leftTitle, leftW / 2, 30);
-      ctx.textAlign = "left";
+      ctx.font = `500 ${16}px ${FONT}`;
+      ctx.fillText(`@${username}`, pad, heroY + 14);
+      heroY += 32;
     }
-    const lArtSize = 170;
-    const lArtX = (leftW - lArtSize) / 2;
-    const lArtY = leftTitle ? 48 : 40;
-    if (stats.topTracks[0]) {
-      const drew = await drawArt(
-        ctx,
-        stats.topTracks[0].albumArt,
-        lArtX,
-        lArtY,
-        lArtSize,
-        12
-      );
-      if (!drew) drawPlaceholderArt(ctx, lArtX, lArtY, lArtSize, 12);
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#fff";
-      ctx.font = `bold ${20}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, stats.topTracks[0].trackName, leftW - 48),
-        leftW / 2,
-        lArtY + lArtSize + 30
-      );
-      ctx.fillStyle = "rgba(255,255,255,0.6)";
-      ctx.font = `${14}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, stats.topTracks[0].artistName, leftW - 48),
-        leftW / 2,
-        lArtY + lArtSize + 52
-      );
-      ctx.fillStyle = "rgba(255,255,255,0.3)";
-      ctx.font = `${11}px ${FONT}`;
-      ctx.fillText("#1 Most Played", leftW / 2, lArtY + lArtSize + 70);
-      ctx.textAlign = "left";
-    } else {
-      drawPlaceholderArt(ctx, lArtX, lArtY, lArtSize, 12);
-    }
-    const lStatY = 370;
-    const lStatW = 160;
-    const lStatH = 48;
-    const lStatGap = 10;
-    const lStatX = (leftW - lStatW * 2 - lStatGap) / 2;
-    drawStatCard(
-      ctx,
-      lStatX,
-      lStatY,
-      lStatW,
-      lStatH,
-      formatDuration(stats.totalTimeMs),
-      "LISTENED",
-      accent,
-      true
-    );
-    drawStatCard(
-      ctx,
-      lStatX + lStatW + lStatGap,
-      lStatY,
-      lStatW,
-      lStatH,
-      `${stats.trackCount}`,
-      "PLAYS",
-      accent
-    );
-    drawStatCard(
-      ctx,
-      lStatX,
-      lStatY + lStatH + lStatGap,
-      lStatW,
-      lStatH,
-      `${stats.uniqueArtistCount}`,
-      "ARTISTS",
-      accent
-    );
-    drawStatCard(
-      ctx,
-      lStatX + lStatW + lStatGap,
-      lStatY + lStatH + lStatGap,
-      lStatW,
-      lStatH,
-      stats.streakDays > 0 ? `${stats.streakDays}d` : `${Math.round(stats.skipRate * 100)}%`,
-      stats.streakDays > 0 ? "STREAK" : "SKIP RATE",
-      accent,
-      stats.streakDays > 0
-    );
-    if (stats.topGenres.length > 0) {
-      drawGenrePills(
-        ctx,
-        stats.topGenres,
-        lStatX,
-        lStatY + (lStatH + lStatGap) * 2 + 8,
-        leftW - lStatX * 2,
-        accent
-      );
-    }
-    const rPad = 32;
-    const rX = leftW + rPad;
-    const rInnerW = w - rX - rPad;
-    const rTitle = username ? `${username}'s Stats` : "My Listening Stats";
+    const title = username ? `${username}'s Stats` : "My Listening Stats";
     ctx.fillStyle = "#fff";
-    ctx.font = `bold ${22}px ${FONT}`;
-    ctx.fillText(truncateText(ctx, rTitle, rInnerW - 120), rX, 32);
+    ctx.font = `bold ${32}px ${FONT}`;
+    ctx.fillText(truncateText(ctx, title, leftW - 20), pad, heroY + 28);
     const periodText = getPeriodDisplayName(period);
-    ctx.font = `600 ${12}px ${FONT}`;
+    ctx.font = `600 ${14}px ${FONT}`;
     const pTextW = ctx.measureText(periodText).width;
-    const pPillW = pTextW + 16;
-    ctx.fillStyle = rgb(accent, 0.2);
-    fillRoundRect(ctx, rX, 42, pPillW, 22, 11);
+    const pPillW = pTextW + 20;
+    ctx.fillStyle = rgb(accent, 0.25);
+    fillRoundRect(ctx, pad, heroY + 40, pPillW, 26, 13);
     ctx.fillStyle = rgb(accent);
-    ctx.fillText(periodText, rX + 8, 56);
+    ctx.fillText(periodText, pad + 10, heroY + 57);
     const providerLabel = getProviderLabel(providerType);
     if (providerLabel) {
-      ctx.fillStyle = "rgba(255,255,255,0.3)";
-      ctx.font = `${11}px ${FONT}`;
-      ctx.fillText(providerLabel, rX + pPillW + 8, 56);
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.font = `${13}px ${FONT}`;
+      ctx.fillText(providerLabel, pad + pPillW + 10, heroY + 57);
     }
-    const rColW = (rInnerW - 20) / 2;
-    const rCol1X = rX;
-    const rCol2X = rX + rColW + 20;
-    let ry = 78;
-    ctx.fillStyle = rgb(accent);
-    ctx.beginPath();
-    ctx.arc(rCol1X + 4, ry + 6, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = `bold ${14}px ${FONT}`;
-    ctx.fillText("Top Tracks", rCol1X + 14, ry + 11);
-    ry += 22;
-    const rArtSize = 34;
-    const rRowH = 44;
-    const rTrackCount = Math.min(5, stats.topTracks.length);
-    for (let i = 0; i < rTrackCount; i++) {
-      const t = stats.topTracks[i];
-      const rowY = ry + i * rRowH;
-      const artY2 = rowY + (rRowH - rArtSize) / 2;
-      const drew = await drawArt(ctx, t.albumArt, rCol1X, artY2, rArtSize, 4);
-      if (!drew) drawPlaceholderArt(ctx, rCol1X, artY2, rArtSize, 4);
-      const textX = rCol1X + rArtSize + 8;
-      const centerY = rowY + rRowH / 2;
-      const maxTextW = rCol1X + rColW - textX - 4;
-      ctx.fillStyle = rankColor(i);
-      ctx.font = `bold ${11}px ${FONT}`;
-      const rk = `${i + 1}`;
-      ctx.fillText(rk, textX, centerY - 5);
-      const rkW = ctx.measureText(rk).width + 5;
+    heroY += 80;
+    const artSize = 220;
+    const artX = pad;
+    const artY = heroY;
+    if (stats.topTracks[0]) {
+      const drew = await drawArt(ctx, stats.topTracks[0].albumArt, artX, artY, artSize, 14);
+      if (!drew) drawPlaceholderArt(ctx, artX, artY, artSize, 14);
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-over";
+      ctx.shadowColor = rgb(accent, 0.35);
+      ctx.shadowBlur = 50;
+      ctx.fillStyle = "rgba(0,0,0,0)";
+      fillRoundRect(ctx, artX, artY, artSize, artSize, 14);
+      ctx.restore();
+      const infoX = artX + artSize + 24;
+      const infoMaxW = leftW - artSize - 24;
       ctx.fillStyle = "#fff";
-      ctx.font = `600 ${11}px ${FONT}`;
+      ctx.font = `bold ${22}px ${FONT}`;
       ctx.fillText(
-        truncateText(ctx, t.trackName, maxTextW - rkW),
-        textX + rkW,
-        centerY - 5
+        truncateText(ctx, stats.topTracks[0].trackName, infoMaxW),
+        infoX,
+        artY + 30
       );
-      ctx.fillStyle = "rgba(255,255,255,0.45)";
-      ctx.font = `${9}px ${FONT}`;
-      const meta = t.playCount ? `${t.artistName} \u2022 ${t.playCount}` : t.artistName;
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = `${16}px ${FONT}`;
       ctx.fillText(
-        truncateText(ctx, meta, maxTextW - rkW),
-        textX + rkW,
-        centerY + 8
+        truncateText(ctx, stats.topTracks[0].artistName, infoMaxW),
+        infoX,
+        artY + 56
       );
+      ctx.fillStyle = rgb(accent, 0.7);
+      ctx.font = `600 ${12}px ${FONT}`;
+      ctx.fillText("#1 Most Played", infoX, artY + 78);
+      if (stats.topTracks[0].playCount) {
+        ctx.fillStyle = rgb(accent);
+        ctx.font = `bold ${36}px ${FONT}`;
+        ctx.fillText(`${stats.topTracks[0].playCount}`, infoX, artY + 130);
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.font = `500 ${13}px ${FONT}`;
+        ctx.fillText("plays", infoX, artY + 150);
+      }
+    } else {
+      drawPlaceholderArt(ctx, artX, artY, artSize, 14);
     }
-    const rAlbumStart = ry + rRowH * rTrackCount + 12;
-    const rAlbumCount = Math.min(5, stats.topAlbums.length);
-    if (rAlbumCount > 0) {
-      let ay = rAlbumStart;
+    const statY = artY + artSize + 28;
+    const statCardW = (leftW - 12) / 3;
+    const statCardH = 60;
+    drawStatCard(ctx, pad, statY, statCardW, statCardH, formatDuration(stats.totalTimeMs), "LISTENED", accent, true);
+    drawStatCard(ctx, pad + statCardW + 6, statY, statCardW, statCardH, `${stats.trackCount}`, "PLAYS", accent);
+    drawStatCard(ctx, pad + (statCardW + 6) * 2, statY, statCardW, statCardH, `${stats.uniqueArtistCount}`, "ARTISTS", accent);
+    const stat2Y = statY + statCardH + 8;
+    drawStatCard(ctx, pad, stat2Y, statCardW, statCardH, `${stats.uniqueTrackCount}`, "UNIQUE", accent);
+    drawStatCard(ctx, pad + statCardW + 6, stat2Y, statCardW, statCardH, stats.streakDays > 0 ? `${stats.streakDays}d` : "-", "STREAK", accent, stats.streakDays > 0);
+    drawStatCard(ctx, pad + (statCardW + 6) * 2, stat2Y, statCardW, statCardH, `${Math.round(stats.skipRate * 100)}%`, "SKIP RATE", accent);
+    if (stats.topGenres.length > 0) {
+      drawGenrePills(ctx, stats.topGenres, pad, stat2Y + statCardH + 16, leftW, accent);
+    }
+    const rX = pad + leftW + 40;
+    const rInnerW = w - rX - pad;
+    const colGap = 24;
+    const colW = (rInnerW - colGap * 2) / 3;
+    const listArtSize = 44;
+    const listRowH = 56;
+    const listHeaderH = 32;
+    async function drawRankedList(items, colX, startY, title2, maxItems) {
       ctx.fillStyle = rgb(accent);
       ctx.beginPath();
-      ctx.arc(rCol1X + 4, ay + 6, 4, 0, Math.PI * 2);
+      ctx.arc(colX + 5, startY + 8, 5, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#fff";
-      ctx.font = `bold ${14}px ${FONT}`;
-      ctx.fillText("Top Albums", rCol1X + 14, ay + 11);
-      ay += 22;
-      for (let i = 0; i < rAlbumCount; i++) {
-        const a = stats.topAlbums[i];
-        const rowY = ay + i * rRowH;
-        const artY2 = rowY + (rRowH - rArtSize) / 2;
-        const drew = await drawArt(ctx, a.albumArt, rCol1X, artY2, rArtSize, 4);
-        if (!drew) drawPlaceholderArt(ctx, rCol1X, artY2, rArtSize, 4);
-        const textX = rCol1X + rArtSize + 8;
-        const centerY = rowY + rRowH / 2;
-        const maxTextW = rCol1X + rColW - textX - 4;
+      ctx.font = `bold ${16}px ${FONT}`;
+      ctx.fillText(title2, colX + 18, startY + 14);
+      let y = startY + listHeaderH;
+      const count = Math.min(maxItems, items.length);
+      ctx.fillStyle = "rgba(255,255,255,0.02)";
+      fillRoundRect(ctx, colX - 10, y - 6, colW + 20, listRowH * count + 12, 12);
+      for (let i = 0; i < count; i++) {
+        const item = items[i];
+        const rowY = y + i * listRowH;
+        const artY2 = rowY + (listRowH - listArtSize) / 2;
+        const radius = item.circular ? listArtSize / 2 : 6;
+        const drew = await drawArt(ctx, item.art, colX, artY2, listArtSize, radius);
+        if (!drew) drawPlaceholderArt(ctx, colX, artY2, listArtSize, radius);
+        const textX = colX + listArtSize + 12;
+        const centerY = rowY + listRowH / 2;
+        const maxTextW = colX + colW - textX;
         ctx.fillStyle = rankColor(i);
-        ctx.font = `bold ${11}px ${FONT}`;
+        ctx.font = `bold ${13}px ${FONT}`;
         const rk = `${i + 1}`;
-        ctx.fillText(rk, textX, centerY - 5);
-        const rkW = ctx.measureText(rk).width + 5;
+        ctx.fillText(rk, textX, centerY - 7);
+        const rkW = ctx.measureText(rk).width + 6;
         ctx.fillStyle = "#fff";
-        ctx.font = `600 ${11}px ${FONT}`;
+        ctx.font = `600 ${13}px ${FONT}`;
         ctx.fillText(
-          truncateText(ctx, a.albumName, maxTextW - rkW),
+          truncateText(ctx, item.name, maxTextW - rkW),
           textX + rkW,
-          centerY - 5
+          centerY - 7
         );
         ctx.fillStyle = "rgba(255,255,255,0.45)";
-        ctx.font = `${9}px ${FONT}`;
+        ctx.font = `${11}px ${FONT}`;
+        const subText = item.plays ? `${item.sub} \u2022 ${item.plays}` : item.sub;
         ctx.fillText(
-          truncateText(ctx, a.artistName, maxTextW - rkW),
+          truncateText(ctx, subText, maxTextW - rkW),
           textX + rkW,
-          centerY + 8
+          centerY + 9
         );
       }
     }
-    let ry2 = 78;
-    ctx.fillStyle = rgb(accent);
-    ctx.beginPath();
-    ctx.arc(rCol2X + 4, ry2 + 6, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = `bold ${14}px ${FONT}`;
-    ctx.fillText("Top Artists", rCol2X + 14, ry2 + 11);
-    ry2 += 22;
-    const rArtistImgSize = 34;
-    const rArtistCount = Math.min(5, stats.topArtists.length);
-    for (let i = 0; i < rArtistCount; i++) {
-      const a = stats.topArtists[i];
-      const rowY = ry2 + i * rRowH;
-      const imgY = rowY + (rRowH - rArtistImgSize) / 2;
-      const drew = await drawArt(
-        ctx,
-        a.artistImage,
-        rCol2X,
-        imgY,
-        rArtistImgSize,
-        rArtistImgSize / 2
-      );
-      if (!drew)
-        drawPlaceholderArt(ctx, rCol2X, imgY, rArtistImgSize, rArtistImgSize / 2);
-      const textX = rCol2X + rArtistImgSize + 8;
-      const centerY = rowY + rRowH / 2;
-      const maxTextW = rCol2X + rColW - textX - 4;
-      ctx.fillStyle = rankColor(i);
-      ctx.font = `bold ${11}px ${FONT}`;
-      const rk = `${i + 1}`;
-      ctx.fillText(rk, textX, centerY - 1);
-      const rkW = ctx.measureText(rk).width + 5;
-      ctx.fillStyle = "#fff";
-      ctx.font = `600 ${12}px ${FONT}`;
-      ctx.fillText(
-        truncateText(ctx, a.artistName, maxTextW - rkW),
-        textX + rkW,
-        centerY - 1
-      );
-      if (a.playCount) {
-        ctx.fillStyle = "rgba(255,255,255,0.4)";
-        ctx.font = `${9}px ${FONT}`;
-        ctx.fillText(`${a.playCount} plays`, textX + rkW, centerY + 12);
-      }
-    }
-    ry2 += rRowH * rArtistCount + 16;
+    const listStartY = pad;
+    const maxListItems = 5;
+    await drawRankedList(
+      stats.topTracks.map((t) => ({
+        name: t.trackName,
+        sub: t.artistName,
+        art: t.albumArt,
+        plays: t.playCount
+      })),
+      rX,
+      listStartY,
+      "Top Tracks",
+      maxListItems
+    );
+    await drawRankedList(
+      stats.topArtists.map((a) => ({
+        name: a.artistName,
+        sub: a.playCount ? `${a.playCount} plays` : "",
+        art: a.artistImage,
+        circular: true
+      })),
+      rX + colW + colGap,
+      listStartY,
+      "Top Artists",
+      maxListItems
+    );
+    await drawRankedList(
+      stats.topAlbums.map((a) => ({
+        name: a.albumName,
+        sub: a.artistName,
+        art: a.albumArt,
+        plays: a.playCount
+      })),
+      rX + (colW + colGap) * 2,
+      listStartY,
+      "Top Albums",
+      maxListItems
+    );
+    const chartY = listStartY + listHeaderH + listRowH * maxListItems + 36;
     if (stats.hourlyDistribution.some((v) => v > 0)) {
       ctx.fillStyle = rgb(accent);
       ctx.beginPath();
-      ctx.arc(rCol2X + 4, ry2 + 6, 4, 0, Math.PI * 2);
+      ctx.arc(rX + 5, chartY + 8, 5, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#fff";
-      ctx.font = `bold ${14}px ${FONT}`;
-      ctx.fillText("Activity", rCol2X + 14, ry2 + 11);
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
-      ctx.font = `${11}px ${FONT}`;
+      ctx.font = `bold ${16}px ${FONT}`;
+      ctx.fillText("Activity by Hour", rX + 18, chartY + 14);
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.font = `${13}px ${FONT}`;
       ctx.textAlign = "right";
-      ctx.fillText(
-        `Peak: ${formatHourLabel(stats.peakHour)}`,
-        rCol2X + rColW,
-        ry2 + 11
-      );
+      ctx.fillText(`Peak: ${formatHourLabel(stats.peakHour)}`, rX + rInnerW, chartY + 14);
       ctx.textAlign = "left";
-      ry2 += 22;
-      const chartH = Math.min(h - ry2 - 30, 100);
-      if (chartH > 30) {
-        drawHourlyChart(
-          ctx,
-          stats.hourlyDistribution,
-          rCol2X,
-          ry2,
-          rColW,
-          chartH,
-          accent,
-          stats.peakHour
-        );
+      const chartTopY = chartY + 28;
+      const chartH = h - chartTopY - 40;
+      if (chartH > 40) {
+        drawHourlyChart(ctx, stats.hourlyDistribution, rX, chartTopY, rInnerW, chartH, accent, stats.peakHour);
       }
     }
-    drawNoiseTexture(ctx, 0, 0, w, h, 0.02);
+    drawNoiseTexture(ctx, 0, 0, w, h, 0.018);
     const topBar = ctx.createLinearGradient(0, 0, w, 0);
     topBar.addColorStop(0, rgb(accent));
     topBar.addColorStop(1, rgb(accent, 0.3));
     ctx.fillStyle = topBar;
-    ctx.fillRect(0, 0, w, 3);
-    ctx.fillStyle = "rgba(255,255,255,0.15)";
-    ctx.font = `${11}px ${FONT}`;
+    ctx.fillRect(0, 0, w, 4);
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.font = `${13}px ${FONT}`;
     ctx.textAlign = "center";
-    ctx.fillText("Listening Stats for Spicetify", w / 2, h - 10);
+    ctx.fillText("Listening Stats for Spicetify", w / 2, h - 14);
     ctx.textAlign = "left";
     return canvas;
   }
@@ -5324,6 +4973,7 @@ var ListeningStatsApp = (() => {
   var DEFAULT_ORDER = [
     "overview",
     "toplists",
+    "genres",
     "activity",
     "recent"
   ];
@@ -5727,7 +5377,6 @@ var ListeningStatsApp = (() => {
   background: var(--background-tinted-base);
   border-radius: 16px;
   padding: 24px;
-  min-height: 400px;
   display: flex;
   flex-direction: column;
   flex: 1 1 300px;
@@ -5940,6 +5589,17 @@ var ListeningStatsApp = (() => {
   transition: background 0.15s ease;
   cursor: pointer;
   position: relative;
+  animation: barGrow 0.5s ease both;
+  transform-origin: bottom;
+}
+
+@keyframes barGrow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 
 .activity-bar.peak {
@@ -6362,7 +6022,6 @@ var ListeningStatsApp = (() => {
   padding: 24px;
   flex: 1 1 300px;
   min-width: 280px;
-  min-height: 400px;
 }
 
 .skeleton-list-title {
@@ -7308,7 +6967,13 @@ var ListeningStatsApp = (() => {
 
 /* --- Export buttons in settings --- */
 .settings-export {
-  margin-bottom: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-export .settings-section-title {
+  margin-bottom: 8px;
 }
 
 .share-modal-overlay {
@@ -7328,9 +6993,9 @@ var ListeningStatsApp = (() => {
   background: var(--background-elevated-base, #282828);
   border-radius: 16px;
   padding: 24px;
-  max-width: 480px;
+  max-width: 720px;
   width: 90%;
-  max-height: 85vh;
+  max-height: 90vh;
   overflow-y: auto;
 }
 
@@ -7435,6 +7100,18 @@ var ListeningStatsApp = (() => {
 .item-row:nth-child(6) {
   animation-delay: 0.18s;
 }
+.item-row:nth-child(7) {
+  animation-delay: 0.21s;
+}
+.item-row:nth-child(8) {
+  animation-delay: 0.24s;
+}
+.item-row:nth-child(9) {
+  animation-delay: 0.27s;
+}
+.item-row:nth-child(10) {
+  animation-delay: 0.3s;
+}
 
 .recent-card {
   animation: fadeInUp 0.3s ease both;
@@ -7508,6 +7185,153 @@ var ListeningStatsApp = (() => {
 
 .settings-toggle.active .settings-toggle-knob {
   transform: translateX(20px);
+}
+
+/* ===== Items Per Section Picker ===== */
+.settings-item-count-picker {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.settings-count-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--text-subdued);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.settings-count-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-base);
+}
+
+.settings-count-btn.active {
+  background: var(--ls-accent, #1db954);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ===== Section Visibility ===== */
+.settings-section-vis {
+  margin-bottom: 16px;
+}
+
+.settings-section-vis .settings-toggle-desc {
+  margin-bottom: 12px;
+}
+
+.settings-toggle-row.compact {
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.settings-vis-label {
+  font-size: 13px;
+  color: var(--text-base);
+}
+
+/* ===== Genre Chips ===== */
+/* ===== Genre Bars ===== */
+.genre-bars-section {
+  background: var(--background-tinted-base);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.genre-bars-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 16px;
+}
+
+.genre-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.genre-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: fadeInUp 0.3s ease both;
+}
+
+.genre-bar-row:nth-child(1) { animation-delay: 0.03s; }
+.genre-bar-row:nth-child(2) { animation-delay: 0.06s; }
+.genre-bar-row:nth-child(3) { animation-delay: 0.09s; }
+.genre-bar-row:nth-child(4) { animation-delay: 0.12s; }
+.genre-bar-row:nth-child(5) { animation-delay: 0.15s; }
+.genre-bar-row:nth-child(6) { animation-delay: 0.18s; }
+.genre-bar-row:nth-child(7) { animation-delay: 0.21s; }
+.genre-bar-row:nth-child(8) { animation-delay: 0.24s; }
+.genre-bar-row:nth-child(9) { animation-delay: 0.27s; }
+.genre-bar-row:nth-child(10) { animation-delay: 0.3s; }
+
+.genre-bar-rank {
+  width: 18px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-subdued);
+  flex-shrink: 0;
+}
+
+.genre-bar-track {
+  flex: 1;
+  position: relative;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.genre-bar-fill {
+  position: absolute;
+  inset: 0;
+  right: auto;
+  border-radius: 6px;
+  background: var(--ls-accent, var(--spice-button));
+  opacity: 0.25;
+  animation: barFillGrow 0.6s ease both;
+  transform-origin: left;
+}
+
+@keyframes barFillGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.genre-bar-name {
+  position: relative;
+  z-index: 1;
+  line-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-base);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.genre-bar-count {
+  flex-shrink: 0;
+  min-width: 36px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-subdued);
 }
 
 /* ===== Settings Danger Zone ===== */
@@ -7900,7 +7724,6 @@ var ListeningStatsApp = (() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
 }
 
 /* ===== Provider Setup Guide Links ===== */
@@ -7947,44 +7770,57 @@ var ListeningStatsApp = (() => {
   var SFM_PROMO_KEY = "listening-stats:sfm-promo-dismissed";
   var VERSION = getCurrentVersion();
   var TOUR_SEEN_KEY = "listening-stats:tour-seen";
-  var FULL_TOUR_STEPS = [
-    {
-      target: ".overview-row",
-      title: "Overview",
-      content: "Your key stats at a glance. Total listening time, track count, and more. Use the period tabs above to switch time ranges.",
-      placement: "bottom"
-    },
-    {
-      target: ".top-lists-section",
-      title: "Top Lists",
-      content: "Your most played tracks, artists, albums, and genres ranked by play count.",
-      placement: "bottom"
-    },
-    {
-      target: ".activity-section",
-      title: "Activity",
-      content: "Your listening patterns by hour of day. Find when you listen the most.",
-      placement: "top"
-    },
-    {
-      target: ".recent-section",
-      title: "Recently Played",
-      content: "Your most recent tracks. Click any card to open it in Spotify.",
-      placement: "top"
-    },
-    {
-      target: ".section-drag-handle",
-      title: "Reorder Sections",
-      content: "Drag these handles to rearrange your dashboard layout to your liking.",
-      placement: "right"
-    },
-    {
-      target: ".header-actions",
-      title: "Share & Settings",
-      content: "Share your stats as an image or open settings to customize your experience.",
-      placement: "bottom"
+  function buildTourSteps(providerType) {
+    const steps = [
+      {
+        target: ".overview-row",
+        title: "Overview",
+        content: "Your key stats at a glance. Total listening time, track count, and more. Use the period tabs above to switch time ranges.",
+        placement: "bottom"
+      },
+      {
+        target: ".top-lists-section",
+        title: "Top Lists",
+        content: "Your most played tracks, artists, albums, and genres ranked by play count.",
+        placement: "bottom"
+      }
+    ];
+    if (providerType === "statsfm") {
+      steps.push({
+        target: ".genre-bars-section",
+        title: "Top Genres",
+        content: "Your most listened genres ranked by play count. Powered by stats.fm genre data.",
+        placement: "bottom"
+      });
     }
-  ];
+    steps.push(
+      {
+        target: ".activity-section",
+        title: "Activity",
+        content: "Your listening patterns by hour of day. Find when you listen the most.",
+        placement: "top"
+      },
+      {
+        target: ".recent-section",
+        title: "Recently Played",
+        content: "Your most recent tracks. Click any card to open it in Spotify.",
+        placement: "top"
+      },
+      {
+        target: ".section-drag-handle",
+        title: "Reorder Sections",
+        content: "Drag these handles to rearrange your dashboard layout to your liking.",
+        placement: "right"
+      },
+      {
+        target: ".header-actions",
+        title: "Share & Settings",
+        content: "Share your stats as an image or open settings to customize your experience.",
+        placement: "bottom"
+      }
+    );
+    return steps;
+  }
   function shouldShowTour() {
     try {
       const seen = localStorage.getItem(TOUR_SEEN_KEY);
@@ -8021,6 +7857,7 @@ var ListeningStatsApp = (() => {
         period: p.period
       }
     ),
+    genres: (p) => /* @__PURE__ */ Spicetify.React.createElement(GenreChips, { topGenres: p.stats.topGenres }),
     activity: (p) => /* @__PURE__ */ Spicetify.React.createElement(
       ActivityChart,
       {
@@ -8038,7 +7875,7 @@ var ListeningStatsApp = (() => {
       const timer = setTimeout(() => {
         const tourType = shouldShowTour();
         if (tourType === "full") {
-          startTour(FULL_TOUR_STEPS);
+          startTour(buildTourSteps(props.providerType));
           markTourComplete();
         }
       }, 500);
@@ -8046,7 +7883,7 @@ var ListeningStatsApp = (() => {
     }, []);
     useEffect9(() => {
       const handler = () => {
-        startTour(FULL_TOUR_STEPS);
+        startTour(buildTourSteps(props.providerType));
       };
       window.addEventListener("listening-stats:start-tour", handler);
       return () => window.removeEventListener("listening-stats:start-tour", handler);
@@ -8174,6 +8011,8 @@ var ListeningStatsApp = (() => {
       order.map((sectionId) => {
         const renderFn = SECTION_REGISTRY[sectionId];
         if (!renderFn) return null;
+        const hidden = getPreferences().hiddenSections;
+        if (hidden.includes(sectionId)) return null;
         const sectionDropPosition = dropTarget && dropTarget.id === sectionId ? dropTarget.position : null;
         return /* @__PURE__ */ Spicetify.React.createElement(
           DraggableSection,
@@ -8337,13 +8176,21 @@ var ListeningStatsApp = (() => {
         clearStatsCache();
         const provider = getActiveProvider();
         if (provider) {
+          const isStatsfm = provider.type === "statsfm";
+          if (isStatsfm) {
+            try {
+              localStorage.setItem(SFM_PROMO_KEY, "1");
+            } catch {
+            }
+          }
           this.setState(
             {
               providerType: provider.type,
               period: provider.defaultPeriod,
               stats: null,
               loading: true,
-              showSettings: false
+              showSettings: false,
+              showSfmPromo: isStatsfm ? false : this.state.showSfmPromo
             },
             () => {
               this.loadStats();
@@ -8435,7 +8282,7 @@ var ListeningStatsApp = (() => {
       const periods = provider?.periods || ["recent"];
       const periodLabels = provider?.periodLabels || { recent: "Recent" };
       const showLikeButtons = providerType !== "lastfm";
-      const sfmPromoPortal = showSfmPromo ? Spicetify.ReactDOM.createPortal(
+      const sfmPromoPortal = showSfmPromo && providerType !== "statsfm" ? Spicetify.ReactDOM.createPortal(
         /* @__PURE__ */ Spicetify.React.createElement(
           SfmPromoPopup,
           {
@@ -8545,7 +8392,8 @@ var ListeningStatsApp = (() => {
           onPeriodChange: this.handlePeriodChange,
           likedTracks,
           onLikeToggle: this.handleLikeToggle,
-          showLikeButtons
+          showLikeButtons,
+          providerType
         }
       ), /* @__PURE__ */ Spicetify.React.createElement(
         Footer,

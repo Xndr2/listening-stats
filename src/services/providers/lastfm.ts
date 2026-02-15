@@ -1,6 +1,5 @@
 import { ListeningStats, RecentTrack } from "../../types/listeningstats";
 import * as LastFm from "../lastfm";
-import { searchAlbum, searchArtist, searchTrack } from "../spotify-api";
 import { destroyPoller, getPollingData, initPoller } from "../tracker";
 import type { TrackingProvider } from "./types";
 
@@ -46,50 +45,6 @@ export function createLastfmProvider(): TrackingProvider {
       return calculateRankedStats(period);
     },
   };
-}
-
-async function enrichArtistImages(
-  artists: Array<{
-    artistUri: string;
-    artistName: string;
-    artistImage?: string;
-  }>,
-): Promise<void> {
-  const needsImage = artists.filter((a) => !a.artistImage);
-  if (needsImage.length === 0) return;
-  const results = await Promise.all(
-    needsImage.map((a) => searchArtist(a.artistName)),
-  );
-  needsImage.forEach((a, i) => {
-    if (results[i].uri && !a.artistUri) a.artistUri = results[i].uri!;
-    if (results[i].imageUrl) a.artistImage = results[i].imageUrl!;
-  });
-}
-
-async function enrichTrackUris(
-  tracks: Array<{ trackUri: string; trackName: string; artistName: string }>,
-): Promise<void> {
-  const needsUri = tracks.filter((t) => !t.trackUri);
-  if (needsUri.length === 0) return;
-  const results = await Promise.all(
-    needsUri.map((t) => searchTrack(t.trackName, t.artistName)),
-  );
-  needsUri.forEach((t, i) => {
-    if (results[i].uri) t.trackUri = results[i].uri!;
-  });
-}
-
-async function enrichAlbumUris(
-  albums: Array<{ albumUri: string; albumName: string; artistName: string }>,
-): Promise<void> {
-  const needsUri = albums.filter((a) => !a.albumUri);
-  if (needsUri.length === 0) return;
-  const results = await Promise.all(
-    needsUri.map((a) => searchAlbum(a.albumName, a.artistName)),
-  );
-  needsUri.forEach((a, i) => {
-    if (results[i].uri) a.albumUri = results[i].uri!;
-  });
 }
 
 async function calculateRecentStats(): Promise<ListeningStats> {
@@ -207,10 +162,6 @@ async function calculateRecentStats(): Promise<ListeningStats> {
       playCount: a.count,
     }));
 
-  await enrichArtistImages(topArtists);
-  await enrichTrackUris(topTracks);
-  await enrichAlbumUris(topAlbums);
-
   const hourlyDistribution = new Array(24).fill(0);
   for (const t of recentTracks) {
     const hour = new Date(t.playedAt).getHours();
@@ -323,10 +274,6 @@ async function calculateRankedStats(period: string): Promise<ListeningStats> {
     playCount: a.playCount,
   }));
 
-  await enrichArtistImages(topArtists);
-  await enrichTrackUris(topTracks);
-  await enrichAlbumUris(topAlbums);
-
   const recentTracks: RecentTrack[] = (
     Array.isArray(recentLfm) ? recentLfm : []
   )
@@ -343,7 +290,12 @@ async function calculateRankedStats(period: string): Promise<ListeningStats> {
       playedAt: t.playedAt,
     }));
 
+  // Populate hourly distribution from recent tracks (best available data)
   const hourlyDistribution = new Array(24).fill(0);
+  for (const t of recentTracks) {
+    const hour = new Date(t.playedAt).getHours();
+    hourlyDistribution[hour]++;
+  }
 
   const totalPlays = lfmTracks.reduce((sum, t) => sum + t.playCount, 0);
   const totalTimeMs = lfmTracks.reduce(
@@ -367,7 +319,7 @@ async function calculateRankedStats(period: string): Promise<ListeningStats> {
     topAlbums,
     hourlyDistribution,
     hourlyUnit: "plays",
-    peakHour: 0,
+    peakHour: hourlyDistribution.indexOf(Math.max(...hourlyDistribution)),
     recentTracks,
     genres: {},
     topGenres: [],

@@ -18,13 +18,16 @@ A real-time listening statistics dashboard for Spotify, powered by Spicetify.
 - **Last.fm integration** accurate play counts and listening history across all your devices with 7 time periods
 - **Local tracking** on device tracking via IndexedDB, no account needed
 - **Top tracks, artists & albums** view your most played content with play counts and listening time
+- **Top genres** ranked bar chart showing your most listened genres (stats.fm)
 - **Activity chart** visualize your listening patterns by hour
-- **Share cards** generate shareable stat images in story or landscape format with blurred art backgrounds and accent colors
+- **Display customization** choose items per section (3/5/10), genres shown (3/5/10), and hide sections you don't need
+- **Drag-and-drop layout** reorder dashboard sections to your liking
+- **Share cards** generate shareable stat images in story or landscape format with blurred art backgrounds, accent colors, and full stats
 - **Data export** export your stats as JSON or CSV
 - **Artist payout estimate** see how much you've contributed to artists
 - **Streak tracking** track consecutive listening days
 - **Skip rate** track how often you skip songs
-- **Animated dashboard** smooth number animations and loading states
+- **Animated dashboard** smooth number animations, staggered list entrances, and bar chart grow effects
 - **Auto-update notifications** get notified when updates are available
 
 ## Installation
@@ -45,7 +48,7 @@ curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.
 **Windows (PowerShell):**
 
 ```powershell
-iwr -useb 'https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1' -OutFile "$env:TEMP\ls-install.ps1"; & "$env:TEMP\ls-install.ps1"; Remove-Item "$env:TEMP\ls-install.ps1"
+irm https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1 | iex
 ```
 
 The installer will automatically:
@@ -102,6 +105,7 @@ Once set up, the dashboard shows:
 - Estimated artist payout
 - Listening streak and skip rate
 - Top tracks, artists, and albums
+- Top genres (stats.fm provider)
 - Hourly activity chart
 - Recently played tracks
 
@@ -110,6 +114,8 @@ Use the period tabs to switch between time ranges. Available periods depend on y
 **Settings panel** (gear icon in the header):
 
 - Switch data provider
+- Display settings: 24-hour time, items per section, genres shown, section visibility
+- Layout: reset card order, restart feature tour
 - Export stats (JSON / CSV)
 - Refresh stats and clear cache
 - Check for updates

@@ -99,7 +99,7 @@ export async function validateUser(username: string): Promise<StatsfmUserInfo> {
   };
 }
 
-export type StatsfmRange = "today" | "days" | "weeks" | "months" | "lifetime";
+export type StatsfmRange = "today" | "weeks" | "months" | "lifetime";
 
 export interface StatsfmTopTrack {
   position: number;

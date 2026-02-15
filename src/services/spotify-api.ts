@@ -297,13 +297,13 @@ async function throttledSearch(
     if (searchCache.has(cacheKey)) return searchCache.get(cacheKey)!;
 
     const result = await fetchFn();
-    searchCache.set(cacheKey, result);
-    schedulePersistSearchCache();
+    if (result.uri || result.imageUrl) {
+      searchCache.set(cacheKey, result);
+      schedulePersistSearchCache();
+    }
     return result;
   } catch {
-    const empty: SpotifySearchResult = {};
-    searchCache.set(cacheKey, empty);
-    return empty;
+    return {};
   } finally {
     releaseSearchSlot();
   }

@@ -5,6 +5,7 @@ const LAYOUT_KEY = "listening-stats:card-order";
 export const DEFAULT_ORDER: string[] = [
   "overview",
   "toplists",
+  "genres",
   "activity",
   "recent",
 ];

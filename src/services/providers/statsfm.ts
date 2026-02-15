@@ -10,10 +10,9 @@ const FREE_LABELS: Record<string, string> = {
   lifetime: "Lifetime",
 };
 
-const PLUS_PERIODS = ["today", "days", "weeks", "months", "lifetime"] as const;
+const PLUS_PERIODS = ["today", "weeks", "months", "lifetime"] as const;
 const PLUS_LABELS: Record<string, string> = {
   today: "Today",
-  days: "This Week",
   weeks: "4 Weeks",
   months: "6 Months",
   lifetime: "Lifetime",
@@ -42,22 +41,7 @@ export function createStatsfmProvider(): TrackingProvider {
     },
 
     async calculateStats(period: string): Promise<ListeningStats> {
-      try {
-        return await calculateStatsfmStats(period as Statsfm.StatsfmRange);
-      } catch (err: any) {
-        // If a Plus-only range returned 400, user's tier may have changed
-        if (
-          err?.message?.includes("400") &&
-          (period === "today" || period === "days")
-        ) {
-          const cfg = Statsfm.getConfig();
-          if (cfg) {
-            Statsfm.saveConfig({ ...cfg, isPlus: false });
-          }
-          return calculateStatsfmStats("weeks");
-        }
-        throw err;
-      }
+      return calculateStatsfmStats(period as Statsfm.StatsfmRange);
     },
   };
 }

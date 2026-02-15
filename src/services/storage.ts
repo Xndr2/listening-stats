@@ -150,26 +150,51 @@ async function cleanupBackup(): Promise<void> {
   }
 }
 
-export function getDB(): Promise<IDBPDatabase> {
+export function resetDBPromise(): void {
+  dbPromise = null;
+}
+
+export async function getDB(): Promise<IDBPDatabase> {
   if (!dbPromise) {
     dbPromise = initDB();
   }
-  return dbPromise;
+  try {
+    const db = await dbPromise;
+    // Verify connection is still valid
+    if (!db.objectStoreNames.contains(STORE_NAME)) {
+      dbPromise = initDB();
+      return dbPromise;
+    }
+    return db;
+  } catch {
+    // Connection failed, retry with fresh init
+    dbPromise = initDB();
+    return dbPromise;
+  }
 }
 
 async function initDB(): Promise<IDBPDatabase> {
-  // Check if migration is needed by opening DB at current version
+  // Check if DB already exists without creating an empty one
   let needsBackup = false;
   let oldDbVersion = 0;
 
   try {
-    const existingDb = await openDB(DB_NAME);
-    oldDbVersion = existingDb.version;
-    existingDb.close();
-    needsBackup = oldDbVersion < DB_VERSION && oldDbVersion > 0;
+    const databases = await indexedDB.databases();
+    const existing = databases.find((db) => db.name === DB_NAME);
+    if (existing && existing.version) {
+      oldDbVersion = existing.version;
+      needsBackup = oldDbVersion < DB_VERSION;
+    }
   } catch {
-    // DB doesn't exist yet (fresh install) -- no backup needed
-    needsBackup = false;
+    // indexedDB.databases() not supported — fall back to opening
+    try {
+      const existingDb = await openDB(DB_NAME);
+      oldDbVersion = existingDb.version;
+      existingDb.close();
+      needsBackup = oldDbVersion < DB_VERSION && oldDbVersion > 0;
+    } catch {
+      needsBackup = false;
+    }
   }
 
   // Back up before migration if the DB exists and is an older version
@@ -180,8 +205,8 @@ async function initDB(): Promise<IDBPDatabase> {
   try {
     const db = await openDB(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion, _newVersion, transaction) {
-        if (oldVersion < 1) {
-          // Fresh install: create store with all indexes
+        // Ensure store exists (handles both fresh install and corrupted state)
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, {
             keyPath: "id",
             autoIncrement: true,
@@ -190,9 +215,8 @@ async function initDB(): Promise<IDBPDatabase> {
           store.createIndex("by-trackUri", "trackUri");
           store.createIndex("by-artistUri", "artistUri");
           store.createIndex("by-type", "type");
-        }
-        if (oldVersion >= 1 && oldVersion < 3) {
-          // Users upgrading from v1 or v2: add any missing indexes without deleting data
+        } else {
+          // Store exists — add any missing indexes
           const store = transaction.objectStore(STORE_NAME);
           if (!store.indexNames.contains("by-startedAt")) {
             store.createIndex("by-startedAt", "startedAt");
@@ -203,10 +227,6 @@ async function initDB(): Promise<IDBPDatabase> {
           if (!store.indexNames.contains("by-artistUri")) {
             store.createIndex("by-artistUri", "artistUri");
           }
-        }
-        if (oldVersion >= 1 && oldVersion < 4) {
-          // v4: Add type index for play/skip filtering (future use)
-          const store = transaction.objectStore(STORE_NAME);
           if (!store.indexNames.contains("by-type")) {
             store.createIndex("by-type", "type");
           }
@@ -280,15 +300,16 @@ async function runDedup(db: IDBPDatabase): Promise<number> {
   }
 }
 
-export async function addPlayEvent(event: PlayEvent): Promise<void> {
+export async function addPlayEvent(event: PlayEvent): Promise<boolean> {
   const db = await getDB();
   const range = IDBKeyRange.only(event.startedAt);
   const existing = await db.getAllFromIndex(STORE_NAME, "by-startedAt", range);
   if (existing.some((e: PlayEvent) => e.trackUri === event.trackUri)) {
     console.warn("[ListeningStats] Duplicate event blocked:", event.trackName);
-    return;
+    return false;
   }
   await db.add(STORE_NAME, event);
+  return true;
 }
 
 export async function deduplicateExistingEvents(): Promise<number> {
@@ -313,5 +334,6 @@ export async function getAllPlayEvents(): Promise<PlayEvent[]> {
 export async function clearAllData(): Promise<void> {
   const db = await getDB();
   await db.clear(STORE_NAME);
+  resetDBPromise();
   console.log("[ListeningStats] IndexedDB data cleared");
 }

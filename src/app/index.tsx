@@ -1,5 +1,5 @@
 import { ApiError } from "../services/api-resilience";
-import { onPreferencesChanged } from "../services/preferences";
+import { getPreferences, onPreferencesChanged } from "../services/preferences";
 import {
   activateProvider,
   getActiveProvider,
@@ -21,6 +21,7 @@ import {
   DraggableSection,
   EmptyState,
   Footer,
+  GenreChips,
   LoadingSkeleton,
   OverviewCards,
   RecentlyPlayed,
@@ -44,49 +45,66 @@ const VERSION = getCurrentVersion();
 
 const TOUR_SEEN_KEY = "listening-stats:tour-seen";
 
-const FULL_TOUR_STEPS: TourStep[] = [
-  {
-    target: ".overview-row",
-    title: "Overview",
-    content:
-      "Your key stats at a glance. Total listening time, track count, and more. Use the period tabs above to switch time ranges.",
-    placement: "bottom",
-  },
-  {
-    target: ".top-lists-section",
-    title: "Top Lists",
-    content:
-      "Your most played tracks, artists, albums, and genres ranked by play count.",
-    placement: "bottom",
-  },
-  {
-    target: ".activity-section",
-    title: "Activity",
-    content:
-      "Your listening patterns by hour of day. Find when you listen the most.",
-    placement: "top",
-  },
-  {
-    target: ".recent-section",
-    title: "Recently Played",
-    content: "Your most recent tracks. Click any card to open it in Spotify.",
-    placement: "top",
-  },
-  {
-    target: ".section-drag-handle",
-    title: "Reorder Sections",
-    content:
-      "Drag these handles to rearrange your dashboard layout to your liking.",
-    placement: "right",
-  },
-  {
-    target: ".header-actions",
-    title: "Share & Settings",
-    content:
-      "Share your stats as an image or open settings to customize your experience.",
-    placement: "bottom",
-  },
-];
+function buildTourSteps(providerType: ProviderType | null): TourStep[] {
+  const steps: TourStep[] = [
+    {
+      target: ".overview-row",
+      title: "Overview",
+      content:
+        "Your key stats at a glance. Total listening time, track count, and more. Use the period tabs above to switch time ranges.",
+      placement: "bottom",
+    },
+    {
+      target: ".top-lists-section",
+      title: "Top Lists",
+      content:
+        "Your most played tracks, artists, albums, and genres ranked by play count.",
+      placement: "bottom",
+    },
+  ];
+
+  if (providerType === "statsfm") {
+    steps.push({
+      target: ".genre-bars-section",
+      title: "Top Genres",
+      content:
+        "Your most listened genres ranked by play count. Powered by stats.fm genre data.",
+      placement: "bottom",
+    });
+  }
+
+  steps.push(
+    {
+      target: ".activity-section",
+      title: "Activity",
+      content:
+        "Your listening patterns by hour of day. Find when you listen the most.",
+      placement: "top",
+    },
+    {
+      target: ".recent-section",
+      title: "Recently Played",
+      content: "Your most recent tracks. Click any card to open it in Spotify.",
+      placement: "top",
+    },
+    {
+      target: ".section-drag-handle",
+      title: "Reorder Sections",
+      content:
+        "Drag these handles to rearrange your dashboard layout to your liking.",
+      placement: "right",
+    },
+    {
+      target: ".header-actions",
+      title: "Share & Settings",
+      content:
+        "Share your stats as an image or open settings to customize your experience.",
+      placement: "bottom",
+    },
+  );
+
+  return steps;
+}
 
 function shouldShowTour(): "full" | "none" {
   try {
@@ -115,6 +133,7 @@ interface DashboardSectionsProps {
   likedTracks: Map<string, boolean>;
   onLikeToggle: (uri: string, e: React.MouseEvent) => void;
   showLikeButtons: boolean;
+  providerType: ProviderType | null;
 }
 
 const SECTION_REGISTRY: Record<
@@ -139,6 +158,7 @@ const SECTION_REGISTRY: Record<
       period={p.period}
     />
   ),
+  genres: (p) => <GenreChips topGenres={p.stats.topGenres} />,
   activity: (p) => (
     <ActivityChart
       hourlyDistribution={p.stats.hourlyDistribution}
@@ -158,7 +178,7 @@ function DashboardSections(props: DashboardSectionsProps) {
     const timer = setTimeout(() => {
       const tourType = shouldShowTour();
       if (tourType === "full") {
-        startTour(FULL_TOUR_STEPS);
+        startTour(buildTourSteps(props.providerType));
         markTourComplete();
       }
     }, 500);
@@ -168,7 +188,7 @@ function DashboardSections(props: DashboardSectionsProps) {
   // Listen for restart-tour event from Settings
   useEffect(() => {
     const handler = () => {
-      startTour(FULL_TOUR_STEPS);
+      startTour(buildTourSteps(props.providerType));
     };
     window.addEventListener("listening-stats:start-tour", handler);
     return () =>
@@ -322,6 +342,8 @@ function DashboardSections(props: DashboardSectionsProps) {
       {order.map((sectionId) => {
         const renderFn = SECTION_REGISTRY[sectionId];
         if (!renderFn) return null;
+        const hidden = getPreferences().hiddenSections;
+        if (hidden.includes(sectionId)) return null;
         const sectionDropPosition =
           dropTarget && dropTarget.id === sectionId
             ? dropTarget.position
@@ -601,6 +623,15 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
     clearStatsCache();
     const provider = getActiveProvider();
     if (provider) {
+      const isStatsfm = provider.type === "statsfm";
+      if (isStatsfm) {
+        // Switching to stats.fm implicitly dismisses the promo
+        try {
+          localStorage.setItem(SFM_PROMO_KEY, "1");
+        } catch {
+          /* ignore */
+        }
+      }
       this.setState(
         {
           providerType: provider.type,
@@ -608,6 +639,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
           stats: null,
           loading: true,
           showSettings: false,
+          showSfmPromo: isStatsfm ? false : this.state.showSfmPromo,
         },
         () => {
           this.loadStats();
@@ -646,7 +678,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
     const periodLabels = provider?.periodLabels || { recent: "Recent" };
     const showLikeButtons = providerType !== "lastfm";
 
-    const sfmPromoPortal = showSfmPromo
+    const sfmPromoPortal = showSfmPromo && providerType !== "statsfm"
       ? Spicetify.ReactDOM.createPortal(
           <SfmPromoPopup
             onDismiss={this.dismissSfmPromo}
@@ -790,6 +822,7 @@ class StatsPage extends Spicetify.React.Component<{}, State> {
             likedTracks={likedTracks}
             onLikeToggle={this.handleLikeToggle}
             showLikeButtons={showLikeButtons}
+            providerType={providerType}
           />
 
           <Footer

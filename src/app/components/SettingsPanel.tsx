@@ -89,7 +89,11 @@ export function SettingsPanel({
   const sfmConnected = Statsfm.isConnected();
   const sfmConfig = Statsfm.getConfig();
   const [loggingOn, setLoggingOn] = useState(isLoggingEnabled());
-  const [use24h, setUse24h] = useState(getPreferences().use24HourTime);
+  const prefs = getPreferences();
+  const [use24h, setUse24h] = useState(prefs.use24HourTime);
+  const [itemCount, setItemCount] = useState(prefs.itemsPerSection);
+  const [genreCount, setGenreCount] = useState(prefs.genresPerSection);
+  const [hiddenSections, setHiddenSections] = useState<string[]>(prefs.hiddenSections);
 
   const switchProvider = (type: ProviderType) => {
     activateProvider(type);
@@ -404,6 +408,85 @@ export function SettingsPanel({
             <span className="settings-toggle-knob" />
           </button>
         </div>
+
+        <div className="settings-toggle-row">
+          <div className="settings-toggle-info">
+            <h4 className="settings-section-title">Items per section</h4>
+            <p className="settings-toggle-desc">
+              Number of tracks, artists, and albums shown in each list
+            </p>
+          </div>
+          <div className="settings-item-count-picker">
+            {[3, 5, 10].map((n) => (
+              <button
+                key={n}
+                className={`settings-count-btn ${itemCount === n ? "active" : ""}`}
+                onClick={() => {
+                  setPreference("itemsPerSection", n);
+                  setItemCount(n);
+                }}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="settings-toggle-row">
+          <div className="settings-toggle-info">
+            <h4 className="settings-section-title">Genres shown</h4>
+            <p className="settings-toggle-desc">
+              Number of genres displayed in the Top Genres section
+            </p>
+          </div>
+          <div className="settings-item-count-picker">
+            {[3, 5, 10].map((n) => (
+              <button
+                key={n}
+                className={`settings-count-btn ${genreCount === n ? "active" : ""}`}
+                onClick={() => {
+                  setPreference("genresPerSection", n);
+                  setGenreCount(n);
+                }}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="settings-section-vis">
+          <h4 className="settings-section-title">Visible sections</h4>
+          <p className="settings-toggle-desc">
+            Toggle which sections appear on the dashboard
+          </p>
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "toplists", label: "Top Lists" },
+            { id: "genres", label: "Top Genres" },
+            { id: "activity", label: "Activity Chart" },
+            { id: "recent", label: "Recently Played" },
+          ].map(({ id, label }) => {
+            const isHidden = hiddenSections.includes(id);
+            return (
+              <div key={id} className="settings-toggle-row compact">
+                <span className="settings-vis-label">{label}</span>
+                <button
+                  className={`settings-toggle ${!isHidden ? "active" : ""}`}
+                  onClick={() => {
+                    const next = isHidden
+                      ? hiddenSections.filter((s) => s !== id)
+                      : [...hiddenSections, id];
+                    setPreference("hiddenSections", next);
+                    setHiddenSections(next);
+                  }}
+                >
+                  <span className="settings-toggle-knob" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </SettingsCategory>
 
       {/* --- Layout --- */}
@@ -421,6 +504,12 @@ export function SettingsPanel({
               window.dispatchEvent(
                 new CustomEvent("listening-stats:reset-layout"),
               );
+              setPreference("hiddenSections", []);
+              setHiddenSections([]);
+              setPreference("itemsPerSection", 5);
+              setItemCount(5);
+              setPreference("genresPerSection", 5);
+              setGenreCount(5);
               Spicetify.showNotification("Layout reset to default");
             }}
           >
@@ -607,6 +696,7 @@ export function SettingsPanel({
                   localStorage.removeItem("listening-stats:preferences");
                   localStorage.removeItem("listening-stats:tour-seen");
                   localStorage.removeItem("listening-stats:tour-version");
+                  localStorage.removeItem("listening-stats:card-order");
                 } catch {
                   /* ignore */
                 }

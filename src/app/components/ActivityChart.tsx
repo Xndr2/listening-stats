@@ -42,7 +42,7 @@ export function ActivityChart({
               key={hr}
               text={`${formatHour(hr)}: ${formatValue(val)}`}
               className={`activity-bar ${hr === peakHour && val > 0 ? "peak" : ""}`}
-              style={{ height: `${h}%` }}
+              style={{ height: `${h}%`, animationDelay: `${hr * 0.02}s` }}
             />
           );
         })}

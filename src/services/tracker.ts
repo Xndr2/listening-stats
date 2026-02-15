@@ -3,7 +3,6 @@ import { addPlayEvent } from "./storage";
 
 const STORAGE_KEY = "listening-stats:pollingData";
 const LOGGING_KEY = "listening-stats:logging";
-const SKIP_THRESHOLD_MS = 30000;
 const STATS_UPDATED_EVENT = "listening-stats:updated";
 const THRESHOLD_KEY = "listening-stats:playThreshold";
 const DEFAULT_THRESHOLD_MS = 10000; // 10 seconds per user decision
@@ -129,22 +128,15 @@ let currentTrackDuration = 0;
 let lastProgressMs = 0;
 let progressHandler: (() => void) | null = null;
 
-function handleSongChange(): void {
+async function handleSongChange(): Promise<void> {
   if (currentTrackUri && playStartTime !== null) {
     const totalPlayedMs =
       accumulatedPlayTime + (isPlaying ? Date.now() - playStartTime : 0);
-    const data = getPollingData();
-    data.totalPlays++;
 
     const threshold = getPlayThreshold();
     const skipped =
       totalPlayedMs < threshold &&
       currentTrackDuration > threshold;
-    if (skipped) {
-      data.skipEvents++;
-    }
-
-    savePollingData(data);
 
     if (previousTrackData) {
       log(
@@ -154,7 +146,7 @@ function handleSongChange(): void {
       );
     }
 
-    writePlayEvent(totalPlayedMs, skipped);
+    await writePlayEvent(totalPlayedMs, skipped);
   }
 
   const playerData = Spicetify.Player.data;
@@ -216,7 +208,7 @@ function captureCurrentTrackData(): void {
   };
 }
 
-function writePlayEvent(totalPlayedMs: number, skipped?: boolean): void {
+async function writePlayEvent(totalPlayedMs: number, skipped?: boolean): Promise<void> {
   if (!previousTrackData) return;
 
   // Determine skip status if not already computed by caller
@@ -240,12 +232,25 @@ function writePlayEvent(totalPlayedMs: number, skipped?: boolean): void {
     type: skipped ? "skip" : "play",
   };
 
-  addPlayEvent(event).catch((err) => {
-    console.warn("[ListeningStats] Failed to write play event:", err);
-  });
+  try {
+    const written = await addPlayEvent(event);
+    if (written) {
+      // Only update polling data when event was actually written to IndexedDB
+      const data = getPollingData();
+      data.totalPlays++;
+      if (skipped) {
+        data.skipEvents++;
+      }
+      savePollingData(data);
 
-  if (activeProviderType === "local") {
-    emitStatsUpdated();
+      if (activeProviderType === "local") {
+        emitStatsUpdated();
+      }
+    } else {
+      log("Dedup guard blocked duplicate event, polling data unchanged");
+    }
+  } catch (err) {
+    console.warn("[ListeningStats] Failed to write play event:", err);
   }
 }
 
