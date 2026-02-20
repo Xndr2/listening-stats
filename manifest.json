@@ -1,7 +1,9 @@
 {
   "name": "Listening Stats",
-  "icon": "<svg role=\"img\" viewBox=\"0 0 24 24\" height=\"24\" width=\"24\"><path fill=\"currentColor\" d=\"M3 12V15H5V12H3ZM7 8V19H9V8H7ZM11 5V22H13V5H11ZM15 8V19H17V8H15ZM19 12V15H21V12H19Z\"/></svg>",
-  "active-icon": "<svg role=\"img\" viewBox=\"0 0 24 24\" height=\"24\" width=\"24\"><path fill=\"currentColor\" d=\"M3 12V15H5V12H3ZM7 8V19H9V8H7ZM11 5V22H13V5H11ZM15 8V19H17V8H15ZM19 12V15H21V12H19Z\"/></svg>",
-  "subfiles": [],
-  "subfiles_extension": ["listening-stats.js"]
+  "description": "A real-time listening statistics dashboard.",
+  "preview": "resources/preview.png",
+  "readme": "README.md",
+  "branch": "dist",
+  "authors": [{ "name": "Xndr2", "url": "https://github.com/Xndr2" }],
+  "tags": ["Listening", "Stats"]
 }

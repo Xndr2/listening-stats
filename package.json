@@ -1,12 +1,12 @@
 {
   "name": "listening-stats",
-  "version": "1.3.26",
+  "version": "1.3.30",
   "description": "Real-time listening statistics dashboard for Spotify",
   "main": "dist/listening-stats.js",
   "scripts": {
     "prebuild": "node -e \"const p=require('./package.json');const v=p.version.split('.');v[2]=parseInt(v[2])+1;p.version=v.join('.');require('fs').writeFileSync('./package.json',JSON.stringify(p,null,2)+'\\n')\"",
-    "build:ext": "esbuild src/app.tsx --bundle --outfile=dist/listening-stats.js --format=iife --target=es2020 --external:react --external:react-dom --loader:.css=text --define:__APP_VERSION__=\"'$(node -p \"require('./package.json').version\")'\"",
-    "build:app": "esbuild src/app/index.tsx --bundle --outfile=dist/index.js --format=iife --global-name=ListeningStatsApp --target=es2020 --loader:.css=text --define:__APP_VERSION__=\"'$(node -p \"require('./package.json').version\")'\" --footer:js='var render=()=>Spicetify.React.createElement(ListeningStatsApp.default);var routes=[];'",
+    "build:ext": "npx esbuild src/app.tsx --bundle --outfile=dist/listening-stats.js --format=iife --target=es2020 --external:react --external:react-dom --loader:.css=text --define:__APP_VERSION__=\"'$(node -p \"require('./package.json').version\")'\"",
+    "build:app": "npx esbuild src/app/index.tsx --bundle --outfile=dist/index.js --format=iife --global-name=ListeningStatsApp --target=es2020 --loader:.css=text --define:__APP_VERSION__=\"'$(node -p \"require('./package.json').version\")'\" --footer:js='var render=()=>Spicetify.React.createElement(ListeningStatsApp.default);var routes=[];'",
     "build": "npm run build:ext && npm run build:app && cp manifest.json dist/",
     "apply": "npm run build && spicetify apply",
     "watch": "npm run build:ext -- --watch & npm run build:app -- --watch",
