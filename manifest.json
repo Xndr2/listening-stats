@@ -1,0 +1,9 @@
+{
+  "name": "Listening Stats",
+  "description": "A real-time listening statistics dashboard.",
+  "preview": "resources/preview.png",
+  "readme": "README.md",
+  "branch": "dist",
+  "authors": [{ "name": "Xndr2", "url": "https://github.com/Xndr2" }],
+  "tags": ["Listening", "Stats"]
+}
