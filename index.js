@@ -2121,7 +2121,7 @@ var ListeningStatsApp = (() => {
   var INSTALL_CMD_WINDOWS = `irm https://raw.githubusercontent.com/${GITHUB_REPO}/main/install.ps1 | iex`;
   function getCurrentVersion() {
     try {
-      return "1.3.32";
+      return "1.3.35";
     } catch {
       return "0.0.0";
     }
