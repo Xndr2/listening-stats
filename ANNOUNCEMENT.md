@@ -1,3 +1,3 @@
 ## Dev Note:
-Due to Spotify limiting their API, I've changed the "`Day Streak`" and "`Days Listened`" sections.  
-Please see the [changelog](https://github.com/Xndr2/listening-stats/releases/tag/v1.3.97).
+Hi all. A **complete rework** is being developed. This will ofc take some time.  
+Please leave feedback on the current system on [github](https://github.com/Xndr2/listening-stats/issues/new/choose) or message me on discord: @xndr.
