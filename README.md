@@ -1,12 +1,15 @@
 # Listening Stats - Spicetify Custom App
 
-A real-time listening statistics dashboard for Spotify, powered by Spicetify.
+A real-time listening statistics dashboard for Spotify, powered by Spicetify.  
+**I am reworking the entire project from the ground up. This will take some time, and a lot of testing.  
+Please leave feedback on the current system in my discord server: https://discord.gg/XtqbFAHk6a  
+Thanks for all the support - Xander**
 
 ![GitHub release](https://img.shields.io/github/v/release/Xndr2/Listening-Stats)
 ![Spicetify](https://img.shields.io/badge/spicetify-2.x-1DB954)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Xndr2/listening-stats/total)
 
-<img width="600" height="" alt="image" src="https://github.com/user-attachments/assets/b66daa0e-4d08-4eb2-b5ff-6b693ce4dbdc" />
+<!-- <img width="600" height="" alt="image" src="https://github.com/user-attachments/assets/b66daa0e-4d08-4eb2-b5ff-6b693ce4dbdc" /> -->
 
 ## Features
 
