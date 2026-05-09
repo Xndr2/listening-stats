@@ -1,6 +1,6 @@
 import esbuild from "esbuild";
 import { globalExternals } from "@fal-works/esbuild-plugin-global-externals";
-import { readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf-8"));
 
@@ -66,6 +66,11 @@ const appConfig = {
 	},
 };
 
+function copyManifestToDist() {
+	mkdirSync("dist", { recursive: true });
+	copyFileSync("manifest.json", "dist/manifest.json");
+}
+
 if (process.argv.includes("--watch")) {
 	const shouldDeploy = process.argv.includes("--deploy");
 
@@ -79,7 +84,7 @@ if (process.argv.includes("--watch")) {
 				execSync("spicetify apply", { stdio: "inherit" });
 				console.log("Deploy complete.");
 			} catch {
-				console.error("Deploy failed — is Spicetify CLI in PATH?");
+				console.error("Deploy failed - is Spicetify CLI in PATH?");
 			}
 		};
 		console.log("Deploy mode: will copy + apply after each rebuild.");
@@ -106,9 +111,11 @@ if (process.argv.includes("--watch")) {
 		esbuild.context(watchExtConfig),
 		esbuild.context(watchAppConfig),
 	]);
+	copyManifestToDist();
 	await Promise.all([extCtx.watch(), appCtx.watch()]);
 	console.log(`Watching for changes...${shouldDeploy ? " (deploy mode)" : ""}`);
 } else {
 	await Promise.all([esbuild.build(extConfig), esbuild.build(appConfig)]);
+	copyManifestToDist();
 	console.log(`Built v${pkg.version} (${isProduction ? "production" : "development"})`);
 }

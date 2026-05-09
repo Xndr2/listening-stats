@@ -34,3 +34,10 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Verify build outputs
+        run: |
+          test -f dist/extension.js
+          test -f dist/index.js
+          test -f dist/manifest.json
+          echo "All required dist files present."
