@@ -1,42 +1,58 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+  release:
+    types: [published]
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
         with:
-          node-version: 20
-          cache: "npm"
+          version: 9
 
-      - name: Install dependencies
-        run: npm ci
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
 
-      - name: Build
-        run: npm run build
+      - run: pnpm install --frozen-lockfile
 
-      - name: Create release archive
+      - name: Build production
+        run: NODE_ENV=production pnpm build
+
+      - name: Create release zip
         run: |
-          cd dist
-          zip -r ../listening-stats.zip .
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: listening-stats.zip
-          generate_release_notes: true
+          mkdir -p release/listening-stats
+          cp dist/extension.js release/listening-stats/
+          cp dist/index.js release/listening-stats/
+          cp manifest.json release/listening-stats/
+          node -e "const fs=require('fs'); const pre=String(process.env.RELEASE_PRE).toLowerCase()==='true'; fs.writeFileSync('release/latest-release.json', JSON.stringify({ tag: process.env.RELEASE_TAG, prerelease: pre }))"
+          cd release && zip -r ../listening-stats.zip listening-stats/
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRE: ${{ github.event.release.prerelease }}
+
+      - name: Upload release asset
+        run: gh release upload "${{ github.event.release.tag_name }}" listening-stats.zip --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update dist branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan dist-temp
+          git rm -rf .
+          cp release/listening-stats/* .
+          cp release/latest-release.json .
+          cp listening-stats.zip .
+          git add extension.js index.js manifest.json latest-release.json listening-stats.zip
+          git commit -m "Release ${{ github.event.release.tag_name }}"
+          git push origin dist-temp:dist --force
