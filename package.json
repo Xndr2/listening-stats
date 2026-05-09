@@ -1,44 +1,44 @@
 {
-	"name": "listening-stats",
-	"version": "1.3.0",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"build": "node build.mjs",
-		"watch": "node build.mjs --watch",
-		"watch:deploy": "node build.mjs --watch --deploy",
-		"deploy": "npm run build && npm run deploy:files && spicetify config custom_apps listening-stats && spicetify apply",
-		"deploy:files": "mkdir -p ~/.config/spicetify/CustomApps/listening-stats && cp dist/index.js dist/extension.js manifest.json ~/.config/spicetify/CustomApps/listening-stats/",
-		"undeploy": "spicetify config custom_apps listening-stats- && rm -rf ~/.config/spicetify/CustomApps/listening-stats && spicetify apply",
-		"typecheck": "tsc --noEmit",
-		"lint": "biome check src",
-		"lint:fix": "biome check --write src",
-		"test": "vitest run --reporter=verbose",
-		"test:watch": "vitest --reporter=verbose",
-		"sandcastle": "npx tsx .sandcastle/main.ts"
-	},
-	"devDependencies": {
-		"@ai-hero/sandcastle": "^0.5.8",
-		"@biomejs/biome": "^2.4.10",
-		"@fal-works/esbuild-plugin-global-externals": "^2.1.2",
-		"@testing-library/react": "^16.3.2",
-		"@types/node": "^25.5.0",
-		"@types/react": "^18.3.28",
-		"@types/react-dom": "^18.3.7",
-		"@types/semver": "^7.7.1",
-		"@vitest/coverage-v8": "^4.1.2",
-		"esbuild": "^0.27.4",
-		"fake-indexeddb": "^6.2.5",
-		"jsdom": "^29.0.1",
-		"react": "^18.3.1",
-		"react-dom": "^18.3.1",
-		"typescript": "^6.0.2",
-		"vitest": "^4.1.2"
-	},
-	"dependencies": {
-		"dexie": "^4.4.2",
-		"fflate": "^0.8.2",
-		"html2canvas": "^1.4.1",
-		"semver": "^7.8.0"
-	}
+  "name": "listening-stats",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "watch:deploy": "node build.mjs --watch --deploy",
+    "deploy": "npm run build && npm run deploy:files && spicetify config custom_apps listening-stats && spicetify apply",
+    "deploy:files": "mkdir -p ~/.config/spicetify/CustomApps/listening-stats && cp dist/index.js dist/extension.js manifest.json ~/.config/spicetify/CustomApps/listening-stats/",
+    "undeploy": "spicetify config custom_apps listening-stats- && rm -rf ~/.config/spicetify/CustomApps/listening-stats && spicetify apply",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src",
+    "lint:fix": "biome check --write src",
+    "test": "vitest run --reporter=verbose",
+    "test:watch": "vitest --reporter=verbose",
+    "sandcastle": "npx tsx .sandcastle/main.ts"
+  },
+  "devDependencies": {
+    "@ai-hero/sandcastle": "^0.5.8",
+    "@biomejs/biome": "^2.4.10",
+    "@fal-works/esbuild-plugin-global-externals": "^2.1.2",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^25.5.0",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "@types/semver": "^7.7.1",
+    "@vitest/coverage-v8": "^4.1.2",
+    "esbuild": "^0.27.4",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  },
+  "dependencies": {
+    "dexie": "^4.4.2",
+    "fflate": "^0.8.2",
+    "html2canvas": "^1.4.1",
+    "semver": "^7.8.0"
+  }
 }
