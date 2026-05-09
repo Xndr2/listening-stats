@@ -1,36 +1,6 @@
-# Dependencies
 node_modules/
-
-# Build output (uncomment if you don't want to track dist)
-# dist/
-
-# IDE
-.idea/
-*.swp
-*.swo
-.DS_Store
-
-# Logs
-*.log
-npm-debug.log*
-
-# Environment
-.env
-.env.local
-
-# Temporary files
-*.tmp
-*.temp
-
-# OS files
-Thumbs.db
-Development.md
-
-# Changelog Editor
-ChangelogEditor/
-
-# Wiki files
-Wiki/
-
-# dist files
 dist/
+coverage/
+*.tgz
+.DS_Store
+.claude/
