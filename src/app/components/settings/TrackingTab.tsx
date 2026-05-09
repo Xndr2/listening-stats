@@ -10,7 +10,9 @@ import { EVENTS } from "../../../shared/constants/events";
 import { LS_KEYS } from "../../../shared/constants/storage-keys";
 import { SegmentedControl } from "../SegmentedControl";
 
-const THRESHOLD_STOPS = [0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000];
+const THRESHOLD_STOPS = [
+	0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000,
+];
 
 const { useState } = Spicetify.React;
 
@@ -35,9 +37,7 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 	const handlePause = (val: boolean) => {
 		setPaused(val);
 		setTrackingPaused(val);
-		window.dispatchEvent(
-			new CustomEvent(val ? EVENTS.TRACKING_PAUSED : EVENTS.TRACKING_RESUMED),
-		);
+		window.dispatchEvent(new CustomEvent(val ? EVENTS.TRACKING_PAUSED : EVENTS.TRACKING_RESUMED));
 		onPrefsChanged();
 	};
 
@@ -59,7 +59,7 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 		onPrefsChanged();
 	};
 
-	const Toggle = Spicetify.ReactComponent?.Toggle;
+	const Toggle = Spicetify.ReactComponent.Toggle;
 
 	return (
 		<div>
@@ -75,7 +75,7 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 					<input
 						type="checkbox"
 						checked={paused}
-						onChange={(e: Event) => handlePause((e.target as HTMLInputElement).checked)}
+						onChange={(e) => handlePause(e.currentTarget.checked)}
 					/>
 				)}
 			</div>
@@ -92,9 +92,7 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 					<input
 						type="checkbox"
 						checked={skipRepeats}
-						onChange={(e: Event) =>
-							handleSkipRepeats((e.target as HTMLInputElement).checked)
-						}
+						onChange={(e) => handleSkipRepeats(e.currentTarget.checked)}
 					/>
 				)}
 			</div>
@@ -125,9 +123,7 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 					<input
 						type="checkbox"
 						checked={logging}
-						onChange={(e: Event) =>
-							handleLogging((e.target as HTMLInputElement).checked)
-						}
+						onChange={(e) => handleLogging(e.currentTarget.checked)}
 					/>
 				)}
 			</div>

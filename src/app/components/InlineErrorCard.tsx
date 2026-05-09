@@ -85,7 +85,7 @@ export function InlineErrorCard({ error, onRetry, onOpenSettings }: InlineErrorC
 				)}
 			</div>
 			{config.cta && (
-				<button className="inline-error-cta" onClick={handleCta}>
+				<button type="button" className="inline-error-cta" onClick={handleCta}>
 					{ctaLabel}
 				</button>
 			)}

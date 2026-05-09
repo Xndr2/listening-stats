@@ -14,7 +14,7 @@ export default function ErrorState({ sectionName, onRetry }: ErrorStateProps) {
 			>
 				Failed to load {sectionName}.
 			</p>
-			<button className="btn-primary" onClick={onRetry} style={{ marginTop: "8px" }}>
+			<button type="button" className="btn-primary" onClick={onRetry} style={{ marginTop: "8px" }}>
 				Retry Load
 			</button>
 		</div>

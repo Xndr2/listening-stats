@@ -1,6 +1,6 @@
 import { LS_KEYS } from "../constants/storage-keys";
-import { db } from "./db";
 import { checkBackupExists, importPlayEvents, restoreFromBackupIdb } from "./backup";
+import { db } from "./db";
 
 export interface IntegrityResult {
 	ok: boolean;

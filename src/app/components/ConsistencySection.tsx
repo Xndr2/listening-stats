@@ -96,9 +96,8 @@ export function ConsistencySection({
 	}
 	const points = buildWindow(dailyPlayCounts ?? [], activePeriod);
 	const totalDays = points.length;
-	const activeDays = points.length > 0
-		? points.filter((p) => p.count > 0).length
-		: (listeningDays ?? 0);
+	const activeDays =
+		points.length > 0 ? points.filter((p) => p.count > 0).length : (listeningDays ?? 0);
 	const avgPlaysPerActiveDay = activeDays > 0 ? totalPlays / activeDays : 0;
 	const avgMinutesPerActiveDay = activeDays > 0 ? totalDuration / 60000 / activeDays : 0;
 	const longestGap = computeLongestGap(points);
@@ -153,7 +152,9 @@ export function ConsistencySection({
 			</div>
 			{!isTodayPeriod && (
 				<div className="consistency-footer">
-					<Tooltip label={`You listened on ${activeDays} of ${totalDays || activeDays} days in this period.`}>
+					<Tooltip
+						label={`You listened on ${activeDays} of ${totalDays || activeDays} days in this period.`}
+					>
 						<div className="consistency-coverage">
 							<div className="consistency-coverage-label">Active-day coverage</div>
 							<div className="consistency-coverage-row">
@@ -212,7 +213,9 @@ export function ConsistencySection({
 												<div className="consistency-sparkline-bar-wrap">
 													<div
 														className={`consistency-sparkline-bar${isPeak ? " peak" : ""}`}
-														style={{ height: `${Math.max((p.count / trendMax) * 100, p.count > 0 ? 8 : 2)}%` }}
+														style={{
+															height: `${Math.max((p.count / trendMax) * 100, p.count > 0 ? 8 : 2)}%`,
+														}}
 													/>
 												</div>
 											</Tooltip>

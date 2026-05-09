@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { circuitBreaker } from "../shared/api/circuit-breaker";
-import { sfmCircuitBreaker, sfmGet, validateUsername, type StatsFmHealthPayload } from "../shared/api/statsfm-client";
+import {
+	type StatsFmHealthPayload,
+	sfmCircuitBreaker,
+	sfmGet,
+	validateUsername,
+} from "../shared/api/statsfm-client";
 
 // Helper to build a fake fetch Response
 function makeResponse(status: number, body: unknown = null): Response {
@@ -46,7 +51,10 @@ describe("sfmGet", () => {
 	});
 
 	it("sfmGet unwraps { items: T[] } wrapper", async () => {
-		const tracks = [{ position: 1, streams: 100 }, { position: 2, streams: 50 }];
+		const tracks = [
+			{ position: 1, streams: 100 },
+			{ position: 2, streams: 50 },
+		];
 		const fetchMock = vi.fn().mockResolvedValue(makeResponse(200, { items: tracks }));
 		vi.stubGlobal("fetch", fetchMock);
 		const result = await sfmGet<typeof tracks>("/top/tracks");

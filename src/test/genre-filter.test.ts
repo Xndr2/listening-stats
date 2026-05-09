@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, fireEvent } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import React from "react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("Genre filter pill preferences", () => {
 	beforeEach(() => {
@@ -98,7 +98,9 @@ describe("Genre filter FilterPill component", () => {
 		const { container } = render(
 			React.createElement(FilterPill, {
 				activeGenre: "rock",
-				onClear: () => { cleared = true; },
+				onClear: () => {
+					cleared = true;
+				},
 			}),
 		);
 		const btn = container.querySelector(".filter-pill-close") as HTMLButtonElement;
@@ -112,9 +114,7 @@ describe("Genre filter FilterPill component", () => {
 			React.createElement(FilterPill, { activeGenre: "rock", onClear: () => {} }),
 		);
 		expect(container.querySelector(".filter-pill")?.textContent).toContain("rock");
-		rerender(
-			React.createElement(FilterPill, { activeGenre: "jazz", onClear: () => {} }),
-		);
+		rerender(React.createElement(FilterPill, { activeGenre: "jazz", onClear: () => {} }));
 		expect(container.querySelector(".filter-pill")?.textContent).toContain("jazz");
 		expect(container.querySelector(".filter-pill")?.textContent).not.toContain("rock");
 	});
@@ -134,7 +134,9 @@ describe("Genre filter TopGenres wiring", () => {
 					{ rank: 1, genre: "pop", count: 100 },
 					{ rank: 2, genre: "rock", count: 50 },
 				],
-				onGenreClick: (g: string) => { clicked = g; },
+				onGenreClick: (g: string) => {
+					clicked = g;
+				},
 				activeGenre: null,
 			}),
 		);
@@ -152,7 +154,9 @@ describe("Genre filter TopGenres wiring", () => {
 					{ rank: 1, genre: "pop", count: 100 },
 					{ rank: 2, genre: "rock", count: 50 },
 				],
-				onGenreClick: (g: string) => { clicks.push(g); },
+				onGenreClick: (g: string) => {
+					clicks.push(g);
+				},
 				activeGenre: null,
 			}),
 		);

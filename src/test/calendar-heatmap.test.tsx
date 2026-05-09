@@ -1,5 +1,5 @@
+import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, cleanup } from "@testing-library/react";
 import { CalendarHeatmap } from "../app/components/CalendarHeatmap";
 
 afterEach(() => {
@@ -40,7 +40,7 @@ describe("CalendarHeatmap", () => {
 		const { container } = render(<CalendarHeatmap dailyPlayCounts={data} />);
 		const labels = container.querySelector(".heatmap-month-labels");
 		expect(labels).not.toBeNull();
-		const text = labels!.textContent ?? "";
+		const text = labels?.textContent ?? "";
 		expect(text.length).toBeGreaterThan(0);
 	});
 

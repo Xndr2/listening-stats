@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { db } from "../shared/storage/db";
+import { importFileEvents, parseJsonEvents, parseV1Csv } from "../shared/storage/import";
 import { generateSyntheticUris } from "../shared/storage/synthetic-uris";
-import {
-	parseV1Csv,
-	parseJsonEvents,
-	importFileEvents,
-	type ImportResult,
-} from "../shared/storage/import";
 import type { PlayEvent } from "../shared/types/play-event";
 
 // ──────────────────────────────────────────────────────
@@ -138,7 +133,8 @@ describe("parseV1Csv", () => {
 	});
 
 	it("throws when header is missing parentheses (old format)", async () => {
-		const badCsv = "Track,Artist,Album,Duration ms,Played ms,Started At,Ended At\nTrack 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z";
+		const badCsv =
+			"Track,Artist,Album,Duration ms,Played ms,Started At,Ended At\nTrack 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z";
 		await expect(parseV1Csv(badCsv)).rejects.toThrow("unrecognized CSV format");
 	});
 
@@ -197,8 +193,10 @@ describe("parseV1Csv", () => {
 	});
 
 	it("parses multiple rows and returns all valid events", async () => {
-		const rows = Array.from({ length: 5 }, (_, i) =>
-			`Track ${i + 1},Artist ${i + 1},Album ${i + 1},180000,150000,2024-0${i + 1}-01T10:00:00.000Z,2024-0${i + 1}-01T10:02:30.000Z`
+		const rows = Array.from(
+			{ length: 5 },
+			(_, i) =>
+				`Track ${i + 1},Artist ${i + 1},Album ${i + 1},180000,150000,2024-0${i + 1}-01T10:00:00.000Z,2024-0${i + 1}-01T10:02:30.000Z`,
 		);
 		const csv = buildV1Csv(rows);
 		const result = await parseV1Csv(csv);
@@ -355,7 +353,9 @@ describe("parseJsonEvents", () => {
 			topArtists: [],
 			totalTimeMs: 0,
 		};
-		await expect(parseJsonEvents(JSON.stringify(statsResult))).rejects.toThrow("raw play events array");
+		await expect(parseJsonEvents(JSON.stringify(statsResult))).rejects.toThrow(
+			"raw play events array",
+		);
 	});
 
 	it("throws for non-array JSON  -  error message contains 'not a valid JSON' or 'raw play events array'", async () => {
@@ -400,7 +400,10 @@ describe("importFileEvents", () => {
 	});
 
 	it("inserts events into the DB and returns correct imported count", async () => {
-		const events = [makePlayEvent({ startedAt: 1000 }), makePlayEvent({ startedAt: 2000, trackName: "Track 2" })];
+		const events = [
+			makePlayEvent({ startedAt: 1000 }),
+			makePlayEvent({ startedAt: 2000, trackName: "Track 2" }),
+		];
 		const result = await importFileEvents(events);
 		expect(result.imported).toBe(2);
 		expect(result.skipped).toBe(0);
@@ -472,7 +475,7 @@ describe("importFileEvents", () => {
 
 	it("uses bulkAdd  -  multiple events inserted in a single transaction", async () => {
 		const events = Array.from({ length: 10 }, (_, i) =>
-			makePlayEvent({ startedAt: i * 1000 + 1, trackName: `Track ${i}` })
+			makePlayEvent({ startedAt: i * 1000 + 1, trackName: `Track ${i}` }),
 		);
 		const result = await importFileEvents(events);
 		expect(result.imported).toBe(10);

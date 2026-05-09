@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { navigateToUri, downloadFile } from "../app/utils";
+import { downloadFile, navigateToUri } from "../app/utils";
 
 describe("navigateToUri", () => {
 	beforeEach(() => {

@@ -1,9 +1,9 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { providerRegistry } from "../shared/stats/provider";
-import { localProvider } from "../shared/stats/local-provider";
-import { statsfmProvider } from "../shared/stats/statsfm-provider";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setPreference } from "../app/preferences";
-import type { StatsResult, Period } from "../shared/types/stats";
+import { localProvider } from "../shared/stats/local-provider";
+import { providerRegistry } from "../shared/stats/provider";
+import { statsfmProvider } from "../shared/stats/statsfm-provider";
+import type { Period, StatsResult } from "../shared/types/stats";
 
 const baseStats: StatsResult = {
 	topTracks: [],
@@ -33,7 +33,11 @@ function setActiveProvider(id: "local" | "statsfm"): void {
 	providerRegistry.setActive(id);
 }
 
-async function renderOverview(container: HTMLElement, stats: StatsResult, period: Period = mockPeriod) {
+async function renderOverview(
+	container: HTMLElement,
+	stats: StatsResult,
+	period: Period = mockPeriod,
+) {
 	const OverviewSection = (await import("../app/components/OverviewSection")).default;
 	Spicetify.ReactDOM.render(
 		Spicetify.React.createElement(OverviewSection, { stats, activePeriod: period }),
@@ -123,7 +127,7 @@ describe("Issue 41: card reflow for missing/unavailable cards", () => {
 		expect(bottomRow).not.toBeNull();
 		const cards = bottomRow!.querySelectorAll(".overview-card");
 		expect(cards.length).toBe(2);
-		const cols = bottomRow!.style.gridTemplateColumns;
+		const cols = bottomRow?.style.gridTemplateColumns;
 		expect(cols).toContain("2");
 	});
 
@@ -142,12 +146,12 @@ describe("Issue 41: card reflow for missing/unavailable cards", () => {
 // ──────────────────────────────────────────────────────────────────────
 describe("Issue 41: section spacing", () => {
 	it("stats-page-content uses --space-md (16px) gap, not --space-lg (24px)", async () => {
-		const fs = await import("fs");
+		const fs = await import("node:fs");
 		const css = fs.readFileSync("src/app/styles.css", "utf8");
 		const match = css.match(/\.stats-page-content\s*\{[^}]*gap:\s*([^;]+)/);
 		expect(match).not.toBeNull();
-		expect(match![1]).toContain("--space-md");
-		expect(match![1]).not.toContain("--space-lg");
+		expect(match?.[1]).toContain("--space-md");
+		expect(match?.[1]).not.toContain("--space-lg");
 	});
 });
 
@@ -185,7 +189,7 @@ describe("Issue 41: onboarding is in-page window", () => {
 			Spicetify.React.createElement(SetupWizard, { onComplete: vi.fn() }),
 			container,
 		);
-		expect(container.querySelector('[aria-modal]')).toBeNull();
+		expect(container.querySelector("[aria-modal]")).toBeNull();
 	});
 });
 
@@ -272,7 +276,7 @@ describe("Issue 41: no em-dash in UI values", () => {
 	it("streak == 0 renders hyphen-minus, not em-dash", async () => {
 		await renderOverview(container, { ...baseStats, streak: 0, newArtistCount: 3 });
 		const streakCard = container.querySelector('[data-card-id="streak"]');
-		const value = streakCard!.querySelector(".overview-card-value");
+		const value = streakCard?.querySelector(".overview-card-value");
 		expect(value?.textContent).toBe("-");
 	});
 

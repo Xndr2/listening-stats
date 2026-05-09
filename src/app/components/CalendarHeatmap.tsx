@@ -14,7 +14,10 @@ interface CellData {
 	count: number;
 }
 
-function buildGrid(dailyPlayCounts: DailyCount[]): { cells: (CellData | null)[][]; monthLabels: { col: number; label: string }[] } {
+function buildGrid(dailyPlayCounts: DailyCount[]): {
+	cells: (CellData | null)[][];
+	monthLabels: { col: number; label: string }[];
+} {
 	const today = new Date();
 	today.setHours(0, 0, 0, 0);
 
@@ -76,7 +79,10 @@ export function CalendarHeatmap({ dailyPlayCounts }: CalendarHeatmapProps) {
 	const { cells, monthLabels } = buildGrid(dailyPlayCounts);
 	const numWeeks = cells.length;
 	const max = Math.max(
-		...cells.flat().filter((c): c is CellData => c !== null).map((c) => c.count),
+		...cells
+			.flat()
+			.filter((c): c is CellData => c !== null)
+			.map((c) => c.count),
 		1,
 	);
 

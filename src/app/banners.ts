@@ -1,5 +1,5 @@
-import { LS_KEYS } from "../shared/constants/storage-keys";
 import type { ParsedRemoteAnnouncement } from "../shared/announcements/remote-announcement";
+import { LS_KEYS } from "../shared/constants/storage-keys";
 
 export interface BannerConfig {
 	title: string;

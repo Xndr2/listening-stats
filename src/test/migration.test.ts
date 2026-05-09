@@ -1,13 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { db, registerVersionChangeHandler } from "../shared/storage/db";
-import type { ArtistRecord } from "../shared/types/stats";
-import type { PlayEvent } from "../shared/types/play-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as backup from "../shared/storage/backup";
+import { db, registerVersionChangeHandler } from "../shared/storage/db";
 import {
-	MIGRATIONS,
 	backupIfUpgradeNeeded,
 	initDatabase,
+	MIGRATIONS,
 } from "../shared/storage/migration-manager";
+import type { PlayEvent } from "../shared/types/play-event";
+import type { ArtistRecord } from "../shared/types/stats";
 
 function makeEvent(startedAt: number): Omit<PlayEvent, "id"> {
 	return {

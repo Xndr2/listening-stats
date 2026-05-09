@@ -24,10 +24,7 @@ describe("GenreChips component", () => {
 
 	it("renders nothing when genres is empty array", async () => {
 		const { GenreChips } = await import("../app/components/GenreChips");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(GenreChips, { genres: [] }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(GenreChips, { genres: [] }), container);
 		expect(container.innerHTML).toBe("");
 	});
 
@@ -42,10 +39,7 @@ describe("GenreChips component", () => {
 
 	it("does NOT emit .genre-chips wrapper when genres is empty []", async () => {
 		const { GenreChips } = await import("../app/components/GenreChips");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(GenreChips, { genres: [] }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(GenreChips, { genres: [] }), container);
 		expect(container.querySelector(".genre-chips")).toBeNull();
 	});
 

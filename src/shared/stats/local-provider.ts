@@ -1,19 +1,19 @@
+import { db } from "../storage/db";
 import type { PlayEvent } from "../types/play-event";
 import type {
 	Period,
-	StatsResult,
-	TopTrack,
-	TopArtist,
-	TopAlbum,
-	TopGenre,
 	RecentPlay,
+	StatsResult,
+	TopAlbum,
+	TopArtist,
+	TopGenre,
+	TopTrack,
 } from "../types/stats";
-import type { StatsProvider, ProviderInfo } from "./provider";
-import type { WaveCallback } from "./progressive";
-import { LOCAL_PERIODS, getAdjacentPeriod, getPriorPeriodBoundaries } from "./periods";
-import { statsCache } from "./stats-cache";
 import { enrichArtists } from "./artist-enrichment";
-import { db } from "../storage/db";
+import { getAdjacentPeriod, getPriorPeriodBoundaries, LOCAL_PERIODS } from "./periods";
+import type { WaveCallback } from "./progressive";
+import type { ProviderInfo, StatsProvider } from "./provider";
+import { statsCache } from "./stats-cache";
 
 const CACHE_KEY_PREFIX = "local";
 const RECENT_PLAYS_LIMIT = 12;
@@ -148,7 +148,14 @@ export class LocalProvider implements StatsProvider {
 		>();
 		const albumMap = new Map<
 			string,
-			{ name: string; uri: string; artistName: string; albumArt?: string; count: number; durationMs: number }
+			{
+				name: string;
+				uri: string;
+				artistName: string;
+				albumArt?: string;
+				count: number;
+				durationMs: number;
+			}
 		>();
 
 		for (const event of events) {
@@ -261,9 +268,8 @@ export class LocalProvider implements StatsProvider {
 			const idx = jsDay === 0 ? 6 : jsDay - 1; // -> 0=Mon..6=Sun
 			weekdayDistribution[idx]++;
 		}
-		const peakWeekday = events.length > 0
-			? weekdayDistribution.indexOf(Math.max(...weekdayDistribution))
-			: 0;
+		const peakWeekday =
+			events.length > 0 ? weekdayDistribution.indexOf(Math.max(...weekdayDistribution)) : 0;
 
 		// Daily play counts for heatmap (53 weeks lookback)
 		const dailyCountMap = new Map<string, number>();

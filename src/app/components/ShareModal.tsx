@@ -1,7 +1,7 @@
-import type { StatsResult, Period } from "../../shared/types/stats";
 import { LS_KEYS } from "../../shared/constants/storage-keys";
 import { providerRegistry } from "../../shared/stats/provider";
-import { formatNumber, formatHour } from "../format";
+import type { Period, StatsResult } from "../../shared/types/stats";
+import { formatHour, formatNumber } from "../format";
 import { CloseIcon } from "../icons";
 
 const { useState, useCallback, useEffect, useMemo } = Spicetify.React;
@@ -48,7 +48,9 @@ function getUsername(): string {
 			const config = JSON.parse(raw);
 			if (config?.username) return config.username;
 		}
-	} catch { /* ignore */ }
+	} catch {
+		/* ignore */
+	}
 	return "";
 }
 
@@ -92,14 +94,11 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 			setPreviewLoading(true);
 			setPreviewError(null);
 			try {
-				const blob = await renderShareCardBlob(
-					stats,
-					variant,
-					size,
-					periodLabel,
-					username,
-					{ followTheme, activeProviderId, periodDayCount },
-				);
+				const blob = await renderShareCardBlob(stats, variant, size, periodLabel, username, {
+					followTheme,
+					activeProviderId,
+					periodDayCount,
+				});
 				if (canceled) return;
 				currentUrl = URL.createObjectURL(blob);
 				setPreviewUrl(currentUrl);
@@ -118,51 +117,68 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 
 	const handleVariantChange = (v: ShareVariant) => setVariant(v);
 
-	const handleOverlayClick = useCallback((e: React.MouseEvent) => {
-		if ((e.target as HTMLElement).classList.contains("share-overlay")) {
-			onClose();
-		}
-	}, [onClose]);
+	const handleOverlayClick = useCallback(
+		(e: React.MouseEvent) => {
+			if ((e.target as HTMLElement).classList.contains("share-overlay")) {
+				onClose();
+			}
+		},
+		[onClose],
+	);
 
 	const handleDownload = useCallback(async () => {
 		if (busy) return;
 		setBusy(true);
 		try {
-			await exportShareCardPng(
-				stats,
-				variant,
-				size,
-				periodLabel,
-				username,
-				{ followTheme, activeProviderId, periodDayCount },
-			);
+			await exportShareCardPng(stats, variant, size, periodLabel, username, {
+				followTheme,
+				activeProviderId,
+				periodDayCount,
+			});
 			Spicetify.showNotification("Share card downloaded!");
 		} catch {
 			Spicetify.showNotification("Could not export share card.", true);
 		} finally {
 			setBusy(false);
 		}
-	}, [stats, variant, size, periodLabel, username, followTheme, activeProviderId, periodDayCount, busy]);
+	}, [
+		stats,
+		variant,
+		size,
+		periodLabel,
+		username,
+		followTheme,
+		activeProviderId,
+		periodDayCount,
+		busy,
+	]);
 
 	const handleCopy = useCallback(async () => {
 		if (busy) return;
 		setBusy(true);
 		try {
-			await copyShareCardToClipboard(
-				stats,
-				variant,
-				size,
-				periodLabel,
-				username,
-				{ followTheme, activeProviderId, periodDayCount },
-			);
+			await copyShareCardToClipboard(stats, variant, size, periodLabel, username, {
+				followTheme,
+				activeProviderId,
+				periodDayCount,
+			});
 			Spicetify.showNotification("Copied to clipboard!");
 		} catch {
 			Spicetify.showNotification("Could not copy share card.", true);
 		} finally {
 			setBusy(false);
 		}
-	}, [stats, variant, size, periodLabel, username, followTheme, activeProviderId, periodDayCount, busy]);
+	}, [
+		stats,
+		variant,
+		size,
+		periodLabel,
+		username,
+		followTheme,
+		activeProviderId,
+		periodDayCount,
+		busy,
+	]);
 
 	return Spicetify.ReactDOM.createPortal(
 		<div className="share-overlay" onClick={handleOverlayClick}>
@@ -170,6 +186,7 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 				<div className="share-modal-header">
 					<h2 className="share-modal-title">Share Cards</h2>
 					<button
+						type="button"
 						className="share-modal-close stats-header-icon-btn"
 						onClick={onClose}
 						aria-label="Close share modal"
@@ -180,30 +197,32 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 				<div className="share-control-group">
 					<div className="share-control-label">Card type</div>
 					<div className="share-tabs-row">
-					{availableVariants.map((v) => (
-						<button
-							key={v.id}
-							className={`share-variant-tab${variant === v.id ? " active" : ""}`}
-							onClick={() => handleVariantChange(v.id)}
-						>
-							{v.label}
-						</button>
-					))}
+						{availableVariants.map((v) => (
+							<button
+								type="button"
+								key={v.id}
+								className={`share-variant-tab${variant === v.id ? " active" : ""}`}
+								onClick={() => handleVariantChange(v.id)}
+							>
+								{v.label}
+							</button>
+						))}
 					</div>
 				</div>
 
 				<div className="share-control-group">
 					<div className="share-control-label">Layout</div>
 					<div className="share-tabs-row">
-					{SIZES.map((s) => (
-						<button
-							key={s.id}
-							className={`share-size-tab${size === s.id ? " active" : ""}`}
-							onClick={() => setSize(s.id)}
-						>
-							{s.label}
-						</button>
-					))}
+						{SIZES.map((s) => (
+							<button
+								type="button"
+								key={s.id}
+								className={`share-size-tab${size === s.id ? " active" : ""}`}
+								onClick={() => setSize(s.id)}
+							>
+								{s.label}
+							</button>
+						))}
 					</div>
 				</div>
 
@@ -238,6 +257,7 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 
 				<div className="share-actions">
 					<button
+						type="button"
 						className="btn-primary share-action-btn"
 						data-testid="share-copy-btn"
 						onClick={handleCopy}
@@ -246,6 +266,7 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 						{busy ? "Working…" : "Copy image"}
 					</button>
 					<button
+						type="button"
 						className="btn-primary share-action-btn"
 						data-testid="share-download-btn"
 						onClick={handleDownload}
@@ -282,7 +303,7 @@ interface ShareCardPreviewProps {
 	username: string;
 }
 
-function ShareCardPreview({ variant, size, stats, periodLabel, username }: ShareCardPreviewProps) {
+function _ShareCardPreview({ variant, size, stats, periodLabel, username }: ShareCardPreviewProps) {
 	const w = getPreviewWidth(variant, size);
 	const aspect = getAspectRatio(size);
 	const isWrapped = variant === "wrapped";
@@ -411,7 +432,17 @@ function tileGrad(seed: string): string {
 	return `linear-gradient(135deg, ${pair[0]}, ${pair[1]})`;
 }
 
-function Tile({ seed, sz, rounded = 4, imageUrl }: { seed: string; sz: number; rounded?: number; imageUrl?: string }) {
+function Tile({
+	seed,
+	sz,
+	rounded = 4,
+	imageUrl,
+}: {
+	seed: string;
+	sz: number;
+	rounded?: number;
+	imageUrl?: string;
+}) {
 	const bg = imageUrl
 		? `url(${imageUrl}) center/cover no-repeat, ${tileGrad(seed)}`
 		: tileGrad(seed);
@@ -438,15 +469,47 @@ function ShareTop5({ stats }: { stats: StatsResult }) {
 	return (
 		<div>
 			<div style={KICKER_STYLE}>My top 5</div>
-			<ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+			<ol
+				style={{
+					listStyle: "none",
+					margin: 0,
+					padding: 0,
+					display: "flex",
+					flexDirection: "column",
+					gap: 8,
+				}}
+			>
 				{tracks.map((t, i) => (
-					<li key={t.trackUri} data-testid="share-top5-item" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-						<span style={{ fontSize: 18, fontWeight: 800, color: "var(--spice-button, #1ed760)", width: 18, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+					<li
+						key={t.trackUri}
+						data-testid="share-top5-item"
+						style={{ display: "flex", alignItems: "center", gap: 10 }}
+					>
+						<span
+							style={{
+								fontSize: 18,
+								fontWeight: 800,
+								color: "var(--spice-button, #1ed760)",
+								width: 18,
+								textAlign: "right",
+								fontVariantNumeric: "tabular-nums",
+							}}
+						>
 							{i + 1}
 						</span>
 						<Tile seed={t.trackUri} sz={28} imageUrl={t.albumArt} />
 						<div style={{ minWidth: 0, flex: 1 }}>
-							<div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.trackName}</div>
+							<div
+								style={{
+									fontSize: 12,
+									fontWeight: 600,
+									whiteSpace: "nowrap",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+								}}
+							>
+								{t.trackName}
+							</div>
 							<div style={{ fontSize: 10, color: "rgba(255,255,255,.55)" }}>{t.artistName}</div>
 						</div>
 					</li>
@@ -463,14 +526,27 @@ function ShareTime({ stats }: { stats: StatsResult }) {
 	return (
 		<div>
 			<div style={KICKER_STYLE}>This month I listened</div>
-			<div data-testid="share-time-hero" style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-				<span style={{ fontSize: 80, fontWeight: 900, color: "var(--spice-button, #1ed760)", lineHeight: 0.9, letterSpacing: "-.04em" }}>
+			<div
+				data-testid="share-time-hero"
+				style={{ display: "flex", alignItems: "baseline", gap: 8 }}
+			>
+				<span
+					style={{
+						fontSize: 80,
+						fontWeight: 900,
+						color: "var(--spice-button, #1ed760)",
+						lineHeight: 0.9,
+						letterSpacing: "-.04em",
+					}}
+				>
 					{totalHours}
 				</span>
 				<span style={{ fontSize: 32, fontWeight: 700 }}>hours</span>
 			</div>
 			{topArtist && (
-				<div style={{ marginTop: 14, fontSize: 13, color: "rgba(255,255,255,.7)", lineHeight: 1.5 }}>
+				<div
+					style={{ marginTop: 14, fontSize: 13, color: "rgba(255,255,255,.7)", lineHeight: 1.5 }}
+				>
 					Mostly to <strong style={{ color: "var(--spice-button, #1ed760)" }}>{topArtist}</strong>.
 				</div>
 			)}
@@ -494,12 +570,49 @@ function ShareGenre({ stats }: { stats: StatsResult }) {
 				{top.map((g, i) => {
 					const pct = totalCount > 0 ? g.count / totalCount : 0;
 					return (
-						<div key={g.genre} data-testid="share-genre-row" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-							<span style={{ flex: "0 0 auto", fontSize: 12, color: "#fff", fontWeight: 600, width: 96 }}>{g.genre}</span>
-							<div style={{ flex: 1, height: 8, background: "rgba(255,255,255,.1)", borderRadius: 4, overflow: "hidden" }}>
-								<div style={{ height: "100%", width: `${(g.count / maxCount) * 100}%`, background: "var(--spice-button, #1ed760)", opacity: 1 - i * 0.18 }} />
+						<div
+							key={g.genre}
+							data-testid="share-genre-row"
+							style={{ display: "flex", alignItems: "center", gap: 10 }}
+						>
+							<span
+								style={{
+									flex: "0 0 auto",
+									fontSize: 12,
+									color: "#fff",
+									fontWeight: 600,
+									width: 96,
+								}}
+							>
+								{g.genre}
+							</span>
+							<div
+								style={{
+									flex: 1,
+									height: 8,
+									background: "rgba(255,255,255,.1)",
+									borderRadius: 4,
+									overflow: "hidden",
+								}}
+							>
+								<div
+									style={{
+										height: "100%",
+										width: `${(g.count / maxCount) * 100}%`,
+										background: "var(--spice-button, #1ed760)",
+										opacity: 1 - i * 0.18,
+									}}
+								/>
 							</div>
-							<span style={{ fontSize: 11, color: "rgba(255,255,255,.6)", fontVariantNumeric: "tabular-nums" }}>{Math.round(pct * 100)}%</span>
+							<span
+								style={{
+									fontSize: 11,
+									color: "rgba(255,255,255,.6)",
+									fontVariantNumeric: "tabular-nums",
+								}}
+							>
+								{Math.round(pct * 100)}%
+							</span>
 						</div>
 					);
 				})}
@@ -520,7 +633,13 @@ function ShareStreak({ stats }: { stats: StatsResult }) {
 			</div>
 			<div
 				data-testid="share-streak-grid"
-				style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 3, marginBottom: 14, maxWidth: "100%" }}
+				style={{
+					display: "grid",
+					gridTemplateColumns: "repeat(8, 1fr)",
+					gap: 3,
+					marginBottom: 14,
+					maxWidth: "100%",
+				}}
 			>
 				{Array.from({ length: 8 }).map((_, wi) => (
 					<div key={wi} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -560,7 +679,9 @@ function ShareThrowback({ stats }: { stats: StatsResult }) {
 			<div style={KICKER_STYLE}>Most-played</div>
 			<Tile seed={track.trackUri} sz={140} rounded={8} imageUrl={track.albumArt} />
 			<div style={{ marginTop: 14 }}>
-				<div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.02em" }}>{track.trackName}</div>
+				<div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.02em" }}>
+					{track.trackName}
+				</div>
 				<div style={{ fontSize: 13, color: "rgba(255,255,255,.7)" }}>
 					{track.artistName} · {track.count} plays
 				</div>
@@ -585,33 +706,100 @@ function ShareWrapped({ stats, size }: { stats: StatsResult; size: ShareSize }) 
 			<div data-testid="share-wrapped-hero">
 				<div style={WRAPPED_KICKER}>This month</div>
 				<div style={{ display: "flex", alignItems: "baseline", gap: 6, lineHeight: 0.9 }}>
-					<span style={{ fontSize: isStory ? 52 : 42, fontWeight: 900, color: "var(--spice-button, #1ed760)", letterSpacing: "-.04em" }}>
+					<span
+						style={{
+							fontSize: isStory ? 52 : 42,
+							fontWeight: 900,
+							color: "var(--spice-button, #1ed760)",
+							letterSpacing: "-.04em",
+						}}
+					>
 						{totalHours}
 					</span>
 					<span style={{ fontSize: 18, fontWeight: 700 }}>hours</span>
-					<span style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 700, color: "var(--spice-button, #1ed760)", letterSpacing: ".08em", textTransform: "uppercase" }}>
+					<span
+						style={{
+							marginLeft: "auto",
+							fontSize: 9.5,
+							fontWeight: 700,
+							color: "var(--spice-button, #1ed760)",
+							letterSpacing: ".08em",
+							textTransform: "uppercase",
+						}}
+					>
 						{streak}d streak
 					</span>
 				</div>
 				<div style={{ marginTop: 5, fontSize: 10.5, color: "rgba(255,255,255,.6)" }}>
-					{formatNumber(stats.totalPlays)} plays · {stats.uniqueArtistCount} artists · peak {peakLabel}
+					{formatNumber(stats.totalPlays)} plays · {stats.uniqueArtistCount} artists · peak{" "}
+					{peakLabel}
 				</div>
 			</div>
 
 			<div style={CHUNK}>
 				<div style={WRAPPED_KICKER}>Top tracks</div>
-				<ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: isStory ? 6 : 4 }}>
+				<ol
+					style={{
+						listStyle: "none",
+						margin: 0,
+						padding: 0,
+						display: "flex",
+						flexDirection: "column",
+						gap: isStory ? 6 : 4,
+					}}
+				>
 					{tracks.map((t, i) => (
-						<li key={t.trackUri} data-testid="share-wrapped-track" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-							<span style={{ fontSize: 12, fontWeight: 800, color: "var(--spice-button, #1ed760)", width: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+						<li
+							key={t.trackUri}
+							data-testid="share-wrapped-track"
+							style={{ display: "flex", alignItems: "center", gap: 8 }}
+						>
+							<span
+								style={{
+									fontSize: 12,
+									fontWeight: 800,
+									color: "var(--spice-button, #1ed760)",
+									width: 12,
+									textAlign: "right",
+									fontVariantNumeric: "tabular-nums",
+								}}
+							>
 								{i + 1}
 							</span>
 							<Tile seed={t.trackUri} sz={isStory ? 22 : 20} imageUrl={t.albumArt} />
 							<div style={{ minWidth: 0, flex: 1 }}>
-								<div style={{ fontSize: isStory ? 11 : 10.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.trackName}</div>
-								<div style={{ fontSize: isStory ? 9 : 8.5, color: "rgba(255,255,255,.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.artistName}</div>
+								<div
+									style={{
+										fontSize: isStory ? 11 : 10.5,
+										fontWeight: 600,
+										whiteSpace: "nowrap",
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+									}}
+								>
+									{t.trackName}
+								</div>
+								<div
+									style={{
+										fontSize: isStory ? 9 : 8.5,
+										color: "rgba(255,255,255,.55)",
+										whiteSpace: "nowrap",
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+									}}
+								>
+									{t.artistName}
+								</div>
 							</div>
-							<span style={{ fontSize: 9, color: "rgba(255,255,255,.4)", fontVariantNumeric: "tabular-nums" }}>{t.count}</span>
+							<span
+								style={{
+									fontSize: 9,
+									color: "rgba(255,255,255,.4)",
+									fontVariantNumeric: "tabular-nums",
+								}}
+							>
+								{t.count}
+							</span>
 						</li>
 					))}
 				</ol>
@@ -622,14 +810,39 @@ function ShareWrapped({ stats, size }: { stats: StatsResult; size: ShareSize }) 
 					<div style={WRAPPED_KICKER}>Top artists</div>
 					<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 						{artists.map((a, i) => (
-							<div key={a.artistUri} data-testid="share-wrapped-artist" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-								<span style={{ fontSize: 12, fontWeight: 800, color: "var(--spice-button, #1ed760)", width: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+							<div
+								key={a.artistUri}
+								data-testid="share-wrapped-artist"
+								style={{ display: "flex", alignItems: "center", gap: 10 }}
+							>
+								<span
+									style={{
+										fontSize: 12,
+										fontWeight: 800,
+										color: "var(--spice-button, #1ed760)",
+										width: 12,
+										textAlign: "right",
+										fontVariantNumeric: "tabular-nums",
+									}}
+								>
 									{i + 1}
 								</span>
 								<Avatar seed={a.artistUri} sz={26} imageUrl={a.imageUrl ?? undefined} />
 								<div style={{ minWidth: 0, flex: 1 }}>
-									<div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.artistName}</div>
-									<div style={{ fontSize: 9.5, color: "rgba(255,255,255,.55)" }}>{a.count} plays</div>
+									<div
+										style={{
+											fontSize: 12,
+											fontWeight: 600,
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
+										{a.artistName}
+									</div>
+									<div style={{ fontSize: 9.5, color: "rgba(255,255,255,.55)" }}>
+										{a.count} plays
+									</div>
 								</div>
 							</div>
 						))}
@@ -644,14 +857,52 @@ function ShareWrapped({ stats, size }: { stats: StatsResult; size: ShareSize }) 
 						{genres.map((g, i) => {
 							const pct = genreTotal > 0 ? g.count / genreTotal : 0;
 							return (
-								<div key={g.genre} data-testid="share-wrapped-genre" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-									<span style={{ flex: "0 0 auto", fontSize: 10, fontWeight: 600, width: isStory ? 78 : 90, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+								<div
+									key={g.genre}
+									data-testid="share-wrapped-genre"
+									style={{ display: "flex", alignItems: "center", gap: 8 }}
+								>
+									<span
+										style={{
+											flex: "0 0 auto",
+											fontSize: 10,
+											fontWeight: 600,
+											width: isStory ? 78 : 90,
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
 										{g.genre}
 									</span>
-									<div style={{ flex: 1, height: 5, background: "rgba(255,255,255,.08)", borderRadius: 3, overflow: "hidden" }}>
-										<div style={{ height: "100%", width: `${(g.count / genreMaxCount) * 100}%`, background: "var(--spice-button, #1ed760)", opacity: 1 - i * 0.2, borderRadius: 3 }} />
+									<div
+										style={{
+											flex: 1,
+											height: 5,
+											background: "rgba(255,255,255,.08)",
+											borderRadius: 3,
+											overflow: "hidden",
+										}}
+									>
+										<div
+											style={{
+												height: "100%",
+												width: `${(g.count / genreMaxCount) * 100}%`,
+												background: "var(--spice-button, #1ed760)",
+												opacity: 1 - i * 0.2,
+												borderRadius: 3,
+											}}
+										/>
 									</div>
-									<span style={{ fontSize: 9, color: "rgba(255,255,255,.5)", fontVariantNumeric: "tabular-nums" }}>{Math.round(pct * 100)}%</span>
+									<span
+										style={{
+											fontSize: 9,
+											color: "rgba(255,255,255,.5)",
+											fontVariantNumeric: "tabular-nums",
+										}}
+									>
+										{Math.round(pct * 100)}%
+									</span>
 								</div>
 							);
 						})}
@@ -720,9 +971,7 @@ interface SharePalette {
 }
 
 function cvRgb(c: [number, number, number], a = 1): string {
-	return a === 1
-		? `rgb(${c[0]},${c[1]},${c[2]})`
-		: `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+	return a === 1 ? `rgb(${c[0]},${c[1]},${c[2]})` : `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 }
 
 function parseCssColorToRgb(value: string | null | undefined): [number, number, number] | null {
@@ -765,9 +1014,10 @@ function getSharePalette(followTheme: boolean): SharePalette {
 		};
 	}
 	const style = getComputedStyle(document.documentElement);
-	const accent = parseCssColorToRgb(style.getPropertyValue("--spice-button"))
-		?? parseCssColorToRgb(style.getPropertyValue("--spice-text"))
-		?? CV_ACCENT;
+	const accent =
+		parseCssColorToRgb(style.getPropertyValue("--spice-button")) ??
+		parseCssColorToRgb(style.getPropertyValue("--spice-text")) ??
+		CV_ACCENT;
 	const base = parseCssColorToRgb(style.getPropertyValue("--spice-main")) ?? [12, 22, 14];
 	const text = parseCssColorToRgb(style.getPropertyValue("--spice-text")) ?? [255, 255, 255];
 	const tMuted = cvRgb(text, 0.62);
@@ -807,7 +1057,11 @@ export function loadImage(url: string): Promise<HTMLImageElement | null> {
 
 function cvRoundRect(
 	ctx: CanvasRenderingContext2D,
-	x: number, y: number, w: number, h: number, r: number,
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+	r: number,
 ) {
 	ctx.beginPath();
 	ctx.moveTo(x + r, y);
@@ -820,20 +1074,21 @@ function cvRoundRect(
 
 function cvFillRoundRect(
 	ctx: CanvasRenderingContext2D,
-	x: number, y: number, w: number, h: number, r: number,
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+	r: number,
 ) {
 	cvRoundRect(ctx, x, y, w, h, r);
 	ctx.fill();
 }
 
-function cvTruncate(
-	ctx: CanvasRenderingContext2D, text: string, maxWidth: number,
-): string {
+function cvTruncate(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
 	if (maxWidth <= 8) return "…";
 	if (ctx.measureText(text).width <= maxWidth) return text;
 	let t = text;
-	while (t.length > 0 && ctx.measureText(`${t}…`).width > maxWidth)
-		t = t.slice(0, -1);
+	while (t.length > 0 && ctx.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
 	return `${t}…`;
 }
 
@@ -843,7 +1098,10 @@ const CV_GAP = 20;
 async function cvDrawArt(
 	ctx: CanvasRenderingContext2D,
 	url: string | undefined | null,
-	x: number, y: number, size: number, radius: number,
+	x: number,
+	y: number,
+	size: number,
+	radius: number,
 ): Promise<boolean> {
 	if (!url) return false;
 	const img = await loadImage(url);
@@ -858,7 +1116,10 @@ async function cvDrawArt(
 
 function cvPlaceholder(
 	ctx: CanvasRenderingContext2D,
-	x: number, y: number, size: number, radius: number,
+	x: number,
+	y: number,
+	size: number,
+	radius: number,
 ) {
 	ctx.fillStyle = "rgba(255,255,255,0.06)";
 	cvFillRoundRect(ctx, x, y, size, size, radius);
@@ -873,7 +1134,12 @@ function cvPlaceholder(
 
 /** Uppercase muted chunk labels (e.g. "GENRE LEADERS") with tracking */
 function cvMutedCapsHeading(
-	ctx: CanvasRenderingContext2D, phrase: string, x: number, y: number, fontPx: number, color: string,
+	ctx: CanvasRenderingContext2D,
+	phrase: string,
+	x: number,
+	y: number,
+	fontPx: number,
+	color: string,
 ) {
 	const prev = ctx.letterSpacing;
 	ctx.fillStyle = color;
@@ -884,8 +1150,13 @@ function cvMutedCapsHeading(
 }
 
 function cvKicker(
-	ctx: CanvasRenderingContext2D, text: string, x: number, y: number, palette: SharePalette,
-	titleCase = false, fontPx = 36,
+	ctx: CanvasRenderingContext2D,
+	text: string,
+	x: number,
+	y: number,
+	palette: SharePalette,
+	titleCase = false,
+	fontPx = 36,
 ): number {
 	ctx.fillStyle = palette.specKickerMuted ?? palette.mutedText;
 	const prev = ctx.letterSpacing;
@@ -899,15 +1170,28 @@ function cvKicker(
 /** 12-hour label for peak hour meta lines */
 function formatShareSpecPeakHour(hour: number): string {
 	const h = ((Math.floor(hour) % 24) + 24) % 24;
-	const v = (h % 12) || 12;
-	const ap = (h < 12 || h === 24) ? "AM" : "PM";
+	const v = h % 12 || 12;
+	const ap = h < 12 || h === 24 ? "AM" : "PM";
 	return `${v} ${ap}`;
 }
 
 function formatShareHeatmapBestDay(dateStr: string): string {
 	const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
 	if (!m) return dateStr;
-	const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+	const months = [
+		"Jan",
+		"Feb",
+		"Mar",
+		"Apr",
+		"May",
+		"Jun",
+		"Jul",
+		"Aug",
+		"Sep",
+		"Oct",
+		"Nov",
+		"Dec",
+	];
 	const mi = Number(m[2]);
 	const di = Number(m[3]);
 	if (mi < 1 || mi > 12) return dateStr;
@@ -915,7 +1199,12 @@ function formatShareHeatmapBestDay(dateStr: string): string {
 }
 
 /** Diagonal gradient fill across palette backgrounds */
-function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, palette: SharePalette) {
+function drawBackground(
+	ctx: CanvasRenderingContext2D,
+	w: number,
+	h: number,
+	palette: SharePalette,
+) {
 	const cssAngleDeg = 160;
 	const ang = cssAngleDeg * (Math.PI / 180);
 	const ux = Math.sin(ang);
@@ -948,7 +1237,8 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, pal
 }
 
 function drawWatermarkBar(
-	ctx: CanvasRenderingContext2D, w: number,
+	ctx: CanvasRenderingContext2D,
+	w: number,
 	captionText: string,
 	palette: SharePalette,
 ) {
@@ -984,7 +1274,10 @@ function drawWatermarkBar(
 }
 
 function drawFooterBar(
-	ctx: CanvasRenderingContext2D, _w: number, h: number, captionText: string,
+	ctx: CanvasRenderingContext2D,
+	_w: number,
+	h: number,
+	captionText: string,
 	palette: SharePalette,
 ) {
 	ctx.fillStyle = palette.specFooterCaption ?? palette.dimText;
@@ -1005,9 +1298,13 @@ function estimateContentHeight(variant: ShareVariant, size: ShareSize): number {
 // ── Per-variant content drawers ──
 
 async function drawTop5Content(
-	ctx: CanvasRenderingContext2D, stats: StatsResult,
-	size: ShareSize, palette: SharePalette,
-	x: number, y: number, w: number,
+	ctx: CanvasRenderingContext2D,
+	stats: StatsResult,
+	size: ShareSize,
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
 ) {
 	const isStory = size === "story";
 	y = cvKicker(ctx, "My top 5", x, y, palette);
@@ -1023,8 +1320,7 @@ async function drawTop5Content(
 
 	ctx.font = `700 ${cntPx}px ${CV_FONT}`;
 	let playNumMax = 0;
-	for (const t of tracks)
-		playNumMax = Math.max(playNumMax, ctx.measureText(`${t.count}`).width);
+	for (const t of tracks) playNumMax = Math.max(playNumMax, ctx.measureText(`${t.count}`).width);
 
 	ctx.font = `600 ${playsLblPx}px ${CV_FONT}`;
 	const defaultLetterSpacing = ctx.letterSpacing;
@@ -1034,10 +1330,7 @@ async function drawTop5Content(
 
 	const playsReserve = Math.ceil(playNumMax + 14 + playsLblW + CV_PAD / 2);
 	const textX = x + rankW + gapArt + tileSz + gapArt;
-	const textAvail = Math.max(
-		72,
-		x + w - playsReserve - CV_GAP - textX,
-	);
+	const textAvail = Math.max(72, x + w - playsReserve - CV_GAP - textX);
 	const titleBase = (ryLocal: number) => ryLocal + Math.round(tileSz * 0.38);
 	const artistBase = (ryLocal: number) => ryLocal + Math.round(tileSz * 0.78);
 	const rowGap = isStory ? 36 : 24;
@@ -1084,7 +1377,12 @@ async function drawTop5Content(
 		const cx = x + 24;
 		const cy = y + 48;
 		cvMutedCapsHeading(
-			ctx, "Top 5 share", cx, cy + 44, 24, palette.specChunkCapsLabelMuted ?? palette.dimText,
+			ctx,
+			"Top 5 share",
+			cx,
+			cy + 44,
+			24,
+			palette.specChunkCapsLabelMuted ?? palette.dimText,
 		);
 		ctx.font = `${28}px ${CV_FONT}`;
 		const playsLineW = ctx.measureText(`${formatNumber(totalFive)} plays`).width;
@@ -1095,10 +1393,7 @@ async function drawTop5Content(
 		const leftMaxW = Math.max(120, innerRight - rightBlk - CV_GAP - cx);
 		ctx.fillStyle = palette.text;
 		ctx.font = `700 ${36}px ${CV_FONT}`;
-		ctx.fillText(
-			cvTruncate(ctx, `${sharePct}% of all plays`, leftMaxW),
-			cx, cy + 114,
-		);
+		ctx.fillText(cvTruncate(ctx, `${sharePct}% of all plays`, leftMaxW), cx, cy + 114);
 		ctx.fillStyle = palette.mutedText;
 		ctx.font = `${28}px ${CV_FONT}`;
 		ctx.textAlign = "right";
@@ -1111,10 +1406,14 @@ async function drawTop5Content(
 }
 
 async function drawTimeContent(
-	ctx: CanvasRenderingContext2D, stats: StatsResult,
-	size: ShareSize, palette: SharePalette,
+	ctx: CanvasRenderingContext2D,
+	stats: StatsResult,
+	size: ShareSize,
+	palette: SharePalette,
 	periodDayCount: number,
-	x: number, y: number, w: number,
+	x: number,
+	y: number,
+	w: number,
 ) {
 	y = cvKicker(ctx, "This month I listened", x, y, palette);
 	const isStory = size === "story";
@@ -1175,10 +1474,7 @@ async function drawTimeContent(
 	ctx.fillText(`${daysEquiv} days`, x + inset, chunkY + 116);
 	ctx.fillStyle = mutedBody;
 	ctx.font = `${26}px ${CV_FONT}`;
-	ctx.fillText(
-		cvTruncate(ctx, "of nonstop play", colW - 2 * inset),
-		x + inset, chunkY + 162,
-	);
+	ctx.fillText(cvTruncate(ctx, "of nonstop play", colW - 2 * inset), x + inset, chunkY + 162);
 
 	const rightX = x + colW + midGap + inset;
 	cvMutedCapsHeading(ctx, "Daily average", rightX, chunkY + 44, 24, capsLabel);
@@ -1188,11 +1484,9 @@ async function drawTimeContent(
 	ctx.fillStyle = mutedBody;
 	ctx.font = `${26}px ${CV_FONT}`;
 	ctx.fillText(
-		cvTruncate(
-			ctx, `across ${formatNumber(stats.totalPlays)} plays`,
-			colW - 2 * inset,
-		),
-		rightX, chunkY + 162,
+		cvTruncate(ctx, `across ${formatNumber(stats.totalPlays)} plays`, colW - 2 * inset),
+		rightX,
+		chunkY + 162,
 	);
 
 	if (stats.topArtists.length === 0) return;
@@ -1226,7 +1520,7 @@ async function drawTimeContent(
 		ctx.fillStyle = palette.dimText;
 		const playsW = ctx.measureText(playsLbl).width + 24;
 		ctx.textAlign = "left";
-		const nameWMax = Math.max(80, (x + w) - nameX - playsW);
+		const nameWMax = Math.max(80, x + w - nameX - playsW);
 		ctx.fillStyle = palette.text;
 		ctx.font = `600 ${36}px ${CV_FONT}`;
 		ctx.fillText(cvTruncate(ctx, a.artistName, nameWMax), nameX, ry + 42);
@@ -1240,9 +1534,13 @@ async function drawTimeContent(
 }
 
 async function drawGenreContent(
-	ctx: CanvasRenderingContext2D, stats: StatsResult,
-	size: ShareSize, palette: SharePalette,
-	x: number, y: number, w: number,
+	ctx: CanvasRenderingContext2D,
+	stats: StatsResult,
+	size: ShareSize,
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
 ) {
 	const limit = size === "story" ? 6 : 5;
 	const top = stats.topGenres.slice(0, limit);
@@ -1261,10 +1559,7 @@ async function drawGenreContent(
 	const pctReserve = isStory ? 120 : 100;
 	const minBarW = isStory ? 72 : 64;
 	const genreLblFontPx = isStory ? 40 : 36;
-	const labelCap = Math.max(
-		160,
-		Math.min(labelWPref, w - pctReserve - minBarW - CV_GAP - 28),
-	);
+	const labelCap = Math.max(160, Math.min(labelWPref, w - pctReserve - minBarW - CV_GAP - 28));
 	const genrePctColor = palette.specGenrePctMuted ?? palette.mutedText;
 
 	for (let i = 0; i < top.length; i++) {
@@ -1304,10 +1599,7 @@ async function drawGenreContent(
 	let genreColW = 200;
 	ctx.font = `700 24px ${CV_FONT}`;
 	for (const lg of leaders) {
-		genreColW = Math.max(
-			genreColW,
-			Math.ceil(ctx.measureText(lg.genre.toUpperCase()).width) + 24,
-		);
+		genreColW = Math.max(genreColW, Math.ceil(ctx.measureText(lg.genre.toUpperCase()).width) + 24);
 	}
 	const innerRight = x + w - 20;
 	genreColW = Math.min(genreColW, Math.floor(w * 0.42));
@@ -1340,9 +1632,13 @@ async function drawGenreContent(
 }
 
 async function drawStreakContent(
-	ctx: CanvasRenderingContext2D, stats: StatsResult,
-	size: ShareSize, palette: SharePalette,
-	x: number, y: number, w: number,
+	ctx: CanvasRenderingContext2D,
+	stats: StatsResult,
+	size: ShareSize,
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
 ) {
 	const streak = stats.streak ?? 0;
 	const isStory = size === "story";
@@ -1366,7 +1662,8 @@ async function drawStreakContent(
 				ctx,
 				x + wi * (cellSize + gap),
 				y + di * (cellSize + gap),
-				cellSize, cellSize,
+				cellSize,
+				cellSize,
 				6,
 			);
 		}
@@ -1380,17 +1677,16 @@ async function drawStreakContent(
 	const pw = ctx.measureText(prefix).width;
 	ctx.fillStyle = palette.text;
 	ctx.font = `bold ${isStory ? 40 : 34}px ${CV_FONT}`;
-	ctx.fillText(
-		cvTruncate(ctx, `${streak} days.`, Math.max(24, x + w - x - pw)),
-		x + pw, y,
-	);
+	ctx.fillText(cvTruncate(ctx, `${streak} days.`, Math.max(24, x + w - x - pw)), x + pw, y);
 
 	if (!isStory || data.length === 0) return;
 
 	y += 80;
 	const totalMins = data.reduce((s, d) => s + d.count * 3, 0);
 	const avgMins = data.length ? Math.round(totalMins / data.length) : 0;
-	const bestDay = data.reduce((best, cur) => (cur.count > best.count ? cur : best), data[0]!);
+	const firstDay = data[0];
+	if (!firstDay) return;
+	const bestDay = data.reduce((best, cur) => (cur.count > best.count ? cur : best), firstDay);
 
 	const midGap = 24;
 	const colW = (w - midGap) / 2;
@@ -1406,14 +1702,7 @@ async function drawStreakContent(
 	ctx.fillText(`${avgMins} min`, x + 28, y + 116);
 	ctx.fillStyle = mutedBody;
 	ctx.font = `${26}px ${CV_FONT}`;
-	ctx.fillText(
-		cvTruncate(
-			ctx,
-			`over the last ${data.length} days`,
-			colW - 56,
-		),
-		x + 28, y + 162,
-	);
+	ctx.fillText(cvTruncate(ctx, `over the last ${data.length} days`, colW - 56), x + 28, y + 162);
 
 	cvMutedCapsHeading(ctx, "Longest streak", x + colW + midGap + 28, y + 44, 24, capCol);
 	ctx.fillStyle = cvRgb(palette.accent);
@@ -1423,7 +1712,8 @@ async function drawStreakContent(
 	ctx.font = `${26}px ${CV_FONT}`;
 	ctx.fillText(
 		cvTruncate(ctx, "your best run this year", colW - 56),
-		x + colW + midGap + 28, y + 162,
+		x + colW + midGap + 28,
+		y + 162,
 	);
 
 	y += chunkH + 28;
@@ -1436,10 +1726,7 @@ async function drawStreakContent(
 	ctx.font = `800 ${36}px ${CV_FONT}`;
 	const playsW = ctx.measureText(playsLbl).width + CV_GAP;
 	ctx.font = `700 ${36}px ${CV_FONT}`;
-	ctx.fillText(
-		cvTruncate(ctx, bestDayStr, Math.max(80, w - 28 - playsW)),
-		x + 28, y + 112,
-	);
+	ctx.fillText(cvTruncate(ctx, bestDayStr, Math.max(80, w - 28 - playsW)), x + 28, y + 112);
 	ctx.fillStyle = cvRgb(palette.accent);
 	ctx.font = `800 ${36}px ${CV_FONT}`;
 	ctx.textAlign = "right";
@@ -1448,9 +1735,13 @@ async function drawStreakContent(
 }
 
 async function drawThrowbackContent(
-	ctx: CanvasRenderingContext2D, stats: StatsResult,
-	size: ShareSize, palette: SharePalette,
-	x: number, y: number, w: number,
+	ctx: CanvasRenderingContext2D,
+	stats: StatsResult,
+	size: ShareSize,
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
 	canvasWidth: number,
 ) {
 	const track = stats.topTracks[0];
@@ -1471,7 +1762,7 @@ async function drawThrowbackContent(
 	ctx.font = `800 ${isStory ? 96 : 64}px ${CV_FONT}`;
 	ctx.fillText(cvTruncate(ctx, track.trackName, w), x, y);
 
-	y += (isStory ? 110 : 70);
+	y += isStory ? 110 : 70;
 	ctx.fillStyle = palette.mutedText;
 	ctx.font = `${isStory ? 44 : 32}px ${CV_FONT}`;
 	ctx.fillText(cvTruncate(ctx, `${track.artistName} · ${track.count} plays`, w), x, y);
@@ -1520,9 +1811,13 @@ async function drawThrowbackContent(
 }
 
 async function drawWrappedContent(
-	ctx: CanvasRenderingContext2D, stats: StatsResult,
-	size: ShareSize, palette: SharePalette,
-	x: number, y: number, w: number,
+	ctx: CanvasRenderingContext2D,
+	stats: StatsResult,
+	size: ShareSize,
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
 	allowStreak: boolean,
 	captionText: string,
 ): Promise<void> {
@@ -1556,7 +1851,7 @@ async function drawWrappedContent(
 	}
 
 	const contentRight = allowStreak && streak > 0 ? x + w - streakReserve : x + w;
-	let availHero = Math.max(100, contentRight - x);
+	const availHero = Math.max(100, contentRight - x);
 
 	let hoursWide = 0;
 	let wordWide = 0;
@@ -1616,7 +1911,8 @@ async function drawWrappedContent(
 
 	const tileS = isStory ? 56 : 52;
 	const kickerBand = 54;
-	let hTracksChunk = padChunk + kickerBand + gapLabel + tracks.length * (tileS + gapRow) + padChunk;
+	const hTracksChunk =
+		padChunk + kickerBand + gapLabel + tracks.length * (tileS + gapRow) + padChunk;
 	cvChunkBg(ctx, x - 8, y, w + 16, hTracksChunk, palette);
 	let cursorY = y + padChunk;
 	cursorY = cvKicker(ctx, "Top tracks", innerL, cursorY, palette, false, 26) + gapLabel;
@@ -1628,7 +1924,7 @@ async function drawWrappedContent(
 		const tileL = innerL + 32 + gapLabel;
 		const textL = tileL + tileS + gapLabel;
 		const titleB = ry + Math.round(tileS * 0.36);
-		const artistB = ry + Math.round(tileS * 0.80);
+		const artistB = ry + Math.round(tileS * 0.8);
 
 		ctx.fillStyle = cvRgb(palette.accent);
 		ctx.font = `800 ${32}px ${CV_FONT}`;
@@ -1657,7 +1953,8 @@ async function drawWrappedContent(
 
 	if (isStory && artists.length > 0) {
 		const aSz = 64;
-		const hArtistChunk = padChunk + kickerBand + gapLabel + artists.length * (aSz + gapRow) + padChunk;
+		const hArtistChunk =
+			padChunk + kickerBand + gapLabel + artists.length * (aSz + gapRow) + padChunk;
 		cvChunkBg(ctx, x - 8, y, w + 16, hArtistChunk, palette);
 		cursorY = y + padChunk;
 		cursorY = cvKicker(ctx, "Top artists", innerL, cursorY, palette, false, 26) + gapLabel;
@@ -1698,15 +1995,12 @@ async function drawWrappedContent(
 		const usableW = innerR - innerL;
 		const gLblCap = Math.max(
 			120,
-			Math.min(
-				isStory ? 240 : 220,
-				usableW - CV_GAP - 120 - CV_GAP - 72,
-			),
+			Math.min(isStory ? 240 : 220, usableW - CV_GAP - 120 - CV_GAP - 72),
 		);
 		const genreRowGap = 16;
 		const genreRowStride = 56;
-		const hGenreChunk = padChunk + kickerBand + gapLabel + genres.length * (genreRowStride + genreRowGap)
-			+ padChunk;
+		const hGenreChunk =
+			padChunk + kickerBand + gapLabel + genres.length * (genreRowStride + genreRowGap) + padChunk;
 		cvChunkBg(ctx, x - 8, y, w + 16, hGenreChunk, palette);
 		cursorY = y + padChunk;
 		cursorY = cvKicker(ctx, "Top genres", innerL, cursorY, palette, false, 26) + gapLabel;
@@ -1751,7 +2045,10 @@ async function drawWrappedContent(
 
 function cvChunkBg(
 	ctx: CanvasRenderingContext2D,
-	x: number, y: number, w: number, h: number,
+	x: number,
+	y: number,
+	w: number,
+	h: number,
 	palette: SharePalette,
 ) {
 	ctx.fillStyle = palette.chunkBg;
@@ -1779,11 +2076,12 @@ export async function renderShareCardCanvas(
 	const canvas = document.createElement("canvas");
 	canvas.width = w;
 	canvas.height = h;
-	const ctx = canvas.getContext("2d")!;
+	const ctx = canvas.getContext("2d");
+	if (!ctx) throw new Error("Canvas 2D context unavailable");
 	const palette = getSharePalette(!!options?.followTheme);
 	const providerId = options?.activeProviderId ?? "local";
 	const allowStreak = providerId === "local";
-	const safeVariant = (!allowStreak && variant === "streak") ? "top5" : variant;
+	const safeVariant = !allowStreak && variant === "streak" ? "top5" : variant;
 
 	const isWrapped = safeVariant === "wrapped";
 	const captionText = username ? `@${username} · ${periodLabel}` : periodLabel;
@@ -1824,7 +2122,15 @@ export async function renderShareCardCanvas(
 			break;
 		case "wrapped":
 			await drawWrappedContent(
-				ctx, stats, size, palette, contentX, contentY, contentW, allowStreak, captionText,
+				ctx,
+				stats,
+				size,
+				palette,
+				contentX,
+				contentY,
+				contentW,
+				allowStreak,
+				captionText,
 			);
 			break;
 	}
@@ -1845,7 +2151,10 @@ export async function renderShareCardBlob(
 	const canvas = await renderShareCardCanvas(stats, variant, size, periodLabel, username, options);
 	return new Promise<Blob>((resolve, reject) => {
 		canvas.toBlob((blob) => {
-			if (!blob) { reject(new Error("PNG blob creation failed")); return; }
+			if (!blob) {
+				reject(new Error("PNG blob creation failed"));
+				return;
+			}
 			resolve(blob);
 		}, "image/png");
 	});
@@ -1880,25 +2189,25 @@ export async function copyShareCardToClipboard(
 	if (!navigator.clipboard?.write) {
 		throw new Error("Clipboard API not available");
 	}
-	await navigator.clipboard.write([
-		new ClipboardItem({ "image/png": blob }),
-	]);
+	await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
 }
 
-export async function shareOrDownload(
-	blob: Blob,
-): Promise<"shared" | "copied" | "downloaded"> {
+export async function shareOrDownload(blob: Blob): Promise<"shared" | "copied" | "downloaded"> {
 	if (navigator.share) {
 		try {
 			const file = new File([blob], "listening-stats.png", { type: "image/png" });
 			await navigator.share({ files: [file] });
 			return "shared";
-		} catch { /* fall through */ }
+		} catch {
+			/* fall through */
+		}
 	}
 	try {
 		await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
 		return "copied";
-	} catch { /* fall through */ }
+	} catch {
+		/* fall through */
+	}
 
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement("a");

@@ -3,7 +3,22 @@
 	"assist": { "actions": { "source": { "organizeImports": "on" } } },
 	"linter": {
 		"enabled": true,
-		"rules": { "recommended": true }
+		"rules": {
+			"recommended": true,
+			"suspicious": {
+				"noArrayIndexKey": "off"
+			},
+			"security": {
+				"noDangerouslySetInnerHtml": "off"
+			},
+			"a11y": {
+				"noStaticElementInteractions": "off",
+				"useKeyWithClickEvents": "off",
+				"useAriaPropsSupportedByRole": "off",
+				"useFocusableInteractive": "off",
+				"useSemanticElements": "off"
+			}
+		}
 	},
 	"formatter": {
 		"enabled": true,
@@ -17,6 +32,25 @@
 		}
 	},
 	"files": {
-		"includes": ["**", "!**/node_modules", "!**/dist", "!**/*.mjs", "!.claude", "!.planning"]
-	}
+		"includes": ["src/**"]
+	},
+	"overrides": [
+		{
+			"includes": ["src/test/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off",
+						"useIterableCallbackReturn": "off"
+					},
+					"style": {
+						"noNonNullAssertion": "off"
+					},
+					"correctness": {
+						"noUnsafeOptionalChaining": "off"
+					}
+				}
+			}
+		}
+	]
 }

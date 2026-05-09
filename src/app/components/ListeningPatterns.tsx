@@ -5,7 +5,15 @@ import { getPreferences } from "../preferences";
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAYS = Array.from({ length: 7 }, (_, i) => i);
 const WEEKDAYS_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const WEEKDAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const WEEKDAYS_FULL = [
+	"Monday",
+	"Tuesday",
+	"Wednesday",
+	"Thursday",
+	"Friday",
+	"Saturday",
+	"Sunday",
+];
 
 interface ListeningPatternsProps {
 	hourlyDistribution: number[];
@@ -14,13 +22,23 @@ interface ListeningPatternsProps {
 	peakWeekday: number;
 }
 
-export function ListeningPatterns({ hourlyDistribution, peakHour, weekdayDistribution, peakWeekday }: ListeningPatternsProps) {
+export function ListeningPatterns({
+	hourlyDistribution,
+	peakHour,
+	weekdayDistribution,
+	peakWeekday,
+}: ListeningPatternsProps) {
 	const [activeTab, setActiveTab] = useState<"hours" | "days">("hours");
 	const prefs = getPreferences();
 
-	const peakLabel = activeTab === "hours"
-		? (hourlyDistribution[peakHour] > 0 ? formatHour(peakHour, prefs.use24HourTime) : null)
-		: (weekdayDistribution[peakWeekday] > 0 ? WEEKDAYS_FULL[peakWeekday] : null);
+	const peakLabel =
+		activeTab === "hours"
+			? hourlyDistribution[peakHour] > 0
+				? formatHour(peakHour, prefs.use24HourTime)
+				: null
+			: weekdayDistribution[peakWeekday] > 0
+				? WEEKDAYS_FULL[peakWeekday]
+				: null;
 
 	return (
 		<div className="section-card">
@@ -37,12 +55,14 @@ export function ListeningPatterns({ hourlyDistribution, peakHour, weekdayDistrib
 			</div>
 			<div className="listening-patterns-tabs">
 				<button
+					type="button"
 					className={`listening-patterns-tab${activeTab === "hours" ? " active" : ""}`}
 					onClick={() => setActiveTab("hours")}
 				>
 					Hours
 				</button>
 				<button
+					type="button"
 					className={`listening-patterns-tab${activeTab === "days" ? " active" : ""}`}
 					onClick={() => setActiveTab("days")}
 				>

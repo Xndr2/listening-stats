@@ -1,7 +1,7 @@
+import { LS_KEYS } from "../../shared/constants/storage-keys";
 import { db, registerVersionChangeHandler } from "../../shared/storage/db";
 import { runStartupChecks } from "../../shared/storage/integrity";
 import { addPlayEvent } from "../../shared/storage/play-events";
-import { LS_KEYS } from "../../shared/constants/storage-keys";
 import type { PlayEvent } from "../../shared/types/play-event";
 import { TrackingFSM } from "./fsm";
 import { HealthIndicator } from "./health";

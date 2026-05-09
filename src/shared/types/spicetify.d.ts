@@ -2,6 +2,32 @@ declare namespace Spicetify {
 	const React: typeof import("react");
 	const ReactDOM: typeof import("react-dom");
 
+	namespace Platform {
+		namespace History {
+			function push(path: string): void;
+		}
+	}
+
+	namespace Locale {
+		function formatNumber(n: number): string;
+		function formatRelativeTime(ms: number): string;
+	}
+
+	namespace ReactComponent {
+		type TooltipWrapperProps = {
+			children?: import("react").ReactNode;
+			label: string;
+			placement?: string;
+		};
+		const TooltipWrapper: import("react").FC<TooltipWrapperProps>;
+
+		type ToggleProps = {
+			value: boolean;
+			onSelected: (v: boolean) => void;
+		};
+		const Toggle: import("react").FC<ToggleProps>;
+	}
+
 	/** Filtered copy of `config-xpui.ini`  -  lists enabled apps/extensions, not filesystem paths. */
 	namespace Config {
 		const version: string;

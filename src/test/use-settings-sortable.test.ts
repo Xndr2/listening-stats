@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useSettingsSortable } from "../app/hooks/useSettingsSortable";
 
 function makeRect(top: number, bottom: number, left = 0, right = 100): DOMRect {
@@ -29,9 +29,7 @@ describe("useSettingsSortable", () => {
 
 	it("exposes onItemPointerDown(itemId) returning a pointerdown handler", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		const handler = result.current.onItemPointerDown("a");
 		expect(typeof handler).toBe("function");
 		// Calling handler with a synthesized event should not throw and not call onReorder
@@ -43,12 +41,10 @@ describe("useSettingsSortable", () => {
 
 	it("ignores pointer movement under 8px (no drag activation)", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		act(() => {
@@ -60,12 +56,10 @@ describe("useSettingsSortable", () => {
 
 	it("activates drag once pointer moves at least 8px from origin", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		act(() => {
@@ -77,12 +71,10 @@ describe("useSettingsSortable", () => {
 
 	it("during drag, source item style applies translate3d(0, dy, 0) and opacity 0.4", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		act(() => {
@@ -90,18 +82,16 @@ describe("useSettingsSortable", () => {
 		});
 		const style = result.current.getItemStyle("a");
 		expect(style).toBeDefined();
-		expect(style!.opacity).toBe(0.4);
-		expect(String(style!.transform)).toContain("translate3d(0,");
-		expect(String(style!.transform)).toContain("20px");
+		expect(style?.opacity).toBe(0.4);
+		expect(String(style?.transform)).toContain("translate3d(0,");
+		expect(String(style?.transform)).toContain("20px");
 		// Other items return undefined
 		expect(result.current.getItemStyle("b")).toBeUndefined();
 	});
 
 	it("computes dropSlotIndex from pointer Y vs item midlines (vertical orientation, default)", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
 			result.current.registerItem("a", makeItem(makeRect(0, 40)));
 			result.current.registerItem("b", makeItem(makeRect(40, 80)));
@@ -110,7 +100,7 @@ describe("useSettingsSortable", () => {
 		// Start drag
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 50, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 50, clientY: 0 }),
 			);
 		});
 		// Move 10px to activate drag, pointer at y=50 (in item b's range)
@@ -135,7 +125,7 @@ describe("useSettingsSortable", () => {
 				order: ["a", "b", "c"],
 				onReorder,
 				orientation: "horizontal",
-			})
+			}),
 		);
 		act(() => {
 			result.current.registerItem("a", makeItem(makeRect(0, 40, 0, 40)));
@@ -145,7 +135,7 @@ describe("useSettingsSortable", () => {
 		// Start drag
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 20 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 20 }),
 			);
 		});
 		// Move 10px to activate, pointer at x=50 (in b range)
@@ -169,11 +159,11 @@ describe("useSettingsSortable", () => {
 	it("applies translate3d on Y axis when orientation='vertical'", () => {
 		const onReorder = vi.fn();
 		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b"], onReorder, orientation: "vertical" })
+			useSettingsSortable({ order: ["a", "b"], onReorder, orientation: "vertical" }),
 		);
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		act(() => {
@@ -181,18 +171,18 @@ describe("useSettingsSortable", () => {
 		});
 		const style = result.current.getItemStyle("a");
 		expect(style).toBeDefined();
-		expect(String(style!.transform)).toContain("translate3d(0,");
-		expect(String(style!.transform)).toContain("20px");
+		expect(String(style?.transform)).toContain("translate3d(0,");
+		expect(String(style?.transform)).toContain("20px");
 	});
 
 	it("applies translate3d on X axis when orientation='horizontal'", () => {
 		const onReorder = vi.fn();
 		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b"], onReorder, orientation: "horizontal" })
+			useSettingsSortable({ order: ["a", "b"], onReorder, orientation: "horizontal" }),
 		);
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		act(() => {
@@ -200,14 +190,12 @@ describe("useSettingsSortable", () => {
 		});
 		const style = result.current.getItemStyle("a");
 		expect(style).toBeDefined();
-		expect(String(style!.transform)).toContain("translate3d(20px, 0, 0)");
+		expect(String(style?.transform)).toContain("translate3d(20px, 0, 0)");
 	});
 
 	it("calls onReorder with arrayMove result on pointerup over a different slot", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
 			result.current.registerItem("a", makeItem(makeRect(0, 40)));
 			result.current.registerItem("b", makeItem(makeRect(40, 80)));
@@ -216,7 +204,7 @@ describe("useSettingsSortable", () => {
 		// Start drag on "a"
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		// Move to activate + position over slot 2 (pointer y=90 → > c's midline at 100? no, 90<100 so slot 2)
@@ -235,9 +223,7 @@ describe("useSettingsSortable", () => {
 
 	it("drop on the same slot does NOT call onReorder", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
 			result.current.registerItem("a", makeItem(makeRect(0, 40)));
 			result.current.registerItem("b", makeItem(makeRect(40, 80)));
@@ -246,7 +232,7 @@ describe("useSettingsSortable", () => {
 		// Drag "a" but keep pointer in slot 0 (y < a midline 20)
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		act(() => {
@@ -261,12 +247,10 @@ describe("useSettingsSortable", () => {
 
 	it("Escape during drag cancels (no onReorder, dragState resets)", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		act(() => {
@@ -283,12 +267,10 @@ describe("useSettingsSortable", () => {
 
 	it("pointercancel during drag cancels (no onReorder, dragState resets)", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		act(() => {
@@ -305,13 +287,11 @@ describe("useSettingsSortable", () => {
 
 	it("drag is rejected if the order array does not include the activeId (stale items defense)", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["b", "c"], onReorder })
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["b", "c"], onReorder }));
 		// Try to start drag with "a" which is NOT in order
 		act(() => {
 			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 })
+				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
 			);
 		});
 		act(() => {
@@ -338,7 +318,7 @@ describe("useSettingsSortable", () => {
 				order: sevenIds,
 				onReorder,
 				orientation: "grid",
-			})
+			}),
 		);
 
 		// Register 7 items at non-overlapping rect positions.

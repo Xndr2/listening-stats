@@ -20,7 +20,7 @@ export function SortableTile({ id, label, tileDragProps, style, children }: Sort
 			className="sortable-tile"
 			data-tile-id={id}
 			style={style}
-			onPointerDown={tileDragProps.onPointerDown as any}
+			onPointerDown={(e) => tileDragProps.onPointerDown(e.nativeEvent)}
 		>
 			<div className="sortable-tile-label">{label}</div>
 			<div className="sortable-tile-toggle" onPointerDown={stopProp}>

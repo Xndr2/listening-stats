@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Header from "../app/components/Header";
-import { providerRegistry } from "../shared/stats/provider";
-import { localProvider } from "../shared/stats/local-provider";
-import { statsfmProvider } from "../shared/stats/statsfm-provider";
-import { LS_KEYS } from "../shared/constants/storage-keys";
 import { getPreferences, SECTION_IDS, setPreference } from "../app/preferences";
 import { EVENTS } from "../shared/constants/events";
+import { LS_KEYS } from "../shared/constants/storage-keys";
+import { localProvider } from "../shared/stats/local-provider";
+import { providerRegistry } from "../shared/stats/provider";
 import { statsCache } from "../shared/stats/stats-cache";
+import { statsfmProvider } from "../shared/stats/statsfm-provider";
 
 describe("settings/dashboard PREFS_CHANGED sync", () => {
 	beforeEach(() => {
@@ -85,9 +85,7 @@ describe("DisplayTab visible section rows vs SECTION_IDS", () => {
 		const { render } = await import("@testing-library/react");
 		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
 
-		render(
-			Spicetify.React.createElement(DisplayTab, { onPrefsChanged: () => {} }),
-		);
+		render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: () => {} }));
 
 		// Coarse section rows only; column toggles live in the Top Lists grid
 		const rows = document.querySelectorAll("[data-row-id]");
@@ -127,10 +125,18 @@ describe("Visible Sections drag-reorder persists sectionOrder + PREFS_CHANGED", 
 		// Rows are spaced 40px apart vertically.
 		const rows = document.querySelectorAll<HTMLElement>("[data-row-id]");
 		rows.forEach((el, i) => {
-			el.getBoundingClientRect = () => ({
-				top: i * 40, bottom: (i + 1) * 40, left: 0, right: 200,
-				width: 200, height: 40, x: 0, y: i * 40, toJSON: () => ({}),
-			}) as DOMRect;
+			el.getBoundingClientRect = () =>
+				({
+					top: i * 40,
+					bottom: (i + 1) * 40,
+					left: 0,
+					right: 200,
+					width: 200,
+					height: 40,
+					x: 0,
+					y: i * 40,
+					toJSON: () => ({}),
+				}) as DOMRect;
 		});
 	}
 
@@ -165,7 +171,13 @@ describe("Visible Sections drag-reorder persists sectionOrder + PREFS_CHANGED", 
 
 		const stored = JSON.parse(localStorage.getItem("listening-stats:preferences") ?? "{}");
 		expect(stored.sectionOrder).toBeDefined();
-		expect(stored.sectionOrder).not.toEqual(["overview", "top-genres", "top-lists", "activity", "recently-played"]);
+		expect(stored.sectionOrder).not.toEqual([
+			"overview",
+			"top-genres",
+			"top-lists",
+			"activity",
+			"recently-played",
+		]);
 		expect(stored.sectionOrder.indexOf("overview")).toBeGreaterThan(0); // overview moved down
 		expect(prefsChangedFired).toBeGreaterThanOrEqual(1);
 		expect(onPrefsChanged).toHaveBeenCalled();
@@ -197,10 +209,25 @@ describe("Visible Sections drag-reorder persists sectionOrder + PREFS_CHANGED", 
 
 	it("reset layout restores hiddenSections and ordering defaults", () => {
 		setPreference("hiddenSections", ["top-lists", "top-tracks", "tracks"]);
-		setPreference("sectionOrder", ["top-lists", "overview", "recently-played", "top-genres", "activity", "consistency"]);
+		setPreference("sectionOrder", [
+			"top-lists",
+			"overview",
+			"recently-played",
+			"top-genres",
+			"activity",
+			"consistency",
+		]);
 		setPreference("columnOrder", ["top-albums", "top-tracks", "top-artists"]);
 		setPreference("overviewOrder", {
-			local: ["skip-rate", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "est-payout"],
+			local: [
+				"skip-rate",
+				"tracks",
+				"unique-artists",
+				"streak",
+				"new-artists",
+				"peak-hour",
+				"est-payout",
+			],
 			statsfm: ["est-payout", "top-genre", "new-artists", "unique-artists"],
 		});
 
@@ -211,15 +238,42 @@ describe("Visible Sections drag-reorder persists sectionOrder + PREFS_CHANGED", 
 
 		const prefs = getPreferences();
 		expect(prefs.hiddenSections).toEqual([]);
-		expect(prefs.sectionOrder).toEqual(["overview", "top-genres", "top-lists", "activity", "consistency", "recently-played"]);
+		expect(prefs.sectionOrder).toEqual([
+			"overview",
+			"top-genres",
+			"top-lists",
+			"activity",
+			"consistency",
+			"recently-played",
+		]);
 		expect(prefs.columnOrder).toEqual(["top-tracks", "top-artists", "top-albums"]);
-		expect(prefs.overviewOrder.local).toEqual(["tracks", "unique-artists", "streak", "new-artists", "peak-hour", "skip-rate", "est-payout"]);
-		expect(prefs.overviewOrder.statsfm).toEqual(["unique-artists", "new-artists", "top-genre", "est-payout"]);
+		expect(prefs.overviewOrder.local).toEqual([
+			"tracks",
+			"unique-artists",
+			"streak",
+			"new-artists",
+			"peak-hour",
+			"skip-rate",
+			"est-payout",
+		]);
+		expect(prefs.overviewOrder.statsfm).toEqual([
+			"unique-artists",
+			"new-artists",
+			"top-genre",
+			"est-payout",
+		]);
 	});
 
 	it("undo reset layout restores previous layout customization", () => {
 		setPreference("hiddenSections", ["top-lists"]);
-		setPreference("sectionOrder", ["top-lists", "overview", "top-genres", "activity", "consistency", "recently-played"]);
+		setPreference("sectionOrder", [
+			"top-lists",
+			"overview",
+			"top-genres",
+			"activity",
+			"consistency",
+			"recently-played",
+		]);
 		setPreference("columnOrder", ["top-albums", "top-tracks", "top-artists"]);
 
 		renderFn(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: () => {} }));
@@ -271,10 +325,18 @@ describe("Top Lists Columns grid in DisplayTab", () => {
 		// Stub tile rects for horizontal layout: 3 tiles side-by-side, each 100px wide
 		const tiles = document.querySelectorAll<HTMLElement>('[data-tile-id^="top-"]');
 		tiles.forEach((el, i) => {
-			el.getBoundingClientRect = (() => ({
-				top: 0, bottom: 80, left: i * 100, right: (i + 1) * 100,
-				width: 100, height: 80, x: i * 100, y: 0, toJSON: () => ({}),
-			}) as DOMRect);
+			el.getBoundingClientRect = () =>
+				({
+					top: 0,
+					bottom: 80,
+					left: i * 100,
+					right: (i + 1) * 100,
+					width: 100,
+					height: 80,
+					x: i * 100,
+					y: 0,
+					toJSON: () => ({}),
+				}) as DOMRect;
 		});
 
 		const firstTile = document.querySelector<HTMLElement>('[data-tile-id="top-tracks"]');
@@ -323,10 +385,12 @@ describe("Top Lists Columns grid in DisplayTab", () => {
 
 		// The subsection wrapper should have opacity 0.4 and pointerEvents none
 		// Find by the data attribute we'll add on the wrapper
-		const subsection = document.querySelector<HTMLElement>('[data-testid="top-lists-columns-subsection"]');
+		const subsection = document.querySelector<HTMLElement>(
+			'[data-testid="top-lists-columns-subsection"]',
+		);
 		expect(subsection).not.toBeNull();
-		expect(subsection!.style.opacity).toBe("0.4");
-		expect(subsection!.style.pointerEvents).toBe("none");
+		expect(subsection?.style.opacity).toBe("0.4");
+		expect(subsection?.style.pointerEvents).toBe("none");
 	});
 });
 
@@ -364,9 +428,15 @@ describe("Header Plus badge", () => {
 	});
 
 	it("renders no Plus badge when active provider is stats.fm Free", async () => {
-		localStorage.setItem(LS_KEYS.STATSFM_CONFIG, JSON.stringify({
-			username: "tester", isPlus: false, connectedAt: Date.now(), lastValidated: Date.now(),
-		}));
+		localStorage.setItem(
+			LS_KEYS.STATSFM_CONFIG,
+			JSON.stringify({
+				username: "tester",
+				isPlus: false,
+				connectedAt: Date.now(),
+				lastValidated: Date.now(),
+			}),
+		);
 		await statsfmProvider.init();
 		providerRegistry.setActive("statsfm");
 		Spicetify.ReactDOM.render(
@@ -382,9 +452,15 @@ describe("Header Plus badge", () => {
 	});
 
 	it("renders Plus badge with text 'Plus' when active provider is stats.fm Plus", async () => {
-		localStorage.setItem(LS_KEYS.STATSFM_CONFIG, JSON.stringify({
-			username: "tester", isPlus: true, connectedAt: Date.now(), lastValidated: Date.now(),
-		}));
+		localStorage.setItem(
+			LS_KEYS.STATSFM_CONFIG,
+			JSON.stringify({
+				username: "tester",
+				isPlus: true,
+				connectedAt: Date.now(),
+				lastValidated: Date.now(),
+			}),
+		);
 		await statsfmProvider.init();
 		providerRegistry.setActive("statsfm");
 		Spicetify.ReactDOM.render(
@@ -402,9 +478,15 @@ describe("Header Plus badge", () => {
 	});
 
 	it("Plus badge sits inside .header-provider-pill with health dot and provider name", async () => {
-		localStorage.setItem(LS_KEYS.STATSFM_CONFIG, JSON.stringify({
-			username: "tester", isPlus: true, connectedAt: Date.now(), lastValidated: Date.now(),
-		}));
+		localStorage.setItem(
+			LS_KEYS.STATSFM_CONFIG,
+			JSON.stringify({
+				username: "tester",
+				isPlus: true,
+				connectedAt: Date.now(),
+				lastValidated: Date.now(),
+			}),
+		);
 		await statsfmProvider.init();
 		providerRegistry.setActive("statsfm");
 		Spicetify.ReactDOM.render(
@@ -454,28 +536,40 @@ describe("Overview Details grid in DisplayTab", () => {
 		];
 		tiles.forEach((el, i) => {
 			const p = positions[i] ?? { top: 0, bottom: 80, left: 0, right: 100 };
-			el.getBoundingClientRect = (() => ({
-				...p, width: p.right - p.left, height: p.bottom - p.top,
-				x: p.left, y: p.top, toJSON: () => ({}),
-			}) as DOMRect);
+			el.getBoundingClientRect = () =>
+				({
+					...p,
+					width: p.right - p.left,
+					height: p.bottom - p.top,
+					x: p.left,
+					y: p.top,
+					toJSON: () => ({}),
+				}) as DOMRect;
 		});
 	}
 
 	it("renders 7 overview tiles split into top 4 (2x2) + bottom 3 (1x3) for local provider", () => {
 		renderFn(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: () => {} }));
-		const tiles = document.querySelectorAll<HTMLElement>("[data-tile-id]:not([data-tile-id^='top-'])");
+		const tiles = document.querySelectorAll<HTMLElement>(
+			"[data-tile-id]:not([data-tile-id^='top-'])",
+		);
 		expect(tiles.length).toBe(7);
 		const ids = Array.from(tiles).map((t) => t.getAttribute("data-tile-id"));
 		expect(ids).toEqual([
-			"tracks", "unique-artists", "streak", "new-artists",
-			"peak-hour", "skip-rate", "est-payout",
+			"tracks",
+			"unique-artists",
+			"streak",
+			"new-artists",
+			"peak-hour",
+			"skip-rate",
+			"est-payout",
 		]);
 	});
 
 	it("local provider settings shows hero placeholder + 2x2 top grid + 1x3 bottom row", () => {
 		renderFn(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: () => {} }));
 		expect(document.querySelector('[data-testid="overview-settings-hero"]')).not.toBeNull();
-		const topGrid = document.querySelector('.overview-settings-top .sortable-grid--2x2');
+		const topGrid = document.querySelector(".overview-settings-top .sortable-grid--2x2");
 		expect(topGrid).not.toBeNull();
 		const topTiles = topGrid!.querySelectorAll<HTMLElement>("[data-tile-id]");
 		expect(topTiles.length).toBe(4);
@@ -494,7 +588,7 @@ describe("Overview Details grid in DisplayTab", () => {
 		stubTileRects();
 
 		// Drag "tracks" (tile 0) down past tile2/tile3 midline
-		const tile = document.querySelector<HTMLElement>("[data-tile-id=\"tracks\"]");
+		const tile = document.querySelector<HTMLElement>('[data-tile-id="tracks"]');
 		expect(tile).not.toBeNull();
 
 		// pointerdown on tile (fireEvent triggers React synthetic handlers), then window pointermove/pointerup
@@ -507,8 +601,13 @@ describe("Overview Details grid in DisplayTab", () => {
 		expect(stored.overviewOrder.local).toBeDefined();
 		// Seven-tile catalog: any non-trivial drag changes default local order
 		expect(stored.overviewOrder.local).not.toEqual([
-			"tracks", "unique-artists", "streak", "new-artists",
-			"peak-hour", "skip-rate", "est-payout",
+			"tracks",
+			"unique-artists",
+			"streak",
+			"new-artists",
+			"peak-hour",
+			"skip-rate",
+			"est-payout",
 		]);
 		expect(prefsChangedFired).toBeGreaterThanOrEqual(1);
 
@@ -523,8 +622,8 @@ describe("Overview Details grid in DisplayTab", () => {
 		renderFn(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: () => {} }));
 
 		// Find the toggle for tracks tile (fallback checkbox in jsdom since Spicetify.ReactComponent.Toggle is undefined)
-		const tracksTile = document.querySelector<HTMLElement>("[data-tile-id=\"tracks\"]");
-		const checkbox = tracksTile?.querySelector<HTMLInputElement>("input[type=\"checkbox\"]");
+		const tracksTile = document.querySelector<HTMLElement>('[data-tile-id="tracks"]');
+		const checkbox = tracksTile?.querySelector<HTMLInputElement>('input[type="checkbox"]');
 		if (!checkbox) {
 			// No checkbox fallback in this environment
 			window.removeEventListener(EVENTS.PREFS_CHANGED, listener);
@@ -567,7 +666,7 @@ describe("Overview Details grid in DisplayTab", () => {
 		window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));
 
 		expect(document.querySelector('[data-testid="overview-settings-hero"]')).not.toBeNull();
-		const topGrid = document.querySelector('.overview-settings-top .sortable-grid--2x2');
+		const topGrid = document.querySelector(".overview-settings-top .sortable-grid--2x2");
 		expect(topGrid).not.toBeNull();
 		const topTiles = topGrid!.querySelectorAll<HTMLElement>("[data-tile-id]");
 		expect(topTiles.length).toBe(4);

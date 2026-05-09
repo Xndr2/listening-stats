@@ -21,7 +21,7 @@ describe("cosmosGet", () => {
 		circuitBreaker.reset();
 		apiCache.invalidate();
 		requestMock = vi.fn();
-		Spicetify.CosmosAsync.request = requestMock;
+		Spicetify.CosmosAsync.request = requestMock as typeof Spicetify.CosmosAsync.request;
 	});
 
 	afterEach(() => {

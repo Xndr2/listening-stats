@@ -23,7 +23,7 @@ async function sha256Truncated(input: string): Promise<string> {
 export async function generateSyntheticUris(
 	trackName: string,
 	artistName: string,
-	albumName: string
+	albumName: string,
 ): Promise<{ trackUri: string; artistUri: string; albumUri: string }> {
 	const compound = trackName + artistName + albumName;
 	const hash = await sha256Truncated(compound);

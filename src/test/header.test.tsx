@@ -1,12 +1,20 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { providerRegistry } from "../shared/stats/provider";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { localProvider } from "../shared/stats/local-provider";
+import { providerRegistry } from "../shared/stats/provider";
 import type { Period } from "../shared/types/stats";
 
 // Build minimal mock periods (the component only needs id/label/getBoundaries).
 const mockPeriods: Period[] = [
-	{ id: "today", label: "Today", getBoundaries: () => ({ start: 0, end: Date.now() }) } as unknown as Period,
-	{ id: "week", label: "This Week", getBoundaries: () => ({ start: 0, end: Date.now() }) } as unknown as Period,
+	{
+		id: "today",
+		label: "Today",
+		getBoundaries: () => ({ start: 0, end: Date.now() }),
+	} as unknown as Period,
+	{
+		id: "week",
+		label: "This Week",
+		getBoundaries: () => ({ start: 0, end: Date.now() }),
+	} as unknown as Period,
 ];
 
 describe("Header period tabs slot", () => {
@@ -79,8 +87,10 @@ describe("Header period tabs slot", () => {
 		// Find a non-active tab and click it.
 		const nonActiveTab = Array.from(tabs).find((t) => !t.classList.contains("active"));
 		expect(nonActiveTab).toBeDefined();
-		nonActiveTab!.click();
+		nonActiveTab?.click();
 		expect(onPeriodChange).toHaveBeenCalledTimes(1);
-		expect(onPeriodChange).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String) }));
+		expect(onPeriodChange).toHaveBeenCalledWith(
+			expect.objectContaining({ id: expect.any(String) }),
+		);
 	});
 });

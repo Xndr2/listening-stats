@@ -58,7 +58,7 @@ export function SettingsModal({
 	return createPortal(
 		<div
 			className="settings-overlay"
-			onClick={(e: MouseEvent) => {
+			onClick={(e) => {
 				if ((e.target as HTMLElement).classList.contains("settings-overlay")) onClose();
 			}}
 		>

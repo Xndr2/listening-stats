@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../shared/storage/db";
 import type { ArtistRecord } from "../shared/types/stats";
 
@@ -47,11 +47,7 @@ describe("enrichArtists", () => {
 	});
 
 	it("calls cosmosGet once with all 3 IDs comma-separated for 3 unenriched URIs", async () => {
-		const uris = [
-			makeArtistUri("aaa111"),
-			makeArtistUri("bbb222"),
-			makeArtistUri("ccc333"),
-		];
+		const uris = [makeArtistUri("aaa111"), makeArtistUri("bbb222"), makeArtistUri("ccc333")];
 
 		cosmosGetMock.mockResolvedValueOnce({
 			ok: true,
@@ -102,9 +98,7 @@ describe("enrichArtists", () => {
 		});
 
 		await enrichArtists(uris);
-		expect(cosmosGetMock).toHaveBeenCalledWith(
-			"https://api.spotify.com/v1/artists?ids=x1,x2,x3",
-		);
+		expect(cosmosGetMock).toHaveBeenCalledWith("https://api.spotify.com/v1/artists?ids=x1,x2,x3");
 	});
 
 	it("successful response writes ArtistRecord objects to db.artists via bulkPut", async () => {
@@ -113,7 +107,9 @@ describe("enrichArtists", () => {
 		cosmosGetMock.mockResolvedValueOnce({
 			ok: true,
 			data: {
-				artists: [makeSpotifyArtist("wr001", "Write Test Artist", ["indie"], "https://img.url/wr001.jpg")],
+				artists: [
+					makeSpotifyArtist("wr001", "Write Test Artist", ["indie"], "https://img.url/wr001.jpg"),
+				],
 			},
 		});
 
@@ -131,7 +127,9 @@ describe("enrichArtists", () => {
 		cosmosGetMock.mockResolvedValueOnce({
 			ok: true,
 			data: {
-				artists: [makeSpotifyArtist("rec001", "Record Artist", ["ambient"], "https://img.url/rec001.jpg")],
+				artists: [
+					makeSpotifyArtist("rec001", "Record Artist", ["ambient"], "https://img.url/rec001.jpg"),
+				],
 			},
 		});
 

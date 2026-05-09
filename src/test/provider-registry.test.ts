@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ProviderRegistry, providerRegistry } from "../shared/stats/provider";
 import { LS_KEYS } from "../shared/constants/storage-keys";
-import type { ProviderInfo, StatsProvider } from "../shared/stats/provider";
-import { initProviders, _resetInitGuard } from "../shared/stats/init-providers";
+import { _resetInitGuard, initProviders } from "../shared/stats/init-providers";
 import { localProvider } from "../shared/stats/local-provider";
+import type { ProviderInfo, StatsProvider } from "../shared/stats/provider";
+import { ProviderRegistry, providerRegistry } from "../shared/stats/provider";
 
 function makeMockProvider(id: string): StatsProvider {
 	return {

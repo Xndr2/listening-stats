@@ -1,13 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import React from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 afterEach(() => {
 	cleanup();
 	localStorage.clear();
 });
 
-async function renderAndWaitForLoad(props: { hasLastfmKey: boolean; onConnectLastfm?: () => void }) {
+async function renderAndWaitForLoad(props: {
+	hasLastfmKey: boolean;
+	onConnectLastfm?: () => void;
+}) {
 	const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
 	const result = render(React.createElement(WorldChartsPage, props));
 	if (props.hasLastfmKey) {
@@ -260,21 +263,21 @@ describe("WorldChartsPage  -  scope/window interaction", () => {
 	it("defaults scope to 'world'", async () => {
 		const { container } = await renderAndWaitForLoad({ hasLastfmKey: true });
 		const scopeTabs = container.querySelector("[data-tabs='scope']");
-		const activeBtn = scopeTabs!.querySelector("button.active");
+		const activeBtn = scopeTabs?.querySelector("button.active");
 		expect(activeBtn?.textContent).toBe("World");
 	});
 
 	it("defaults window to 'today'", async () => {
 		const { container } = await renderAndWaitForLoad({ hasLastfmKey: true });
 		const windowTabs = container.querySelector("[data-tabs='window']");
-		const activeBtn = windowTabs!.querySelector("button.active");
+		const activeBtn = windowTabs?.querySelector("button.active");
 		expect(activeBtn?.textContent).toBe("Today");
 	});
 
 	it("clicking a scope tab selects it", async () => {
 		const { container } = await renderAndWaitForLoad({ hasLastfmKey: true });
 		const scopeTabs = container.querySelector("[data-tabs='scope']");
-		const usBtn = scopeTabs!.querySelectorAll("button")[1];
+		const usBtn = scopeTabs!.querySelectorAll("button")[1]!;
 		fireEvent.click(usBtn);
 		expect(usBtn.classList.contains("active")).toBe(true);
 	});
@@ -282,7 +285,7 @@ describe("WorldChartsPage  -  scope/window interaction", () => {
 	it("clicking a window tab selects it", async () => {
 		const { container } = await renderAndWaitForLoad({ hasLastfmKey: true });
 		const windowTabs = container.querySelector("[data-tabs='window']");
-		const weekBtn = windowTabs!.querySelectorAll("button")[1];
+		const weekBtn = windowTabs!.querySelectorAll("button")[1]!;
 		fireEvent.click(weekBtn);
 		expect(weekBtn.classList.contains("active")).toBe(true);
 	});
@@ -291,7 +294,7 @@ describe("WorldChartsPage  -  scope/window interaction", () => {
 		const { LS_KEYS } = await import("../shared/constants/storage-keys");
 		const { container } = await renderAndWaitForLoad({ hasLastfmKey: true });
 		const scopeTabs = container.querySelector("[data-tabs='scope']");
-		const usBtn = scopeTabs!.querySelectorAll("button")[1];
+		const usBtn = scopeTabs!.querySelectorAll("button")[1]!;
 		fireEvent.click(usBtn);
 		expect(localStorage.getItem(LS_KEYS.WORLD_CHARTS_SCOPE)).toBe("us");
 	});
@@ -300,7 +303,7 @@ describe("WorldChartsPage  -  scope/window interaction", () => {
 		const { LS_KEYS } = await import("../shared/constants/storage-keys");
 		const { container } = await renderAndWaitForLoad({ hasLastfmKey: true });
 		const windowTabs = container.querySelector("[data-tabs='window']");
-		const weekBtn = windowTabs!.querySelectorAll("button")[1];
+		const weekBtn = windowTabs!.querySelectorAll("button")[1]!;
 		fireEvent.click(weekBtn);
 		expect(localStorage.getItem(LS_KEYS.WORLD_CHARTS_WINDOW)).toBe("week");
 	});
@@ -310,7 +313,7 @@ describe("WorldChartsPage  -  scope/window interaction", () => {
 		localStorage.setItem(LS_KEYS.WORLD_CHARTS_SCOPE, "jp");
 		const { container } = await renderAndWaitForLoad({ hasLastfmKey: true });
 		const scopeTabs = container.querySelector("[data-tabs='scope']");
-		const activeBtn = scopeTabs!.querySelector("button.active");
+		const activeBtn = scopeTabs?.querySelector("button.active");
 		expect(activeBtn?.textContent).toBe("JP");
 	});
 
@@ -319,7 +322,7 @@ describe("WorldChartsPage  -  scope/window interaction", () => {
 		localStorage.setItem(LS_KEYS.WORLD_CHARTS_WINDOW, "week");
 		const { container } = await renderAndWaitForLoad({ hasLastfmKey: true });
 		const windowTabs = container.querySelector("[data-tabs='window']");
-		const activeBtn = windowTabs!.querySelector("button.active");
+		const activeBtn = windowTabs?.querySelector("button.active");
 		expect(activeBtn?.textContent).toBe("Week");
 	});
 
@@ -328,7 +331,7 @@ describe("WorldChartsPage  -  scope/window interaction", () => {
 		localStorage.setItem(LS_KEYS.WORLD_CHARTS_SCOPE, "invalid");
 		const { container } = await renderAndWaitForLoad({ hasLastfmKey: true });
 		const scopeTabs = container.querySelector("[data-tabs='scope']");
-		const activeBtn = scopeTabs!.querySelector("button.active");
+		const activeBtn = scopeTabs?.querySelector("button.active");
 		expect(activeBtn?.textContent).toBe("World");
 	});
 });
@@ -364,7 +367,10 @@ describe("WorldChartsPage  -  empty state (no Last.fm key)", () => {
 	});
 
 	it("empty state has a Connect button", async () => {
-		const { container } = await renderAndWaitForLoad({ hasLastfmKey: false, onConnectLastfm: () => {} });
+		const { container } = await renderAndWaitForLoad({
+			hasLastfmKey: false,
+			onConnectLastfm: () => {},
+		});
 		const btn = container.querySelector(".world-charts-empty button");
 		expect(btn).not.toBeNull();
 		expect(btn?.textContent).toContain("Connect");

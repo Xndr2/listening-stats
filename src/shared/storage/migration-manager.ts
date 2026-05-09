@@ -1,12 +1,9 @@
-import type Dexie from "dexie";
+import type { Transaction } from "dexie";
+import { LS_KEYS } from "../constants/storage-keys";
 import { backupToIdb } from "./backup";
 import { db } from "./db";
-import { LS_KEYS } from "../constants/storage-keys";
 
-export type UpgradeCallback = (
-	tx: Dexie.Transaction,
-	oldVersion: number,
-) => void | Promise<void>;
+export type UpgradeCallback = (tx: Transaction, oldVersion: number) => void | Promise<void>;
 
 export interface MigrationRegistry {
 	[targetVersion: number]: UpgradeCallback;
@@ -25,9 +22,7 @@ const TARGET_VERSION = 5;
  * Backup play events before opening when stored IDB version < TARGET_VERSION.
  * No-op for current prod schema; kept for future version bumps (tests cover it).
  */
-export async function backupIfUpgradeNeeded(
-	currentVersion: number,
-): Promise<void> {
+export async function backupIfUpgradeNeeded(currentVersion: number): Promise<void> {
 	if (currentVersion >= TARGET_VERSION || currentVersion === 0) return;
 	await backupToIdb();
 }

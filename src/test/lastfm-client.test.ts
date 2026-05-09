@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 function makeResponse(status: number, body: unknown = null): Response {
 	const bodyStr = body !== null ? JSON.stringify(body) : null;
@@ -157,9 +157,7 @@ describe("lastfmGetCharts  -  response mapping", () => {
 	it("delta defaults to 0 (Last.fm does not provide rank change)", async () => {
 		const body = {
 			tracks: {
-				track: [
-					{ name: "A", artist: { name: "B" }, playcount: "100", listeners: "10" },
-				],
+				track: [{ name: "A", artist: { name: "B" }, playcount: "100", listeners: "10" }],
 			},
 		};
 		const fetchMock = vi.fn().mockResolvedValue(makeResponse(200, body));

@@ -1,5 +1,5 @@
-import type { StatsResult } from "../types/stats";
 import type { AppError } from "../errors";
+import type { StatsResult } from "../types/stats";
 
 export type SectionSlotStatus = "pending" | "loading" | "resolved" | "error";
 
@@ -39,8 +39,11 @@ export const EMPTY_STATS: StatsResult = {
 
 export function slotKeyForWave(wave: WaveId): keyof SectionSlots {
 	switch (wave) {
-		case 1: return "overview";
-		case 2: return "lists";
-		case 3: return "activity";
+		case 1:
+			return "overview";
+		case 2:
+			return "lists";
+		case 3:
+			return "activity";
 	}
 }

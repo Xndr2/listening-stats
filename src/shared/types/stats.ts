@@ -1,7 +1,5 @@
 // API wrapper result
-export type Result<T, E> =
-	| { ok: true; data: T; stale?: boolean }
-	| { ok: false; error: E };
+export type Result<T, E> = { ok: true; data: T; stale?: boolean } | { ok: false; error: E };
 
 export type ApiError =
 	| { type: "rate_limited"; retryAfter: number }

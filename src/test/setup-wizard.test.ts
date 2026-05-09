@@ -1,16 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { providerRegistry } from "../shared/stats/provider";
-import { LS_KEYS } from "../shared/constants/storage-keys";
-
 // Imports that will exist after Task 2 (GREEN phase)
 import {
 	buildCacheKey,
-	shouldShowWizard,
-	markWizardSeen,
 	buildProviderChangedState,
+	markWizardSeen,
+	shouldShowWizard,
 } from "../app/App";
 import { filterOverviewCards } from "../app/components/OverviewCards";
+import { LS_KEYS } from "../shared/constants/storage-keys";
+import { providerRegistry } from "../shared/stats/provider";
 
 // ─── Test Suite 1: Provider-qualified cacheKey ────────────────────────────────
 
@@ -143,14 +141,36 @@ describe("PROVIDER_CHANGED handler activeProviderId update", () => {
 		providerRegistry._resetForTesting();
 		// Register both providers so setActive doesn't throw
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "local", name: "Local", description: "Local provider", capabilities: { hasActivityData: true, hasGenreData: true, hasStreakData: true, hasSkipRate: false, tier: "n/a" as const } }),
+			getProviderInfo: () => ({
+				id: "local",
+				name: "Local",
+				description: "Local provider",
+				capabilities: {
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: true,
+					hasSkipRate: false,
+					tier: "n/a" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),
 			destroy: vi.fn(),
 		});
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "statsfm", name: "stats.fm", description: "stats.fm provider", capabilities: { hasActivityData: false, hasGenreData: true, hasStreakData: false, hasSkipRate: false, tier: "free" as const } }),
+			getProviderInfo: () => ({
+				id: "statsfm",
+				name: "stats.fm",
+				description: "stats.fm provider",
+				capabilities: {
+					hasActivityData: false,
+					hasGenreData: true,
+					hasStreakData: false,
+					hasSkipRate: false,
+					tier: "free" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),

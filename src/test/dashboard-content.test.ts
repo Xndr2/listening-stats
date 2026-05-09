@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import React from "react";
-import { getRankClass } from "../app/components/TopLists";
+import { afterEach, describe, expect, it } from "vitest";
 import { ActivityChart } from "../app/components/ActivityChart";
-import { RecentlyPlayed } from "../app/components/RecentlyPlayed";
 import { ListeningPatterns } from "../app/components/ListeningPatterns";
+import { RecentlyPlayed } from "../app/components/RecentlyPlayed";
+import { getRankClass } from "../app/components/TopLists";
 import type { RecentPlay } from "../shared/types/stats";
 
 afterEach(() => {
@@ -111,28 +111,22 @@ describe("RecentlyPlayed", () => {
 
 	it("renders up to 12 recent plays", () => {
 		const plays = Array.from({ length: 12 }, (_, i) => makePlay(i));
-		const { container } = render(
-			React.createElement(RecentlyPlayed, { recentPlays: plays }),
-		);
+		const { container } = render(React.createElement(RecentlyPlayed, { recentPlays: plays }));
 		// Each play item is a direct child of .recently-played
 		const wrapper = container.querySelector(".recently-played");
 		expect(wrapper).not.toBeNull();
-		expect(wrapper!.children).toHaveLength(12);
+		expect(wrapper?.children).toHaveLength(12);
 	});
 
 	it("renders fewer items when fewer plays are provided", () => {
 		const plays = Array.from({ length: 3 }, (_, i) => makePlay(i));
-		const { container } = render(
-			React.createElement(RecentlyPlayed, { recentPlays: plays }),
-		);
+		const { container } = render(React.createElement(RecentlyPlayed, { recentPlays: plays }));
 		const wrapper = container.querySelector(".recently-played");
-		expect(wrapper!.children).toHaveLength(3);
+		expect(wrapper?.children).toHaveLength(3);
 	});
 
 	it("shows section header", () => {
-		const { getByText } = render(
-			React.createElement(RecentlyPlayed, { recentPlays: [] }),
-		);
+		const { getByText } = render(React.createElement(RecentlyPlayed, { recentPlays: [] }));
 		expect(getByText("Recently Played")).not.toBeNull();
 	});
 
@@ -146,12 +140,10 @@ describe("RecentlyPlayed", () => {
 				playedAt: Date.now(),
 			},
 		];
-		const { container } = render(
-			React.createElement(RecentlyPlayed, { recentPlays: plays }),
-		);
+		const { container } = render(React.createElement(RecentlyPlayed, { recentPlays: plays }));
 		const img = container.querySelector("img");
 		expect(img).not.toBeNull();
-		expect(img!.src).toBe("https://example.com/art.jpg");
+		expect(img?.src).toBe("https://example.com/art.jpg");
 	});
 });
 
@@ -202,7 +194,7 @@ describe("ListeningPatterns", () => {
 		);
 		const activityChart = container.querySelector(".activity-chart");
 		expect(activityChart).not.toBeNull();
-		const bars = activityChart!.querySelectorAll(".activity-bar");
+		const bars = activityChart?.querySelectorAll(".activity-bar");
 		expect(bars).toHaveLength(24);
 	});
 
@@ -221,7 +213,7 @@ describe("ListeningPatterns", () => {
 
 		const weekdayChart = container.querySelector(".weekday-chart");
 		expect(weekdayChart).not.toBeNull();
-		const bars = weekdayChart!.querySelectorAll(".activity-bar");
+		const bars = weekdayChart?.querySelectorAll(".activity-bar");
 		expect(bars).toHaveLength(7);
 	});
 

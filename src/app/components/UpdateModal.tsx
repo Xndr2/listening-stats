@@ -54,14 +54,16 @@ export function UpdateModal({
 	receiveBetaUpdates,
 	onReceiveBetaUpdatesChange,
 }: UpdateModalProps) {
-	const Toggle = Spicetify.ReactComponent?.Toggle;
+	const Toggle = Spicetify.ReactComponent.Toggle;
 	const [changelogMd, setChangelogMd] = useState<string | null>(null);
 	const [changelogErr, setChangelogErr] = useState<string | null>(null);
 	const [copiedWhich, setCopiedWhich] = useState<null | "bash" | "powershell">(null);
-	const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const copiedTimerRef = useRef<number | null>(null);
 
 	const bashCmd = receiveBetaUpdates ? INSTALL_COMMAND_BASH_PRERELEASE : INSTALL_COMMAND_BASH;
-	const psCmd = receiveBetaUpdates ? INSTALL_COMMAND_POWERSHELL_PRERELEASE : INSTALL_COMMAND_POWERSHELL;
+	const psCmd = receiveBetaUpdates
+		? INSTALL_COMMAND_POWERSHELL_PRERELEASE
+		: INSTALL_COMMAND_POWERSHELL;
 
 	useEffect(() => {
 		if (!open) return;
@@ -98,21 +100,26 @@ export function UpdateModal({
 		onClose();
 	}, [onClose]);
 
-	const handleCopy = useCallback(async (which: "bash" | "powershell") => {
-		const text = which === "bash" ? bashCmd : psCmd;
-		const ok = await copyToClipboard(text);
-		if (ok) {
-			if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current);
-			setCopiedWhich(which);
-			copiedTimerRef.current = window.setTimeout(() => {
-				setCopiedWhich(null);
-				copiedTimerRef.current = null;
-			}, 2500);
-			Spicetify.showNotification(which === "bash" ? "Copied (macOS / Linux)." : "Copied (Windows).");
-		} else {
-			Spicetify.showNotification("Could not copy.", true);
-		}
-	}, [bashCmd, psCmd]);
+	const handleCopy = useCallback(
+		async (which: "bash" | "powershell") => {
+			const text = which === "bash" ? bashCmd : psCmd;
+			const ok = await copyToClipboard(text);
+			if (ok) {
+				if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current);
+				setCopiedWhich(which);
+				copiedTimerRef.current = window.setTimeout(() => {
+					setCopiedWhich(null);
+					copiedTimerRef.current = null;
+				}, 2500);
+				Spicetify.showNotification(
+					which === "bash" ? "Copied (macOS / Linux)." : "Copied (Windows).",
+				);
+			} else {
+				Spicetify.showNotification("Could not copy.", true);
+			}
+		},
+		[bashCmd, psCmd],
+	);
 
 	const { createPortal } = Spicetify.ReactDOM;
 
@@ -177,9 +184,7 @@ export function UpdateModal({
 						<input
 							type="checkbox"
 							checked={receiveBetaUpdates}
-							onChange={(e: Event) =>
-								onReceiveBetaUpdatesChange((e.target as HTMLInputElement).checked)
-							}
+							onChange={(e) => onReceiveBetaUpdatesChange(e.currentTarget.checked)}
 						/>
 					)}
 				</div>
@@ -201,9 +206,7 @@ export function UpdateModal({
 							{copiedWhich === "bash" ? "Copied" : "Copy"}
 						</button>
 					</div>
-					<pre className="settings-about-command-pre" tabIndex={0}>
-						{bashCmd}
-					</pre>
+					<pre className="settings-about-command-pre">{bashCmd}</pre>
 				</div>
 
 				<div className="settings-about-command-block">
@@ -217,9 +220,7 @@ export function UpdateModal({
 							{copiedWhich === "powershell" ? "Copied" : "Copy"}
 						</button>
 					</div>
-					<pre className="settings-about-command-pre" tabIndex={0}>
-						{psCmd}
-					</pre>
+					<pre className="settings-about-command-pre">{psCmd}</pre>
 				</div>
 
 				<p className="settings-about-hint update-modal-repo-hint">

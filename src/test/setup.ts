@@ -40,9 +40,10 @@ vi.stubGlobal("Spicetify", {
 		TooltipWrapper: ({ children }: { children: unknown }) => children,
 		Toggle: vi.fn(({ value, onSelected }: { value: boolean; onSelected: (v: boolean) => void }) =>
 			React.createElement("button", {
+				type: "button",
 				"data-checked": value,
 				onClick: () => onSelected(!value),
-			})
+			}),
 		),
 	},
 	Locale: {

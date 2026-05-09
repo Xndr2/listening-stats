@@ -1,8 +1,8 @@
-import { LS_KEYS } from "../../shared/constants/storage-keys";
 import { classifyLastfmError } from "../../shared/api/lastfm-client";
-import { getChartsAsync, getArtistChartsAsync } from "../world-charts-service";
-import type { WorldScope, WorldTrack, WorldWindow } from "../world-charts-service";
+import { LS_KEYS } from "../../shared/constants/storage-keys";
 import type { AppError } from "../../shared/errors";
+import type { WorldScope, WorldTrack, WorldWindow } from "../world-charts-service";
+import { getArtistChartsAsync, getChartsAsync } from "../world-charts-service";
 import { InlineErrorCard } from "./InlineErrorCard";
 import { WorldChartsSkeleton } from "./LoadingSkeleton";
 
@@ -24,9 +24,14 @@ const VALID_SCOPES = new Set<string>(SCOPES.map((s) => s.value));
 const VALID_WINDOWS = new Set<string>(WINDOWS.map((w) => w.value));
 
 const TILE_COLORS: [string, string][] = [
-	["#3a1f10", "#c44e1d"], ["#1f2d3a", "#5b8fb9"], ["#2a1a3a", "#8b5cf6"],
-	["#3a2a1a", "#e0a458"], ["#1a3a2e", "#5dbf99"], ["#3a1a2a", "#d36ba6"],
-	["#102a3a", "#3d8fd1"], ["#2a3a1a", "#a3c46d"],
+	["#3a1f10", "#c44e1d"],
+	["#1f2d3a", "#5b8fb9"],
+	["#2a1a3a", "#8b5cf6"],
+	["#3a2a1a", "#e0a458"],
+	["#1a3a2e", "#5dbf99"],
+	["#3a1a2a", "#d36ba6"],
+	["#102a3a", "#3d8fd1"],
+	["#2a3a1a", "#a3c46d"],
 ];
 
 function tileGradient(seed: string): string {
@@ -129,7 +134,7 @@ export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPa
 						Add a Last.fm API key to see what the world is playing.
 					</p>
 					{onConnectLastfm && (
-						<button className="btn-primary" onClick={onConnectLastfm}>
+						<button type="button" className="btn-primary" onClick={onConnectLastfm}>
 							Connect Last.fm
 						</button>
 					)}
@@ -145,7 +150,6 @@ export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPa
 		const query = isArtist ? item.title : `${item.title} ${item.artist}`;
 
 		return (
-			// biome-ignore lint/a11y/useSemanticElements: flex row layout requires div
 			<div
 				key={item.id}
 				className="world-chart-item"
@@ -169,10 +173,7 @@ export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPa
 				</div>
 				<div className="world-chart-stats">
 					{!isArtist && <div className="world-chart-plays">{item.plays}</div>}
-					<div
-						className="world-chart-delta"
-						data-direction={delta.direction}
-					>
+					<div className="world-chart-delta" data-direction={delta.direction}>
 						{delta.indicator}
 					</div>
 				</div>
@@ -188,9 +189,15 @@ export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPa
 					<h2 className="section-title">What the world is playing</h2>
 				</div>
 				<div className="world-charts-tabs">
-					<div className="world-charts-tab-group" data-tabs="scope" role="tablist" aria-label="Region">
+					<div
+						className="world-charts-tab-group"
+						data-tabs="scope"
+						role="tablist"
+						aria-label="Region"
+					>
 						{SCOPES.map((s) => (
 							<button
+								type="button"
 								key={s.value}
 								className={`world-charts-tab${scope === s.value ? " active" : ""}`}
 								role="tab"
@@ -201,9 +208,15 @@ export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPa
 							</button>
 						))}
 					</div>
-					<div className="world-charts-tab-group" data-tabs="window" role="tablist" aria-label="Time window">
+					<div
+						className="world-charts-tab-group"
+						data-tabs="window"
+						role="tablist"
+						aria-label="Time window"
+					>
 						{WINDOWS.map((w) => (
 							<button
+								type="button"
 								key={w.value}
 								className={`world-charts-tab${timeWindow === w.value ? " active" : ""}`}
 								role="tab"
@@ -249,9 +262,7 @@ export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPa
 						</div>
 					</div>
 
-					<div className="world-charts-source">
-						Source: Last.fm
-					</div>
+					<div className="world-charts-source">Source: Last.fm</div>
 				</>
 			)}
 		</div>

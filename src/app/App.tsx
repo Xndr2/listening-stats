@@ -1,5 +1,7 @@
 declare const __VERSION__: string;
 
+import type { ParsedRemoteAnnouncement } from "../shared/announcements/remote-announcement";
+import { fetchRemoteAnnouncement } from "../shared/announcements/remote-announcement";
 import { EVENTS } from "../shared/constants/events";
 import { LS_KEYS } from "../shared/constants/storage-keys";
 import type { AppError } from "../shared/errors";
@@ -17,8 +19,6 @@ import type { ProviderRegistry } from "../shared/stats/provider";
 import { providerRegistry } from "../shared/stats/provider";
 import { statsCache } from "../shared/stats/stats-cache";
 import type { Period, StatsResult } from "../shared/types/stats";
-import type { ParsedRemoteAnnouncement } from "../shared/announcements/remote-announcement";
-import { fetchRemoteAnnouncement } from "../shared/announcements/remote-announcement";
 import type { UpdateCheckResult } from "../shared/update/update-check";
 import { checkForAppUpdate, isUpdatePromptSnoozed } from "../shared/update/update-check";
 import { resolveAnnouncementBanner } from "./banners";
@@ -93,11 +93,11 @@ import OverviewSection from "./components/OverviewSection";
 import { RecentlyPlayed } from "./components/RecentlyPlayed";
 import { SetupWizard } from "./components/SetupWizard";
 import { ShareModal } from "./components/ShareModal";
-import { UpdateModal } from "./components/UpdateModal";
 import type { SettingsTab } from "./components/settings/SettingsModal";
 import { SettingsModal } from "./components/settings/SettingsModal";
 import { TopGenres } from "./components/TopGenres";
 import { TopLists } from "./components/TopLists";
+import { UpdateModal } from "./components/UpdateModal";
 import { WorldChartsPage } from "./components/WorldChartsPage";
 
 const { useState, useEffect, useCallback, useRef, useMemo } = Spicetify.React;

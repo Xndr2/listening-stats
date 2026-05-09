@@ -1,14 +1,14 @@
+import { LS_KEYS } from "../constants/storage-keys";
 import type { Period, StatsResult } from "../types/stats";
 import type { WaveCallback } from "./progressive";
-import { LS_KEYS } from "../constants/storage-keys";
 
 export interface ProviderCapabilities {
-	hasActivityData: boolean;  // hourly/weekday distribution available
+	hasActivityData: boolean; // hourly/weekday distribution available
 	hasConsistencyData?: boolean; // provider-specific consistency view available
-	hasGenreData: boolean;     // topGenres populated
-	hasStreakData: boolean;    // streak card data available
-	hasSkipRate: boolean;      // skip-rate overview card available
-	tier: 'free' | 'plus' | 'n/a';  // 'n/a' for local provider
+	hasGenreData: boolean; // topGenres populated
+	hasStreakData: boolean; // streak card data available
+	hasSkipRate: boolean; // skip-rate overview card available
+	tier: "free" | "plus" | "n/a"; // 'n/a' for local provider
 }
 
 export interface ProviderInfo {

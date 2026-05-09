@@ -1,4 +1,4 @@
-import { TOUR_STEPS, markTourSeen, type TargetRect, type TourStep } from "../tour";
+import { markTourSeen, type TargetRect, TOUR_STEPS, type TourStep } from "../tour";
 import { TourPopover } from "./TourPopover";
 
 const { useState, useLayoutEffect, useCallback, useRef, useEffect } = Spicetify.React;
@@ -32,7 +32,9 @@ export function GuidedTour({ active, version, steps = TOUR_STEPS, onComplete }: 
 	const timersRef = useRef<number[]>([]);
 
 	useEffect(() => {
-		return () => { timersRef.current.forEach(clearTimeout); };
+		return () => {
+			timersRef.current.forEach(clearTimeout);
+		};
 	}, []);
 
 	const finish = useCallback(() => {
@@ -40,19 +42,19 @@ export function GuidedTour({ active, version, steps = TOUR_STEPS, onComplete }: 
 		onComplete();
 	}, [version, onComplete]);
 
-	const updateTarget = useCallback((stepIndex: number) => {
-		const s = steps[stepIndex];
-		if (!s) return;
-		timersRef.current.forEach(clearTimeout);
-		timersRef.current = [];
-		scrollTarget(s.selector);
-		const refresh = () => setTargetRect(measureTarget(s.selector));
-		refresh();
-		timersRef.current.push(
-			window.setTimeout(refresh, 160),
-			window.setTimeout(refresh, 320),
-		);
-	}, [steps]);
+	const updateTarget = useCallback(
+		(stepIndex: number) => {
+			const s = steps[stepIndex];
+			if (!s) return;
+			timersRef.current.forEach(clearTimeout);
+			timersRef.current = [];
+			scrollTarget(s.selector);
+			const refresh = () => setTargetRect(measureTarget(s.selector));
+			refresh();
+			timersRef.current.push(window.setTimeout(refresh, 160), window.setTimeout(refresh, 320));
+		},
+		[steps],
+	);
 
 	const handleNext = useCallback(() => {
 		if (stepRef.current >= steps.length - 1) {

@@ -1,9 +1,9 @@
 import Dexie from "dexie";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-	type ExportEnvelope,
 	backupToIdb,
 	checkBackupExists,
+	type ExportEnvelope,
 	exportPlayEvents,
 	importPlayEvents,
 	restoreFromBackupIdb,
@@ -104,9 +104,7 @@ describe("backup module", () => {
 				events: [],
 			} as unknown as ExportEnvelope;
 
-			await expect(importPlayEvents(envelope)).rejects.toThrow(
-				"Unknown export format version",
-			);
+			await expect(importPlayEvents(envelope)).rejects.toThrow("Unknown export format version");
 		});
 
 		it("count() equals envelope.count after import", async () => {

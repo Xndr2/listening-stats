@@ -4,3 +4,4 @@ coverage/
 *.tgz
 .DS_Store
 .claude/
+.pnpm-store/

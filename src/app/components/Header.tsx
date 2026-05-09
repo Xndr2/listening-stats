@@ -1,12 +1,12 @@
-import { EVENTS } from "../../shared/constants/events";
-import { LS_KEYS } from "../../shared/constants/storage-keys";
 import type { HealthPayload } from "../../extension/tracker/health";
 import type { StatsFmHealthPayload } from "../../shared/api/statsfm-client";
-import { GearIcon, ShareIcon } from "../icons";
-import { providerRegistry } from "../../shared/stats/provider";
+import { EVENTS } from "../../shared/constants/events";
+import { LS_KEYS } from "../../shared/constants/storage-keys";
 import type { ProviderCapabilities } from "../../shared/stats/provider";
-import PeriodTabs from "./PeriodTabs";
+import { providerRegistry } from "../../shared/stats/provider";
 import type { Period } from "../../shared/types/stats";
+import { GearIcon, ShareIcon } from "../icons";
+import PeriodTabs from "./PeriodTabs";
 
 const { useState, useEffect } = Spicetify.React;
 const STATSFM_REFRESH_WINDOW_MS = 2 * 60_000;
@@ -28,7 +28,9 @@ export function getLocalHealthColor(health: HealthPayload | null): "green" | "ye
 	return "red";
 }
 
-export function getStatsFmHealthColor(health: StatsFmHealthPayload | null): "green" | "yellow" | "red" {
+export function getStatsFmHealthColor(
+	health: StatsFmHealthPayload | null,
+): "green" | "yellow" | "red" {
 	if (!health || health.lastSuccessAt === null) return "red";
 	if (health.circuitOpen) return "red";
 	if (health.lastError !== null) return "red";
@@ -54,7 +56,7 @@ export function buildLocalTooltip(health: HealthPayload | null): string {
 	if (!health.healthy && health.lastError) return `Tracking error: ${health.lastError}`;
 	const ageMin = (Date.now() - health.lastWriteAt) / 60_000;
 	const trackSuffix = health.lastTrackName
-		? ` - ${health.lastTrackName.length > 40 ? health.lastTrackName.slice(0, 40) + "..." : health.lastTrackName}`
+		? ` - ${health.lastTrackName.length > 40 ? `${health.lastTrackName.slice(0, 40)}...` : health.lastTrackName}`
 		: "";
 	if (ageMin < 1) return `Last play just now${trackSuffix}`;
 	if (ageMin < 60) return `Last play ${Math.floor(ageMin)}m ago${trackSuffix}`;
@@ -65,16 +67,14 @@ export function buildStatsFmTooltip(health: StatsFmHealthPayload | null): string
 	if (!health || health.lastFetchAt === null) return "No data fetched yet";
 	if (health.circuitOpen) return "stats.fm unavailable: circuit open";
 	if (health.lastError !== null) {
-		const msg = health.lastError.length > 60
-			? health.lastError.slice(0, 60) + "…"
-			: health.lastError;
+		const msg =
+			health.lastError.length > 60 ? `${health.lastError.slice(0, 60)}…` : health.lastError;
 		return `API error: ${msg}`;
 	}
 	if (health.lastSuccessAt === null) return "No data fetched yet";
 	const refreshIn = Math.max(0, STATSFM_REFRESH_WINDOW_MS - (Date.now() - health.lastSuccessAt));
-	const refreshSuffix = refreshIn > 0
-		? ` · refresh in ${formatMsRemaining(refreshIn)}`
-		: " · refresh due now";
+	const refreshSuffix =
+		refreshIn > 0 ? ` · refresh in ${formatMsRemaining(refreshIn)}` : " · refresh due now";
 	const ageMin = (Date.now() - health.lastSuccessAt) / 60_000;
 	if (ageMin < 1) return `API healthy, just refreshed${refreshSuffix}`;
 	if (ageMin < 60) return `API healthy, refreshed ${Math.floor(ageMin)}m ago${refreshSuffix}`;
@@ -173,9 +173,8 @@ export default function Header({
 	}, []);
 
 	const healthColor = getHealthColor(activeProviderId, health, sfmHealth);
-	const tooltipText = activeProviderId === "statsfm"
-		? buildStatsFmTooltip(sfmHealth)
-		: buildLocalTooltip(health);
+	const tooltipText =
+		activeProviderId === "statsfm" ? buildStatsFmTooltip(sfmHealth) : buildLocalTooltip(health);
 
 	return (
 		<header className="stats-header">
@@ -198,6 +197,7 @@ export default function Header({
 				{activePage && onPageChange && (
 					<div className="page-tabs" role="tablist" data-testid="page-tabs">
 						<button
+							type="button"
 							className={`page-tab${activePage === "dashboard" ? " active" : ""}`}
 							role="tab"
 							aria-selected={activePage === "dashboard"}
@@ -206,6 +206,7 @@ export default function Header({
 							Dashboard
 						</button>
 						<button
+							type="button"
 							className={`page-tab${activePage === "world" ? " active" : ""}`}
 							role="tab"
 							aria-selected={activePage === "world"}
@@ -228,6 +229,7 @@ export default function Header({
 				)}
 				{onShareClick && (
 					<button
+						type="button"
 						className="stats-header-icon-btn"
 						onClick={onShareClick}
 						aria-label="Share card"
@@ -236,6 +238,7 @@ export default function Header({
 					/>
 				)}
 				<button
+					type="button"
 					className="stats-header-icon-btn"
 					onClick={onSettingsClick}
 					aria-label="Open settings"

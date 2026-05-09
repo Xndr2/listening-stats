@@ -29,7 +29,11 @@ interface UseSettingsSortableResult {
 export function useSettingsSortable(opts: UseSettingsSortableOptions): UseSettingsSortableResult {
 	const { order, onReorder } = opts;
 	const orientation = opts.orientation ?? "vertical";
-	const [dragState, setDragState] = useState<DragState>({ isDragging: false, activeId: null, dropSlotIndex: null });
+	const [dragState, setDragState] = useState<DragState>({
+		isDragging: false,
+		activeId: null,
+		dropSlotIndex: null,
+	});
 
 	// Refs that change during drag, kept out of state to avoid re-renders on every pointermove.
 	const originRef = useRef<{ x: number; y: number } | null>(null);
@@ -48,40 +52,43 @@ export function useSettingsSortable(opts: UseSettingsSortableOptions): UseSettin
 		else itemElsRef.current.delete(itemId);
 	}, []);
 
-	const computeDropSlot = useCallback((pointerX: number, pointerY: number): number => {
-		const ord = orderRef.current;
-		if (orientation === "grid") {
+	const computeDropSlot = useCallback(
+		(pointerX: number, pointerY: number): number => {
+			const ord = orderRef.current;
+			if (orientation === "grid") {
+				for (let i = 0; i < ord.length; i++) {
+					const el = itemElsRef.current.get(ord[i]);
+					if (!el) continue;
+					const rect = el.getBoundingClientRect();
+					if (
+						pointerX >= rect.left &&
+						pointerX <= rect.right &&
+						pointerY >= rect.top &&
+						pointerY <= rect.bottom
+					) {
+						const midX = (rect.left + rect.right) / 2;
+						return pointerX < midX ? i : i + 1;
+					}
+				}
+				return ord.length - 1;
+			}
+			// 1D mode: linear scan along the orientation axis.
 			for (let i = 0; i < ord.length; i++) {
 				const el = itemElsRef.current.get(ord[i]);
 				if (!el) continue;
 				const rect = el.getBoundingClientRect();
-				if (
-					pointerX >= rect.left &&
-					pointerX <= rect.right &&
-					pointerY >= rect.top &&
-					pointerY <= rect.bottom
-				) {
-					const midX = (rect.left + rect.right) / 2;
-					return pointerX < midX ? i : i + 1;
+				if (orientation === "horizontal") {
+					const mid = (rect.left + rect.right) / 2;
+					if (pointerX < mid) return i;
+				} else {
+					const mid = (rect.top + rect.bottom) / 2;
+					if (pointerY < mid) return i;
 				}
 			}
 			return ord.length - 1;
-		}
-		// 1D mode: linear scan along the orientation axis.
-		for (let i = 0; i < ord.length; i++) {
-			const el = itemElsRef.current.get(ord[i]);
-			if (!el) continue;
-			const rect = el.getBoundingClientRect();
-			if (orientation === "horizontal") {
-				const mid = (rect.left + rect.right) / 2;
-				if (pointerX < mid) return i;
-			} else {
-				const mid = (rect.top + rect.bottom) / 2;
-				if (pointerY < mid) return i;
-			}
-		}
-		return ord.length - 1;
-	}, [orientation]);
+		},
+		[orientation],
+	);
 
 	const reset = useCallback(() => {
 		originRef.current = null;
@@ -90,23 +97,30 @@ export function useSettingsSortable(opts: UseSettingsSortableOptions): UseSettin
 		setDragState({ isDragging: false, activeId: null, dropSlotIndex: null });
 	}, []);
 
-	const onPointerMove = useCallback((e: PointerEvent) => {
-		if (!originRef.current) return;
-		const dx = e.clientX - originRef.current.x;
-		const dy = e.clientY - originRef.current.y;
-		deltaXRef.current = dx;
-		deltaYRef.current = dy;
+	const onPointerMove = useCallback(
+		(e: PointerEvent) => {
+			if (!originRef.current) return;
+			const dx = e.clientX - originRef.current.x;
+			const dy = e.clientY - originRef.current.y;
+			deltaXRef.current = dx;
+			deltaYRef.current = dy;
 
-		setDragState((prev) => {
-			const dist = Math.hypot(dx, dy);
-			if (!prev.isDragging) {
-				if (dist < ACTIVATION_THRESHOLD_PX) return prev;
-				// Activate drag
-				return { isDragging: true, activeId: prev.activeId, dropSlotIndex: computeDropSlot(e.clientX, e.clientY) };
-			}
-			return { ...prev, dropSlotIndex: computeDropSlot(e.clientX, e.clientY) };
-		});
-	}, [computeDropSlot]);
+			setDragState((prev) => {
+				const dist = Math.hypot(dx, dy);
+				if (!prev.isDragging) {
+					if (dist < ACTIVATION_THRESHOLD_PX) return prev;
+					// Activate drag
+					return {
+						isDragging: true,
+						activeId: prev.activeId,
+						dropSlotIndex: computeDropSlot(e.clientX, e.clientY),
+					};
+				}
+				return { ...prev, dropSlotIndex: computeDropSlot(e.clientX, e.clientY) };
+			});
+		},
+		[computeDropSlot],
+	);
 
 	const onPointerUp = useCallback(() => {
 		// Resolve drop using the freshest dragState
@@ -130,9 +144,12 @@ export function useSettingsSortable(opts: UseSettingsSortableOptions): UseSettin
 
 	const onPointerCancel = useCallback(() => reset(), [reset]);
 
-	const onKeyDown = useCallback((e: KeyboardEvent) => {
-		if (e.key === "Escape") reset();
-	}, [reset]);
+	const onKeyDown = useCallback(
+		(e: KeyboardEvent) => {
+			if (e.key === "Escape") reset();
+		},
+		[reset],
+	);
 
 	// Attach window listeners only while a pointerdown is "armed" (origin captured).
 	// We attach unconditionally on mount because activation can happen mid-move; cleanup on unmount.
@@ -160,26 +177,29 @@ export function useSettingsSortable(opts: UseSettingsSortableOptions): UseSettin
 		};
 	}, []);
 
-	const getItemStyle = useCallback((itemId: string): Record<string, string | number> | undefined => {
-		if (!dragState.isDragging) return undefined;
-		if (dragState.activeId !== itemId) return undefined;
-		// Transform follows pointer along the orientation axis. Vertical lists
-		// only translate Y; horizontal lists only translate X (no diagonal jitter
-		// on a 1D track). Grid mode (2D) translates both axes so the dragged
-		// tile follows the cursor freely across rows + columns.
-		let transform: string;
-		if (orientation === "horizontal") {
-			transform = `translate3d(${deltaXRef.current}px, 0, 0)`;
-		} else if (orientation === "grid") {
-			transform = `translate3d(${deltaXRef.current}px, ${deltaYRef.current}px, 0)`;
-		} else {
-			transform = `translate3d(0, ${deltaYRef.current}px, 0)`;
-		}
-		return {
-			transform,
-			opacity: 0.4,
-		};
-	}, [dragState.isDragging, dragState.activeId, orientation]);
+	const getItemStyle = useCallback(
+		(itemId: string): Record<string, string | number> | undefined => {
+			if (!dragState.isDragging) return undefined;
+			if (dragState.activeId !== itemId) return undefined;
+			// Transform follows pointer along the orientation axis. Vertical lists
+			// only translate Y; horizontal lists only translate X (no diagonal jitter
+			// on a 1D track). Grid mode (2D) translates both axes so the dragged
+			// tile follows the cursor freely across rows + columns.
+			let transform: string;
+			if (orientation === "horizontal") {
+				transform = `translate3d(${deltaXRef.current}px, 0, 0)`;
+			} else if (orientation === "grid") {
+				transform = `translate3d(${deltaXRef.current}px, ${deltaYRef.current}px, 0)`;
+			} else {
+				transform = `translate3d(0, ${deltaYRef.current}px, 0)`;
+			}
+			return {
+				transform,
+				opacity: 0.4,
+			};
+		},
+		[dragState.isDragging, dragState.activeId, orientation],
+	);
 
 	return { dragState, onItemPointerDown, registerItem, getItemStyle };
 }

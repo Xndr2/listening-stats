@@ -4,8 +4,8 @@
  * resolvedAt: null = pending, 0 = no match, timestamp = resolved.
  */
 
-import { cosmosGet } from "../api/cosmos-async";
 import { circuitBreaker } from "../api/circuit-breaker";
+import { cosmosGet } from "../api/cosmos-async";
 import { db } from "./db";
 
 // ──────────────────────────────────────────────────────
@@ -58,15 +58,10 @@ function sleep(ms: number): Promise<void> {
  */
 export async function resolveImportedUris(options?: { delayMs?: number }): Promise<void> {
 	// Step 1: Query all events with synthetic trackUris that haven't been attempted yet
-	const candidates = await db.playEvents
-		.where("trackUri")
-		.startsWith("listening-stats:")
-		.toArray();
+	const candidates = await db.playEvents.where("trackUri").startsWith("listening-stats:").toArray();
 
 	// Filter to only unresolved ones (resolvedAt null or undefined; resolvedAt=0 means permanently unresolvable)
-	const unresolved = candidates.filter(
-		(e) => e.resolvedAt === null || e.resolvedAt === undefined
-	);
+	const unresolved = candidates.filter((e) => e.resolvedAt === null || e.resolvedAt === undefined);
 
 	// Step 2: Early return if nothing to do
 	if (unresolved.length === 0) return;
@@ -89,7 +84,8 @@ export async function resolveImportedUris(options?: { delayMs?: number }): Promi
 	for (const syntheticUri of uniqueSyntheticUris) {
 		if (circuitBreaker.isOpen()) break;
 
-		const meta = metaByUri.get(syntheticUri)!;
+		const meta = metaByUri.get(syntheticUri);
+		if (!meta) continue;
 		const { trackName, artistName } = meta;
 
 		// Build Spotify search URL with encoded query
@@ -104,17 +100,14 @@ export async function resolveImportedUris(options?: { delayMs?: number }): Promi
 				break;
 			}
 			// Other errors (http_error, network_error): mark as unresolvable and continue
-			await db.playEvents
-				.where("trackUri")
-				.equals(syntheticUri)
-				.modify({ resolvedAt: 0 });
+			await db.playEvents.where("trackUri").equals(syntheticUri).modify({ resolvedAt: 0 });
 		} else {
 			// Case-insensitive track + primary artist match within top 5 results
 			const items = result.data.tracks.items;
 			const match = items.find(
 				(item) =>
 					item.name.toLowerCase() === trackName.toLowerCase() &&
-					item.artists[0]?.name.toLowerCase() === artistName.toLowerCase()
+					item.artists[0]?.name.toLowerCase() === artistName.toLowerCase(),
 			);
 
 			if (match) {
@@ -131,10 +124,7 @@ export async function resolveImportedUris(options?: { delayMs?: number }): Promi
 					});
 			} else {
 				// No confident match: mark unresolvable (resolvedAt 0)
-				await db.playEvents
-					.where("trackUri")
-					.equals(syntheticUri)
-					.modify({ resolvedAt: 0 });
+				await db.playEvents.where("trackUri").equals(syntheticUri).modify({ resolvedAt: 0 });
 			}
 		}
 

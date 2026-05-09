@@ -14,15 +14,23 @@ export const SECTION_IDS = [
 export const COLUMN_IDS = ["top-tracks", "top-artists", "top-albums"] as const;
 
 export const OVERVIEW_CARD_IDS = {
-	local: ["tracks", "unique-artists", "streak", "new-artists", "peak-hour", "skip-rate", "est-payout"],
+	local: [
+		"tracks",
+		"unique-artists",
+		"streak",
+		"new-artists",
+		"peak-hour",
+		"skip-rate",
+		"est-payout",
+	],
 	statsfm: ["unique-artists", "new-artists", "top-genre", "est-payout"],
 } as const;
 
 export const OVERVIEW_CARD_LABELS: Record<string, string> = {
-	"tracks": "Tracks",
+	tracks: "Tracks",
 	"unique-artists": "Unique Artists",
 	"listening-days": "Listening Days",
-	"streak": "Streak",
+	streak: "Streak",
 	"skip-rate": "Skip Rate",
 	"est-payout": "Est. Payout",
 	"top-genre": "Top Genre",

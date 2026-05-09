@@ -29,19 +29,19 @@ describe("STATSFM_PERIODS array", () => {
 	it("sfm-weeks has label 'This Week'", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-weeks");
 		expect(period).toBeDefined();
-		expect(period!.label).toBe("This Week");
+		expect(period?.label).toBe("This Week");
 	});
 
 	it("sfm-months has label 'This Month'", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-months");
 		expect(period).toBeDefined();
-		expect(period!.label).toBe("This Month");
+		expect(period?.label).toBe("This Month");
 	});
 
 	it("sfm-all-time has label 'All Time'", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-all-time");
 		expect(period).toBeDefined();
-		expect(period!.label).toBe("All Time");
+		expect(period?.label).toBe("All Time");
 	});
 });
 
@@ -71,7 +71,7 @@ describe("STATSFM_PERIODS_PLUS array", () => {
 	it("sfm-today has label 'Today'", () => {
 		const period = STATSFM_PERIODS_PLUS.find((p) => p.id === "sfm-today");
 		expect(period).toBeDefined();
-		expect(period!.label).toBe("Today");
+		expect(period?.label).toBe("Today");
 	});
 
 	it("each period has a non-empty label", () => {
@@ -104,6 +104,7 @@ describe("sfm-weeks boundaries", () => {
 
 	it("start is Monday 2026-03-30 midnight", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-weeks");
+		expect(period).toBeDefined();
 		const { start } = period!.getBoundaries();
 		const startDate = new Date(start);
 		expect(startDate.getFullYear()).toBe(2026);
@@ -137,6 +138,7 @@ describe("sfm-months boundaries", () => {
 
 	it("at 2026-04-01, start is April 1 midnight, end is May 1 midnight", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-months");
+		expect(period).toBeDefined();
 		const { start, end } = period!.getBoundaries();
 		const startDate = new Date(start);
 		const endDate = new Date(end);
@@ -161,12 +163,14 @@ describe("sfm-all-time boundaries", () => {
 
 	it("start is 0", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-all-time");
+		expect(period).toBeDefined();
 		const { start } = period!.getBoundaries();
 		expect(start).toBe(0);
 	});
 
 	it("end is Number.MAX_SAFE_INTEGER", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-all-time");
+		expect(period).toBeDefined();
 		const { end } = period!.getBoundaries();
 		expect(end).toBe(Number.MAX_SAFE_INTEGER);
 	});
@@ -195,6 +199,7 @@ describe("sfm-today boundaries", () => {
 
 	it("start is midnight, end is next midnight", () => {
 		const period = STATSFM_PERIODS_PLUS.find((p) => p.id === "sfm-today");
+		expect(period).toBeDefined();
 		const { start, end } = period!.getBoundaries();
 		const startDate = new Date(start);
 		expect(startDate.getHours()).toBe(0);

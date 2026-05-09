@@ -59,11 +59,10 @@ export function TopLists({
 					<span className="section-kicker">Most played</span>
 					<h2 className="section-title">Tracks</h2>
 				</header>
-				{(loading || loadingByColumn?.tracks) ? (
+				{loading || loadingByColumn?.tracks ? (
 					<TopListColumnSkeleton />
 				) : (
 					stats?.topTracks.slice(0, prefs.itemsPerSection).map((track) => (
-						// biome-ignore lint/a11y/useSemanticElements: flex row layout requires div
 						<div
 							key={track.trackUri || `unknown-track-${track.rank}`}
 							className="top-list-row"
@@ -133,13 +132,12 @@ export function TopLists({
 					<span className="section-kicker">Top</span>
 					<h2 className="section-title">Artists</h2>
 				</header>
-				{(loading || loadingByColumn?.artists) ? (
+				{loading || loadingByColumn?.artists ? (
 					<TopListColumnSkeleton />
 				) : (
 					stats?.topArtists.slice(0, prefs.itemsPerSection).map((artist) => {
 						const primaryGenre = artist.genres?.[0];
 						return (
-							// biome-ignore lint/a11y/useSemanticElements: flex row layout requires div
 							<div
 								key={artist.artistUri || `unknown-artist-${artist.rank}`}
 								className="top-list-row"
@@ -194,7 +192,6 @@ export function TopLists({
 										{primaryGenre && (
 											<>
 												<span style={{ opacity: 0.4 }}>·</span>
-												{/* biome-ignore lint/a11y/useSemanticElements: genre tag is styled as inline clickable text, not a standalone action */}
 												<span
 													role="button"
 													tabIndex={0}
@@ -234,11 +231,10 @@ export function TopLists({
 					<span className="section-kicker">Top</span>
 					<h2 className="section-title">Albums</h2>
 				</header>
-				{(loading || loadingByColumn?.albums) ? (
+				{loading || loadingByColumn?.albums ? (
 					<TopListColumnSkeleton />
 				) : (
 					stats?.topAlbums.slice(0, prefs.itemsPerSection).map((album) => (
-						// biome-ignore lint/a11y/useSemanticElements: flex row layout requires div
 						<div
 							key={album.albumUri || `unknown-album-${album.rank}`}
 							className="top-list-row"

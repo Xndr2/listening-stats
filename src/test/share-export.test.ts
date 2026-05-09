@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockCtx = {
 	fillRect: vi.fn(),
@@ -35,7 +35,9 @@ class MockImage {
 	onload: (() => void) | null = null;
 	onerror: (() => void) | null = null;
 	private _src = "";
-	get src() { return this._src; }
+	get src() {
+		return this._src;
+	}
 	set src(url: string) {
 		this._src = url;
 		Promise.resolve().then(() => this.onerror?.());
@@ -45,26 +47,106 @@ class MockImage {
 function setupCanvasMock() {
 	vi.stubGlobal("Image", MockImage);
 	vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(mockCtx as any);
-	vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
-		function (this: HTMLCanvasElement, cb: BlobCallback) {
-			cb(new Blob(["fake-png"], { type: "image/png" }));
-		},
-	);
+	vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
+		this: HTMLCanvasElement,
+		cb: BlobCallback,
+	) {
+		cb(new Blob(["fake-png"], { type: "image/png" }));
+	});
 }
 
 function makeMockStats() {
 	return {
 		topTracks: [
-			{ rank: 1, trackUri: "spotify:track:1", trackName: "Ribs", artistName: "Lorde", artistUri: "spotify:artist:1", albumName: "Pure Heroine", albumUri: "spotify:album:1", albumArt: "https://art/1", count: 84, durationMs: 240000 },
-			{ rank: 2, trackUri: "spotify:track:2", trackName: "Green Light", artistName: "Lorde", artistUri: "spotify:artist:1", albumName: "Melodrama", albumUri: "spotify:album:2", albumArt: "https://art/2", count: 72, durationMs: 234000 },
-			{ rank: 3, trackUri: "spotify:track:3", trackName: "Liability", artistName: "Lorde", artistUri: "spotify:artist:1", albumName: "Melodrama", albumUri: "spotify:album:2", albumArt: "https://art/3", count: 65, durationMs: 175000 },
-			{ rank: 4, trackUri: "spotify:track:4", trackName: "Supercut", artistName: "Lorde", artistUri: "spotify:artist:1", albumName: "Melodrama", albumUri: "spotify:album:2", albumArt: "https://art/4", count: 58, durationMs: 263000 },
-			{ rank: 5, trackUri: "spotify:track:5", trackName: "Perfect Places", artistName: "Lorde", artistUri: "spotify:artist:1", albumName: "Melodrama", albumUri: "spotify:album:2", albumArt: "https://art/5", count: 51, durationMs: 228000 },
+			{
+				rank: 1,
+				trackUri: "spotify:track:1",
+				trackName: "Ribs",
+				artistName: "Lorde",
+				artistUri: "spotify:artist:1",
+				albumName: "Pure Heroine",
+				albumUri: "spotify:album:1",
+				albumArt: "https://art/1",
+				count: 84,
+				durationMs: 240000,
+			},
+			{
+				rank: 2,
+				trackUri: "spotify:track:2",
+				trackName: "Green Light",
+				artistName: "Lorde",
+				artistUri: "spotify:artist:1",
+				albumName: "Melodrama",
+				albumUri: "spotify:album:2",
+				albumArt: "https://art/2",
+				count: 72,
+				durationMs: 234000,
+			},
+			{
+				rank: 3,
+				trackUri: "spotify:track:3",
+				trackName: "Liability",
+				artistName: "Lorde",
+				artistUri: "spotify:artist:1",
+				albumName: "Melodrama",
+				albumUri: "spotify:album:2",
+				albumArt: "https://art/3",
+				count: 65,
+				durationMs: 175000,
+			},
+			{
+				rank: 4,
+				trackUri: "spotify:track:4",
+				trackName: "Supercut",
+				artistName: "Lorde",
+				artistUri: "spotify:artist:1",
+				albumName: "Melodrama",
+				albumUri: "spotify:album:2",
+				albumArt: "https://art/4",
+				count: 58,
+				durationMs: 263000,
+			},
+			{
+				rank: 5,
+				trackUri: "spotify:track:5",
+				trackName: "Perfect Places",
+				artistName: "Lorde",
+				artistUri: "spotify:artist:1",
+				albumName: "Melodrama",
+				albumUri: "spotify:album:2",
+				albumArt: "https://art/5",
+				count: 51,
+				durationMs: 228000,
+			},
 		],
 		topArtists: [
-			{ rank: 1, artistUri: "spotify:artist:1", artistName: "Lorde", count: 312, durationMs: 5000000, genres: ["art pop"], imageUrl: "https://img/1" },
-			{ rank: 2, artistUri: "spotify:artist:2", artistName: "Phoebe Bridgers", count: 200, durationMs: 3500000, genres: ["indie rock"], imageUrl: "https://img/2" },
-			{ rank: 3, artistUri: "spotify:artist:3", artistName: "Bon Iver", count: 150, durationMs: 3000000, genres: ["indie folk"], imageUrl: "https://img/3" },
+			{
+				rank: 1,
+				artistUri: "spotify:artist:1",
+				artistName: "Lorde",
+				count: 312,
+				durationMs: 5000000,
+				genres: ["art pop"],
+				imageUrl: "https://img/1",
+			},
+			{
+				rank: 2,
+				artistUri: "spotify:artist:2",
+				artistName: "Phoebe Bridgers",
+				count: 200,
+				durationMs: 3500000,
+				genres: ["indie rock"],
+				imageUrl: "https://img/2",
+			},
+			{
+				rank: 3,
+				artistUri: "spotify:artist:3",
+				artistName: "Bon Iver",
+				count: 150,
+				durationMs: 3000000,
+				genres: ["indie folk"],
+				imageUrl: "https://img/3",
+			},
 		],
 		topAlbums: [],
 		topGenres: [
@@ -85,7 +167,10 @@ function makeMockStats() {
 		listeningDays: 28,
 		weekdayDistribution: [100, 120, 110, 130, 140, 160, 150],
 		peakWeekday: 5,
-		dailyPlayCounts: Array.from({ length: 56 }, (_, i) => ({ date: `2026-03-${i + 1}`, count: Math.floor(Math.random() * 50) })),
+		dailyPlayCounts: Array.from({ length: 56 }, (_, i) => ({
+			date: `2026-03-${i + 1}`,
+			count: Math.floor(Math.random() * 50),
+		})),
 		newArtistCount: 14,
 		priorPeriodTotalDuration: 130 * 60 * 60 * 1000,
 	};
@@ -110,21 +195,39 @@ describe("renderShareCardBlob (Canvas 2D pipeline)", () => {
 
 	it("produces a PNG blob", async () => {
 		const { renderShareCardBlob } = await import("../app/components/ShareModal");
-		const blob = await renderShareCardBlob(makeMockStats(), "top5", "square", "Last 4 weeks", "testuser");
+		const blob = await renderShareCardBlob(
+			makeMockStats(),
+			"top5",
+			"square",
+			"Last 4 weeks",
+			"testuser",
+		);
 		expect(blob).toBeInstanceOf(Blob);
 		expect(blob.type).toBe("image/png");
 	});
 
 	it("creates canvas with correct dimensions for square", async () => {
 		const { renderShareCardCanvas } = await import("../app/components/ShareModal");
-		const canvas = await renderShareCardCanvas(makeMockStats(), "top5", "square", "Last 4 weeks", "");
+		const canvas = await renderShareCardCanvas(
+			makeMockStats(),
+			"top5",
+			"square",
+			"Last 4 weeks",
+			"",
+		);
 		expect(canvas.width).toBe(1080);
 		expect(canvas.height).toBe(1080);
 	});
 
 	it("creates canvas with correct dimensions for story", async () => {
 		const { renderShareCardCanvas } = await import("../app/components/ShareModal");
-		const canvas = await renderShareCardCanvas(makeMockStats(), "top5", "story", "Last 4 weeks", "");
+		const canvas = await renderShareCardCanvas(
+			makeMockStats(),
+			"top5",
+			"story",
+			"Last 4 weeks",
+			"",
+		);
 		expect(canvas.width).toBe(1080);
 		expect(canvas.height).toBe(1920);
 	});
@@ -141,7 +244,13 @@ describe("renderShareCardBlob (Canvas 2D pipeline)", () => {
 
 	it("renders wrapped variant in story size without error", async () => {
 		const { renderShareCardBlob } = await import("../app/components/ShareModal");
-		const blob = await renderShareCardBlob(makeMockStats(), "wrapped", "story", "Last 4 weeks", "testuser");
+		const blob = await renderShareCardBlob(
+			makeMockStats(),
+			"wrapped",
+			"story",
+			"Last 4 weeks",
+			"testuser",
+		);
 		expect(blob).toBeInstanceOf(Blob);
 	});
 
@@ -193,11 +302,13 @@ describe("exportShareCardPng", () => {
 
 		const clickSpy = vi.fn();
 		const origCE = document.createElement.bind(document);
-		vi.spyOn(document, "createElement").mockImplementation((tag: string, opts?: ElementCreationOptions) => {
-			const node = origCE.call(document, tag, opts);
-			if (tag === "a") vi.spyOn(node, "click").mockImplementation(clickSpy);
-			return node;
-		});
+		vi.spyOn(document, "createElement").mockImplementation(
+			(tag: string, opts?: ElementCreationOptions) => {
+				const node = origCE.call(document, tag, opts);
+				if (tag === "a") vi.spyOn(node, "click").mockImplementation(clickSpy);
+				return node;
+			},
+		);
 
 		await exportShareCardPng(makeMockStats(), "top5", "square", "Last 4 weeks", "");
 
@@ -225,9 +336,12 @@ describe("copyShareCardToClipboard", () => {
 			writable: true,
 			configurable: true,
 		});
-		vi.stubGlobal("ClipboardItem", class MockClipboardItem {
-			constructor(public items: Record<string, Blob>) {}
-		});
+		vi.stubGlobal(
+			"ClipboardItem",
+			class MockClipboardItem {
+				constructor(public items: Record<string, Blob>) {}
+			},
+		);
 
 		await copyShareCardToClipboard(makeMockStats(), "top5", "square", "Last 4 weeks", "testuser");
 
@@ -260,13 +374,16 @@ describe("shareOrDownload", () => {
 		const { shareOrDownload } = await import("../app/components/ShareModal");
 		const shareFn = vi.fn().mockResolvedValue(undefined);
 		vi.stubGlobal("navigator", { ...navigator, share: shareFn, clipboard: { write: vi.fn() } });
-		vi.stubGlobal("File", class MockFile extends Blob {
-			name: string;
-			constructor(parts: BlobPart[], name: string, opts?: BlobPropertyBag) {
-				super(parts, opts);
-				this.name = name;
-			}
-		});
+		vi.stubGlobal(
+			"File",
+			class MockFile extends Blob {
+				name: string;
+				constructor(parts: BlobPart[], name: string, opts?: BlobPropertyBag) {
+					super(parts, opts);
+					this.name = name;
+				}
+			},
+		);
 
 		const blob = new Blob(["png"], { type: "image/png" });
 		const result = await shareOrDownload(blob);
@@ -280,16 +397,22 @@ describe("shareOrDownload", () => {
 		const shareFn = vi.fn().mockRejectedValue(new Error("cancelled"));
 		const writeFn = vi.fn().mockResolvedValue(undefined);
 		vi.stubGlobal("navigator", { ...navigator, share: shareFn, clipboard: { write: writeFn } });
-		vi.stubGlobal("ClipboardItem", class MockClipboardItem {
-			constructor(public items: Record<string, Blob>) {}
-		});
-		vi.stubGlobal("File", class MockFile extends Blob {
-			name: string;
-			constructor(parts: BlobPart[], name: string, opts?: BlobPropertyBag) {
-				super(parts, opts);
-				this.name = name;
-			}
-		});
+		vi.stubGlobal(
+			"ClipboardItem",
+			class MockClipboardItem {
+				constructor(public items: Record<string, Blob>) {}
+			},
+		);
+		vi.stubGlobal(
+			"File",
+			class MockFile extends Blob {
+				name: string;
+				constructor(parts: BlobPart[], name: string, opts?: BlobPropertyBag) {
+					super(parts, opts);
+					this.name = name;
+				}
+			},
+		);
 
 		const blob = new Blob(["png"], { type: "image/png" });
 		const result = await shareOrDownload(blob);
@@ -309,11 +432,13 @@ describe("shareOrDownload", () => {
 
 		const clickSpy = vi.fn();
 		const origCE = document.createElement.bind(document);
-		vi.spyOn(document, "createElement").mockImplementation((tag: string, opts?: ElementCreationOptions) => {
-			const node = origCE.call(document, tag, opts);
-			if (tag === "a") vi.spyOn(node, "click").mockImplementation(clickSpy);
-			return node;
-		});
+		vi.spyOn(document, "createElement").mockImplementation(
+			(tag: string, opts?: ElementCreationOptions) => {
+				const node = origCE.call(document, tag, opts);
+				if (tag === "a") vi.spyOn(node, "click").mockImplementation(clickSpy);
+				return node;
+			},
+		);
 
 		const blob = new Blob(["png"], { type: "image/png" });
 		const result = await shareOrDownload(blob);
@@ -370,11 +495,13 @@ describe("ShareModal busy state", () => {
 		);
 
 		const copyBtn = document.querySelector<HTMLButtonElement>("[data-testid='share-copy-btn']");
-		const downloadBtn = document.querySelector<HTMLButtonElement>("[data-testid='share-download-btn']");
+		const downloadBtn = document.querySelector<HTMLButtonElement>(
+			"[data-testid='share-download-btn']",
+		);
 		expect(copyBtn).toBeTruthy();
 		expect(downloadBtn).toBeTruthy();
-		expect(copyBtn!.disabled).toBe(false);
-		expect(downloadBtn!.disabled).toBe(false);
+		expect(copyBtn?.disabled).toBe(false);
+		expect(downloadBtn?.disabled).toBe(false);
 	});
 
 	it("shows success notification after copy", async () => {
@@ -383,9 +510,12 @@ describe("ShareModal busy state", () => {
 			writable: true,
 			configurable: true,
 		});
-		vi.stubGlobal("ClipboardItem", class MockClipboardItem {
-			constructor(public items: Record<string, Blob>) {}
-		});
+		vi.stubGlobal(
+			"ClipboardItem",
+			class MockClipboardItem {
+				constructor(public items: Record<string, Blob>) {}
+			},
+		);
 
 		const { ShareModal } = await import("../app/components/ShareModal");
 		const mockStats = makeMockStats();
@@ -400,7 +530,7 @@ describe("ShareModal busy state", () => {
 		);
 
 		const copyBtn = document.querySelector<HTMLButtonElement>("[data-testid='share-copy-btn']");
-		copyBtn!.click();
+		copyBtn?.click();
 
 		await vi.waitFor(() => {
 			expect(Spicetify.showNotification).toHaveBeenCalledWith("Copied to clipboard!");
@@ -425,8 +555,10 @@ describe("ShareModal busy state", () => {
 			container,
 		);
 
-		const downloadBtn = document.querySelector<HTMLButtonElement>("[data-testid='share-download-btn']");
-		downloadBtn!.click();
+		const downloadBtn = document.querySelector<HTMLButtonElement>(
+			"[data-testid='share-download-btn']",
+		);
+		downloadBtn?.click();
 
 		await vi.waitFor(() => {
 			expect(Spicetify.showNotification).toHaveBeenCalledWith("Share card downloaded!");

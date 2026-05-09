@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { statsCache } from "../shared/stats/stats-cache";
-import { providerRegistry } from "../shared/stats/provider";
-import { initProviders, _resetInitGuard } from "../shared/stats/init-providers";
+import { beforeEach, describe, expect, it } from "vitest";
 import { EVENTS } from "../shared/constants/events";
+import { _resetInitGuard, initProviders } from "../shared/stats/init-providers";
+import { providerRegistry } from "../shared/stats/provider";
+import { statsCache } from "../shared/stats/stats-cache";
 
 describe("Dashboard integration", () => {
 	beforeEach(() => {

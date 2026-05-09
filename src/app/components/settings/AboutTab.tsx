@@ -1,5 +1,5 @@
-import { GITHUB_REPO_WEB_URL } from "../../../shared/constants/github-repo";
 import { EVENTS } from "../../../shared/constants/events";
+import { GITHUB_REPO_WEB_URL } from "../../../shared/constants/github-repo";
 import { getPreferences, setPreference } from "../../preferences";
 
 const { useCallback } = Spicetify.React;
@@ -17,7 +17,7 @@ export function AboutTab({
 	onPrefsChanged,
 	onReceiveBetaUpdatesChanged,
 }: AboutTabProps) {
-	const Toggle = Spicetify.ReactComponent?.Toggle;
+	const Toggle = Spicetify.ReactComponent.Toggle;
 	const prefs = getPreferences();
 
 	const handleBetaChannel = useCallback(
@@ -43,8 +43,8 @@ export function AboutTab({
 				<div>
 					<div className="settings-label">Prereleases</div>
 					<div className="settings-sublabel">
-						Same setting as in the updates window  -  affects version checks and which install command is copied
-						there.
+						Same setting as in the updates window - affects version checks and which install command
+						is copied there.
 					</div>
 				</div>
 				{Toggle ? (
@@ -53,19 +53,21 @@ export function AboutTab({
 					<input
 						type="checkbox"
 						checked={prefs.receiveBetaUpdates}
-						onChange={(e: Event) =>
-							handleBetaChannel((e.target as HTMLInputElement).checked)
-						}
+						onChange={(e) => handleBetaChannel(e.currentTarget.checked)}
 					/>
 				)}
 			</div>
 
 			<p className="settings-about-short-lead">
-				Changelog, install commands, and release checks are in{" "}
-				<strong>Check for updates</strong> (footer or below).
+				Changelog, install commands, and release checks are in <strong>Check for updates</strong>{" "}
+				(footer or below).
 			</p>
 
-			<button type="button" className="btn-secondary settings-about-check-updates" onClick={onOpenUpdates}>
+			<button
+				type="button"
+				className="btn-secondary settings-about-check-updates"
+				onClick={onOpenUpdates}
+			>
 				Check for updates…
 			</button>
 

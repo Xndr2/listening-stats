@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TOUR_STEPS } from "../app/tour";
 
 function createTourTarget(
@@ -95,8 +95,15 @@ describe("Tour alignment scroll vs measure separation", () => {
 		const tabsEl = document.createElement("div");
 		tabsEl.setAttribute("data-testid", "page-tabs");
 		tabsEl.getBoundingClientRect = () => ({
-			top: 60, left: 20, width: 300, height: 36,
-			right: 320, bottom: 96, x: 20, y: 60, toJSON: () => {},
+			top: 60,
+			left: 20,
+			width: 300,
+			height: 36,
+			right: 320,
+			bottom: 96,
+			x: 20,
+			y: 60,
+			toJSON: () => {},
 		});
 		tabsEl.scrollIntoView = vi.fn();
 		document.body.appendChild(tabsEl);

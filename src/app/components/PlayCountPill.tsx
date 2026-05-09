@@ -25,19 +25,25 @@ export function PlayCountPill({ count, variant, firstPlayedAt }: PlayCountPillPr
 	const tooltip = getTooltip(count, firstPlayedAt);
 
 	if (variant === "bubble") {
-		return React.createElement("div", { className: "play-count-bubble", title: tooltip },
+		return React.createElement(
+			"div",
+			{ className: "play-count-bubble", title: tooltip },
 			React.createElement("div", { className: "play-count-bubble-icon" }, "\u{25B6}"),
 			React.createElement("span", { className: "play-count-badge" }, count),
 		);
 	}
 
 	if (variant === "minimal") {
-		return React.createElement("div", { className: "play-count-minimal", title: tooltip },
+		return React.createElement(
+			"div",
+			{ className: "play-count-minimal", title: tooltip },
 			`×${count}`,
 		);
 	}
 
-	return React.createElement("div", { className: "play-count-pill", title: tooltip },
+	return React.createElement(
+		"div",
+		{ className: "play-count-pill", title: tooltip },
 		React.createElement("span", { className: "play-count-dot" }),
 		`${count} plays`,
 	);

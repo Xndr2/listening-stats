@@ -20,12 +20,27 @@ export function OverviewCardsSkeleton() {
 
 export function TopListsWaveSkeleton() {
 	return (
-		<div className="top-lists-wave-skeleton" aria-hidden="true" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
+		<div
+			className="top-lists-wave-skeleton"
+			aria-hidden="true"
+			style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}
+		>
 			{Array.from({ length: 3 }).map((_, col) => (
-				<div key={col} style={{ padding: "16px", background: "rgba(var(--spice-rgb-misc),.03)", borderRadius: "8px", border: "1px solid rgba(var(--spice-rgb-misc),.06)" }}>
+				<div
+					key={col}
+					style={{
+						padding: "16px",
+						background: "rgba(var(--spice-rgb-misc),.03)",
+						borderRadius: "8px",
+						border: "1px solid rgba(var(--spice-rgb-misc),.06)",
+					}}
+				>
 					<SkeletonBlock width="80px" height="14px" style={{ marginBottom: "14px" }} />
 					{Array.from({ length: 5 }).map((_, row) => (
-						<div key={row} style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" }}>
+						<div
+							key={row}
+							style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" }}
+						>
 							<SkeletonCircle size={20} style={{ flexShrink: 0 }} />
 							<SkeletonBlock width="36px" height="36px" style={{ flexShrink: 0 }} />
 							<div style={{ flex: 1 }}>
@@ -44,7 +59,13 @@ export function TopListSkeleton() {
 	return (
 		<div>
 			{Array.from({ length: 5 }).map((_, i) => (
-				<SkeletonBlock key={i} className="top-list-row" height="64px" style={{ marginBottom: "6px" }} aria-hidden="true" />
+				<SkeletonBlock
+					key={i}
+					className="top-list-row"
+					height="64px"
+					style={{ marginBottom: "6px" }}
+					aria-hidden="true"
+				/>
 			))}
 		</div>
 	);
@@ -55,18 +76,47 @@ export function WorldChartsSkeleton() {
 		<div className="world-charts-skeleton" aria-hidden="true">
 			{Array.from({ length: 2 }).map((_, section) => (
 				<div key={section} style={{ marginBottom: "32px" }}>
-					<div className="skeleton-shimmer" style={{ width: "100px", height: "12px", marginBottom: "6px", borderRadius: "4px" }} />
-					<div className="skeleton-shimmer" style={{ width: "140px", height: "18px", marginBottom: "16px", borderRadius: "4px" }} />
+					<div
+						className="skeleton-shimmer"
+						style={{ width: "100px", height: "12px", marginBottom: "6px", borderRadius: "4px" }}
+					/>
+					<div
+						className="skeleton-shimmer"
+						style={{ width: "140px", height: "18px", marginBottom: "16px", borderRadius: "4px" }}
+					/>
 					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
 						{Array.from({ length: 8 }).map((_, row) => (
-							<div key={row} style={{ display: "flex", gap: "12px", alignItems: "center", padding: "6px 8px" }}>
-								<div className="skeleton-shimmer" style={{ width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0 }} />
-								<div className="skeleton-shimmer skeleton-tile" style={{ width: "36px", height: "36px", borderRadius: "4px", flexShrink: 0 }} />
+							<div
+								key={row}
+								style={{ display: "flex", gap: "12px", alignItems: "center", padding: "6px 8px" }}
+							>
+								<div
+									className="skeleton-shimmer"
+									style={{ width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0 }}
+								/>
+								<div
+									className="skeleton-shimmer skeleton-tile"
+									style={{ width: "36px", height: "36px", borderRadius: "4px", flexShrink: 0 }}
+								/>
 								<div style={{ flex: 1 }}>
-									<div className="skeleton-shimmer" style={{ width: "75%", height: "12px", marginBottom: "6px", borderRadius: "4px" }} />
-									<div className="skeleton-shimmer" style={{ width: "50%", height: "10px", borderRadius: "4px" }} />
+									<div
+										className="skeleton-shimmer"
+										style={{
+											width: "75%",
+											height: "12px",
+											marginBottom: "6px",
+											borderRadius: "4px",
+										}}
+									/>
+									<div
+										className="skeleton-shimmer"
+										style={{ width: "50%", height: "10px", borderRadius: "4px" }}
+									/>
 								</div>
-								<div className="skeleton-shimmer" style={{ width: "40px", height: "12px", borderRadius: "4px", flexShrink: 0 }} />
+								<div
+									className="skeleton-shimmer"
+									style={{ width: "40px", height: "12px", borderRadius: "4px", flexShrink: 0 }}
+								/>
 							</div>
 						))}
 					</div>
@@ -123,4 +173,3 @@ export function RecentlyPlayedSkeleton() {
 		</div>
 	);
 }
-

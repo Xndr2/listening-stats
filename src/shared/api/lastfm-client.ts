@@ -1,5 +1,5 @@
-import type { WorldScope, WorldTrack, WorldWindow } from "../types/world-charts";
 import type { AppError } from "../errors";
+import type { WorldScope, WorldTrack, WorldWindow } from "../types/world-charts";
 
 const BASE = "https://ws.audioscrobbler.com/2.0/";
 

@@ -1,11 +1,15 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { setPreference } from "../app/preferences";
+import { localProvider } from "../shared/stats/local-provider";
+import { providerRegistry } from "../shared/stats/provider";
 import { db } from "../shared/storage/db";
 import type { PlayEvent } from "../shared/types/play-event";
-import { providerRegistry } from "../shared/stats/provider";
-import { localProvider } from "../shared/stats/local-provider";
-import { setPreference } from "../app/preferences";
 
-function makePlayEvent(trackUri: string, startedAt: number, overrides?: Partial<PlayEvent>): PlayEvent {
+function makePlayEvent(
+	trackUri: string,
+	startedAt: number,
+	overrides?: Partial<PlayEvent>,
+): PlayEvent {
 	return {
 		trackUri,
 		trackName: "Test Track",
@@ -43,10 +47,7 @@ describe("PlaybarWidget", () => {
 	it("renders nothing when no track is playing", async () => {
 		(Spicetify.Player as any).data = { isPaused: false, item: null };
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		expect(container.querySelector(".play-count-pill")).toBeNull();
 		expect(container.querySelector(".play-count-bubble")).toBeNull();
 		expect(container.querySelector(".play-count-minimal")).toBeNull();
@@ -60,10 +61,7 @@ describe("PlaybarWidget", () => {
 			item: { uri, name: "Test Track", metadata: {} },
 		};
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		// Wait for async effect
 		await new Promise((r) => setTimeout(r, 50));
 		expect(container.querySelector(".play-count-pill")).toBeNull();
@@ -81,14 +79,11 @@ describe("PlaybarWidget", () => {
 			item: { uri, name: "Test Track", metadata: {} },
 		};
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		await new Promise((r) => setTimeout(r, 50));
 		const pill = container.querySelector(".play-count-pill");
 		expect(pill).not.toBeNull();
-		expect(pill!.textContent).toContain("3 plays");
+		expect(pill?.textContent).toContain("3 plays");
 	});
 
 	it("renders bubble variant when preference is set to bubble", async () => {
@@ -103,10 +98,7 @@ describe("PlaybarWidget", () => {
 			item: { uri, name: "Test Track", metadata: {} },
 		};
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		await new Promise((r) => setTimeout(r, 50));
 		expect(container.querySelector(".play-count-bubble")).not.toBeNull();
 	});
@@ -123,10 +115,7 @@ describe("PlaybarWidget", () => {
 			item: { uri, name: "Test Track", metadata: {} },
 		};
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		await new Promise((r) => setTimeout(r, 50));
 		expect(container.querySelector(".play-count-minimal")).not.toBeNull();
 	});
@@ -156,17 +145,14 @@ describe("PlaybarWidget", () => {
 				},
 			}),
 			getSupportedPeriods: () => [],
-			calculateStats: async () => ({} as any),
+			calculateStats: async () => ({}) as any,
 			init: async () => {},
 			destroy: () => {},
 		});
 		providerRegistry.setActive("statsfm");
 
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		await new Promise((r) => setTimeout(r, 50));
 		expect(container.querySelector(".play-count-pill")).not.toBeNull();
 	});
@@ -196,17 +182,14 @@ describe("PlaybarWidget", () => {
 				},
 			}),
 			getSupportedPeriods: () => [],
-			calculateStats: async () => ({} as any),
+			calculateStats: async () => ({}) as any,
 			init: async () => {},
 			destroy: () => {},
 		});
 		providerRegistry.setActive("statsfm");
 
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		await new Promise((r) => setTimeout(r, 50));
 		expect(container.querySelector(".play-count-pill")).not.toBeNull();
 	});
@@ -214,23 +197,17 @@ describe("PlaybarWidget", () => {
 	it("shows tooltip with first-play date", async () => {
 		const uri = "spotify:track:abc123";
 		const firstDate = new Date("2026-03-12T10:00:00Z").getTime();
-		await db.playEvents.bulkAdd([
-			makePlayEvent(uri, firstDate),
-			makePlayEvent(uri, Date.now()),
-		]);
+		await db.playEvents.bulkAdd([makePlayEvent(uri, firstDate), makePlayEvent(uri, Date.now())]);
 		(Spicetify.Player as any).data = {
 			isPaused: false,
 			item: { uri, name: "Test Track", metadata: {} },
 		};
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		await new Promise((r) => setTimeout(r, 50));
 		const pill = container.querySelector(".play-count-pill");
-		expect(pill!.getAttribute("title")).toMatch(/Played 2 times/);
-		expect(pill!.getAttribute("title")).toMatch(/first on/);
+		expect(pill?.getAttribute("title")).toMatch(/Played 2 times/);
+		expect(pill?.getAttribute("title")).toMatch(/first on/);
 	});
 
 	it("updates when PREFS_CHANGED event fires (variant switch)", async () => {
@@ -244,10 +221,7 @@ describe("PlaybarWidget", () => {
 			item: { uri, name: "Test Track", metadata: {} },
 		};
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		await new Promise((r) => setTimeout(r, 50));
 		expect(container.querySelector(".play-count-pill")).not.toBeNull();
 
@@ -276,10 +250,7 @@ describe("PlaybarWidget", () => {
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
 		const widgetContainer = document.createElement("div");
 		nowPlayingWidget.appendChild(widgetContainer);
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			widgetContainer,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), widgetContainer);
 		await new Promise((r) => setTimeout(r, 50));
 		const pill = nowPlayingWidget.querySelector(".play-count-pill");
 		expect(pill).not.toBeNull();
@@ -297,10 +268,7 @@ describe("PlaybarWidget", () => {
 			item: { uri, name: "Test Track", metadata: {} },
 		};
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		await new Promise((r) => setTimeout(r, 50));
 		// count = 1, should be hidden
 		expect(container.querySelector(".play-count-pill")).toBeNull();
@@ -311,6 +279,6 @@ describe("PlaybarWidget", () => {
 		await new Promise((r) => setTimeout(r, 50));
 		// count = 2, should now be visible
 		expect(container.querySelector(".play-count-pill")).not.toBeNull();
-		expect(container.querySelector(".play-count-pill")!.textContent).toContain("2 plays");
+		expect(container.querySelector(".play-count-pill")?.textContent).toContain("2 plays");
 	});
 });

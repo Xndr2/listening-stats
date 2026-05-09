@@ -1,6 +1,6 @@
 import App from "./App";
-import { injectStyles } from "./styles";
 import { PlaybarWidget } from "./components/PlaybarWidget";
+import { injectStyles } from "./styles";
 
 const { React } = Spicetify;
 
@@ -48,10 +48,7 @@ export function render() {
 
 		retryInterval = setInterval(tryAttach, 2000);
 
-		Spicetify.ReactDOM.render(
-			React.createElement(PlaybarWidget),
-			container,
-		);
+		Spicetify.ReactDOM.render(React.createElement(PlaybarWidget), container);
 	}
 
 	return React.createElement(App);

@@ -1,6 +1,6 @@
 import { formatHour } from "../format";
-import { getPreferences, setPreference } from "../preferences";
 import type { ActivityTabId } from "../preferences";
+import { getPreferences, setPreference } from "../preferences";
 import { CalendarHeatmap } from "./CalendarHeatmap";
 import { SkeletonBlock } from "./SkeletonPrimitives";
 
@@ -9,7 +9,15 @@ const { useState } = Spicetify.React;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAYS = Array.from({ length: 7 }, (_, i) => i);
 const WEEKDAYS_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const WEEKDAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const WEEKDAYS_FULL = [
+	"Monday",
+	"Tuesday",
+	"Wednesday",
+	"Thursday",
+	"Friday",
+	"Saturday",
+	"Sunday",
+];
 
 const TAB_OPTIONS: { value: ActivityTabId; label: string }[] = [
 	{ value: "hour", label: "By hour" },
@@ -38,6 +46,9 @@ export function ActivitySection({
 	streak,
 	showStreak,
 }: ActivitySectionProps) {
+	const prefs = getPreferences();
+	const [activeTab, setActiveTab] = useState<ActivityTabId>(() => prefs.activityTab);
+
 	if (loading) {
 		return (
 			<div className="section-card" aria-hidden="true">
@@ -46,15 +57,13 @@ export function ActivitySection({
 					<h2 className="section-title">Activity</h2>
 				</header>
 				<div className="activity-chart">
-					{Array.from({ length: 24 }).map((_, i) => (
-						<SkeletonBlock key={i} className="activity-bar" height={`${20 + (i % 6) * 10}%`} />
+					{HOURS.map((hr) => (
+						<SkeletonBlock key={hr} className="activity-bar" height={`${20 + (hr % 6) * 10}%`} />
 					))}
 				</div>
 			</div>
 		);
 	}
-	const prefs = getPreferences();
-	const [activeTab, setActiveTab] = useState<ActivityTabId>(prefs.activityTab);
 
 	const handleTabChange = (tab: ActivityTabId) => {
 		setActiveTab(tab);
@@ -84,6 +93,7 @@ export function ActivitySection({
 			<div className="activity-tabs">
 				{TAB_OPTIONS.map((opt) => (
 					<button
+						type="button"
 						key={opt.value}
 						className={`activity-tab${activeTab === opt.value ? " active" : ""}`}
 						onClick={() => handleTabChange(opt.value)}
@@ -99,7 +109,8 @@ export function ActivitySection({
 					<CalendarHeatmap dailyPlayCounts={dailyPlayCounts ?? []} />
 					{showStreak && streak != null && streak > 0 && (
 						<div className="streak-callout">
-							You've listened on <strong>{streak} days</strong> in a row &middot; longest stretch this year.
+							You've listened on <strong>{streak} days</strong> in a row &middot; longest stretch
+							this year.
 						</div>
 					)}
 				</>

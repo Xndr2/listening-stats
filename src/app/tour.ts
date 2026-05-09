@@ -19,19 +19,19 @@ const BASE_TOUR_STEPS: TourStep[] = [
 		id: "health",
 		label: "Health Indicator",
 		text: "This dot shows your tracking status. Green means data is flowing, yellow means it’s been a while, and red means something needs attention. Works for both local and stats.fm tracking.",
-		selector: "[data-tour-target=\"health\"], .header-provider-pill",
+		selector: '[data-tour-target="health"], .header-provider-pill',
 	},
 	{
 		id: "page-tabs",
 		label: "Dashboard & World",
 		text: "Switch between your personal Dashboard and the global World charts. The World tab shows trending tracks and artists worldwide from Last.fm.",
-		selector: "[data-testid=\"page-tabs\"]",
+		selector: '[data-testid="page-tabs"]',
 	},
 	{
 		id: "period",
 		label: "Time Window",
 		text: "Pick a time range and every section on the dashboard updates to match. Available periods depend on your tracking provider.",
-		selector: "[data-tour-target=\"period\"], .period-tabs",
+		selector: '[data-tour-target="period"], .period-tabs',
 	},
 ];
 
@@ -40,25 +40,25 @@ const SECTION_TOUR_STEPS: Record<string, TourStep> = {
 		id: "overview",
 		label: "Overview Cards",
 		text: "Your headline stats for the selected period include total plays, unique artists, listening streak, and more. The cards shown depend on your provider and tier.",
-		selector: "[data-section-id=\"overview\"]",
+		selector: '[data-section-id="overview"]',
 	},
 	lists: {
 		id: "lists",
 		label: "Top Lists",
 		text: "Your most-played tracks, artists, and albums ranked side by side. Click any item to jump straight to it in Spotify.",
-		selector: "[data-section-id=\"top-lists\"]",
+		selector: '[data-section-id="top-lists"]',
 	},
 	activity: {
 		id: "activity",
 		label: "Activity Charts",
 		text: "Hourly and daily listening patterns visualized as charts. Discover your peak hours and most active days of the week.",
-		selector: "[data-section-id=\"activity\"]",
+		selector: '[data-section-id="activity"]',
 	},
 	consistency: {
 		id: "consistency",
 		label: "Consistency",
 		text: "See how regularly you listened in this period, including active days, average intensity, and your longest silent gap.",
-		selector: "[data-section-id=\"consistency\"]",
+		selector: '[data-section-id="consistency"]',
 	},
 };
 
@@ -67,13 +67,13 @@ const ACTION_TOUR_STEPS: TourStep[] = [
 		id: "share",
 		label: "Share Card",
 		text: "Generate a shareable image of your stats. Download it as a PNG or copy it straight to your clipboard.",
-		selector: "[data-tour-target=\"share\"], [aria-label=\"Share card\"]",
+		selector: '[data-tour-target="share"], [aria-label="Share card"]',
 	},
 	{
 		id: "gear",
 		label: "Settings",
 		text: "Customize everything by reordering or hiding sections, switching tracking providers, managing your data, and connecting Last.fm for world charts.",
-		selector: "[data-tour-target=\"settings\"], [aria-label=\"Open settings\"]",
+		selector: '[data-tour-target="settings"], [aria-label="Open settings"]',
 	},
 ];
 
@@ -94,16 +94,14 @@ export function getTourSteps(context?: TourContext): TourStep[] {
 		];
 	}
 	if (context.activePage === "world") {
-		return [
-			BASE_TOUR_STEPS[0],
-			BASE_TOUR_STEPS[1],
-			ACTION_TOUR_STEPS[1],
-		];
+		return [BASE_TOUR_STEPS[0], BASE_TOUR_STEPS[1], ACTION_TOUR_STEPS[1]];
 	}
 	const sectionSteps = context.sectionIds
 		.map((id) => SECTION_TOUR_STEPS[id])
 		.filter((s): s is TourStep => !!s);
-	const actionSteps = context.hasShare ? ACTION_TOUR_STEPS : ACTION_TOUR_STEPS.filter((s) => s.id !== "share");
+	const actionSteps = context.hasShare
+		? ACTION_TOUR_STEPS
+		: ACTION_TOUR_STEPS.filter((s) => s.id !== "share");
 	return [...BASE_TOUR_STEPS, ...sectionSteps, ...actionSteps];
 }
 

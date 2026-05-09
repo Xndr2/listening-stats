@@ -1,6 +1,6 @@
+import { EVENTS } from "../../shared/constants/events";
 import { FilterIcon } from "../icons";
 import { setPreference } from "../preferences";
-import { EVENTS } from "../../shared/constants/events";
 
 interface FilterPillProps {
 	activeGenre: string | null;
@@ -24,7 +24,6 @@ export function FilterPill({ activeGenre, onClear }: FilterPillProps) {
 			<span
 				className="filter-pill-icon"
 				aria-hidden="true"
-				// biome-ignore lint/security/noDangerouslySetInnerHtml: inline SVG icon string from src/app/icons.ts (project pattern)
 				dangerouslySetInnerHTML={{ __html: FilterIcon }}
 			/>
 			<span>Filtering by</span>

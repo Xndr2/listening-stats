@@ -1,5 +1,5 @@
-import { db } from "../../shared/storage/db";
 import { EVENTS } from "../../shared/constants/events";
+import { db } from "../../shared/storage/db";
 import { getPreferences } from "../preferences";
 import { PlayCountPill } from "./PlayCountPill";
 
@@ -68,7 +68,9 @@ export function PlaybarWidget() {
 
 	if (!info || info.count <= 1) return null;
 
-	return React.createElement("div", { className: "play-count-widget-anchor" },
+	return React.createElement(
+		"div",
+		{ className: "play-count-widget-anchor" },
 		React.createElement(PlayCountPill, {
 			count: info.count,
 			variant: prefs.playCountVariant,

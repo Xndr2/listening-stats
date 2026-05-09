@@ -1,4 +1,10 @@
-export type AppErrorVariant = "UserNotFound" | "NetworkError" | "ServiceDown" | "RateLimited" | "InvalidApiKey" | "Unknown";
+export type AppErrorVariant =
+	| "UserNotFound"
+	| "NetworkError"
+	| "ServiceDown"
+	| "RateLimited"
+	| "InvalidApiKey"
+	| "Unknown";
 
 export interface AppError {
 	variant: AppErrorVariant;

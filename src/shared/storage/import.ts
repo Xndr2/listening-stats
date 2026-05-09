@@ -88,7 +88,10 @@ function splitCsvRow(row: string): string[] {
  */
 export async function parseV1Csv(text: string): Promise<ParseResult> {
 	// Split on \n and filter empty lines
-	const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+	const lines = text
+		.split("\n")
+		.map((l) => l.trim())
+		.filter((l) => l.length > 0);
 
 	if (lines.length === 0) {
 		return { events: [], errors: 0, errorDetails: [] };
@@ -99,16 +102,16 @@ export async function parseV1Csv(text: string): Promise<ParseResult> {
 		// Detect known non-importable CSV formats and give specific guidance
 		if (header.startsWith("Period,")) {
 			throw new Error(
-				"Import failed: this is a stats summary CSV, not a raw history export. Use \"Raw History (CSV)\" in v1 to get importable data."
+				'Import failed: this is a stats summary CSV, not a raw history export. Use "Raw History (CSV)" in v1 to get importable data.',
 			);
 		}
 		if (header.startsWith("Rank,")) {
 			throw new Error(
-				"Import failed: this is a stats summary CSV, not a raw history export. Use \"Raw History (CSV)\" in v1 to get importable data."
+				'Import failed: this is a stats summary CSV, not a raw history export. Use "Raw History (CSV)" in v1 to get importable data.',
 			);
 		}
 		throw new Error(
-			`Import failed: unrecognized CSV format (expected v1 export). Got: "${header.slice(0, 60)}"`
+			`Import failed: unrecognized CSV format (expected v1 export). Got: "${header.slice(0, 60)}"`,
 		);
 	}
 
@@ -138,7 +141,7 @@ export async function parseV1Csv(text: string): Promise<ParseResult> {
 		const startedAt = new Date(startedRaw).getTime();
 		const endedAt = new Date(endedRaw).getTime();
 
-		if (isNaN(durationMs) || isNaN(playedMs)) {
+		if (Number.isNaN(durationMs) || Number.isNaN(playedMs)) {
 			errors++;
 			if (errorDetails.length < MAX_ERROR_DETAILS) {
 				errorDetails.push(`Row ${rowNum}: invalid numeric field (duration or played ms)`);
@@ -146,7 +149,7 @@ export async function parseV1Csv(text: string): Promise<ParseResult> {
 			continue;
 		}
 
-		if (!isFinite(startedAt) || isNaN(startedAt) || startedAt <= 0) {
+		if (!Number.isFinite(startedAt) || Number.isNaN(startedAt) || startedAt <= 0) {
 			errors++;
 			if (errorDetails.length < MAX_ERROR_DETAILS) {
 				errorDetails.push(`Row ${rowNum}: invalid timestamp (Started At: "${startedRaw}")`);
@@ -154,7 +157,7 @@ export async function parseV1Csv(text: string): Promise<ParseResult> {
 			continue;
 		}
 
-		if (!isFinite(endedAt) || isNaN(endedAt) || endedAt <= 0) {
+		if (!Number.isFinite(endedAt) || Number.isNaN(endedAt) || endedAt <= 0) {
 			errors++;
 			if (errorDetails.length < MAX_ERROR_DETAILS) {
 				errorDetails.push(`Row ${rowNum}: invalid timestamp (Ended At: "${endedRaw}")`);
@@ -209,13 +212,9 @@ export async function parseJsonEvents(text: string): Promise<ParseResult> {
 			parsed !== null &&
 			"topTracks" in (parsed as Record<string, unknown>)
 		) {
-			throw new Error(
-				"Import failed: JSON must be a raw play events array, not a stats export"
-			);
+			throw new Error("Import failed: JSON must be a raw play events array, not a stats export");
 		}
-		throw new Error(
-			"Import failed: JSON must be a raw play events array, not a stats export"
-		);
+		throw new Error("Import failed: JSON must be a raw play events array, not a stats export");
 	}
 
 	const events: Omit<PlayEvent, "id">[] = [];
@@ -297,9 +296,7 @@ export async function parseJsonEvents(text: string): Promise<ParseResult> {
 // ──────────────────────────────────────────────────────
 
 /** Dedupe by startedAt + trackName, bulk-add new rows, then kick off URI resolution. */
-export async function importFileEvents(
-	events: Omit<PlayEvent, "id">[]
-): Promise<ImportResult> {
+export async function importFileEvents(events: Omit<PlayEvent, "id">[]): Promise<ImportResult> {
 	if (events.length === 0) {
 		return { imported: 0, skipped: 0, errors: 0, errorDetails: [] };
 	}

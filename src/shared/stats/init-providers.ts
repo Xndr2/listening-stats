@@ -1,5 +1,5 @@
-import { providerRegistry } from "./provider";
 import { localProvider } from "./local-provider";
+import { providerRegistry } from "./provider";
 import { statsfmProvider } from "./statsfm-provider";
 
 /**

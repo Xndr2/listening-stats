@@ -1,9 +1,9 @@
-import { validateUsername, type StatsFmConfig } from "../../shared/api/statsfm-client";
+import { type StatsFmConfig, validateUsername } from "../../shared/api/statsfm-client";
 import { EVENTS } from "../../shared/constants/events";
 import { LS_KEYS } from "../../shared/constants/storage-keys";
-import { statsfmProvider } from "../../shared/stats/statsfm-provider";
 import { providerRegistry } from "../../shared/stats/provider";
 import { statsCache } from "../../shared/stats/stats-cache";
+import { statsfmProvider } from "../../shared/stats/statsfm-provider";
 
 const { useState } = Spicetify.React;
 
@@ -67,13 +67,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 						<h2 className="wizard-title">Welcome to Listening Stats</h2>
 						<p className="wizard-subtitle">Choose how you want to track your listening history.</p>
 						<div className="wizard-provider-cards">
-							<button
-								type="button"
-								className="wizard-provider-card"
-								onClick={completeLocal}
-							>
+							<button type="button" className="wizard-provider-card" onClick={completeLocal}>
 								<div className="wizard-provider-name">Local Tracking</div>
-								<div className="wizard-provider-desc">Stats tracked on this device. No account required.</div>
+								<div className="wizard-provider-desc">
+									Stats tracked on this device. No account required.
+								</div>
 								<div className="wizard-provider-cta">Start with Local</div>
 							</button>
 							<button
@@ -82,7 +80,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 								onClick={() => setStep("statsfm")}
 							>
 								<div className="wizard-provider-name">stats.fm</div>
-								<div className="wizard-provider-desc">Import your listening history from your stats.fm profile.</div>
+								<div className="wizard-provider-desc">
+									Import your listening history from your stats.fm profile.
+								</div>
 								<div className="wizard-provider-cta">Use stats.fm</div>
 							</button>
 						</div>
@@ -116,10 +116,20 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 								className="wizard-statsfm-input"
 							/>
 							<div className="wizard-statsfm-actions">
-								<button type="button" className="btn-secondary" onClick={() => setStep("provider")} disabled={connecting}>
+								<button
+									type="button"
+									className="btn-secondary"
+									onClick={() => setStep("provider")}
+									disabled={connecting}
+								>
 									Back
 								</button>
-								<button type="button" className="btn-primary" onClick={() => void connectStatsFm()} disabled={connecting || !username.trim()}>
+								<button
+									type="button"
+									className="btn-primary"
+									onClick={() => void connectStatsFm()}
+									disabled={connecting || !username.trim()}
+								>
 									{connecting ? "Connecting..." : "Connect stats.fm"}
 								</button>
 							</div>

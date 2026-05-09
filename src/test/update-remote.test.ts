@@ -20,7 +20,9 @@ describe("compareVersions", () => {
 
 describe("markdownLiteToHtml", () => {
 	it("renders headings, bold, links, and code", () => {
-		const html = markdownLiteToHtml("## Title\n\nHello **world** and `code` and [a](https://ex.test).");
+		const html = markdownLiteToHtml(
+			"## Title\n\nHello **world** and `code` and [a](https://ex.test).",
+		);
 		expect(html).toContain("<h3>");
 		expect(html).toContain("Title");
 		expect(html).toContain("<strong>world</strong>");

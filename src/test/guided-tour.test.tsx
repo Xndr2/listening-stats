@@ -1,6 +1,6 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { markTourSeen, resetTourSeen, shouldAutoStartTour, TOUR_STEPS } from "../app/tour";
 import { LS_KEYS } from "../shared/constants/storage-keys";
-import { TOUR_STEPS, markTourSeen, resetTourSeen, shouldAutoStartTour } from "../app/tour";
 
 describe("GuidedTour integration", () => {
 	let container: HTMLDivElement;
@@ -93,7 +93,9 @@ describe("GuidedTour integration", () => {
 			const nextBtn = document.querySelector(".tour-btn-next") as HTMLButtonElement;
 			nextBtn.click();
 		}
-		expect(document.body.textContent).toContain(`Step ${TOUR_STEPS.length} of ${TOUR_STEPS.length}`);
+		expect(document.body.textContent).toContain(
+			`Step ${TOUR_STEPS.length} of ${TOUR_STEPS.length}`,
+		);
 		const finishBtn = document.querySelector(".tour-btn-next") as HTMLButtonElement;
 		expect(finishBtn.textContent).toBe("Finish");
 		finishBtn.click();
@@ -230,8 +232,15 @@ describe("GuidedTour spotlight and positioning", () => {
 		}
 		el.setAttribute("data-tour-target", "true");
 		el.getBoundingClientRect = () => ({
-			top: 100, left: 50, width: 200, height: 40,
-			right: 250, bottom: 140, x: 50, y: 100, toJSON: () => {},
+			top: 100,
+			left: 50,
+			width: 200,
+			height: 40,
+			right: 250,
+			bottom: 140,
+			x: 50,
+			y: 100,
+			toJSON: () => {},
 		});
 		el.scrollIntoView = vi.fn();
 		document.body.appendChild(el);

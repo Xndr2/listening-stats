@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	COLUMN_IDS,
+	getPreferences,
+	normalizeHiddenSections,
 	OVERVIEW_CARD_IDS,
 	OVERVIEW_CARD_LABELS,
 	SECTION_IDS,
-	getPreferences,
-	normalizeHiddenSections,
 	setPreference,
 } from "../app/preferences";
 import { EVENTS } from "../shared/constants/events";
@@ -228,7 +228,14 @@ describe("preferences  -  v2.5 sectionOrder/columnOrder", () => {
 	});
 
 	it("persists sectionOrder via setPreference and round-trips", () => {
-		const custom = ["recently-played", "overview", "top-lists", "activity", "top-genres", "consistency"];
+		const custom = [
+			"recently-played",
+			"overview",
+			"top-lists",
+			"activity",
+			"top-genres",
+			"consistency",
+		];
 		setPreference("sectionOrder", custom);
 		expect(getPreferences().sectionOrder).toEqual(custom);
 	});
@@ -240,7 +247,14 @@ describe("preferences  -  v2.5 sectionOrder/columnOrder", () => {
 	});
 
 	it("preserves sectionOrder when setting an unrelated preference", () => {
-		const custom = ["top-lists", "overview", "top-genres", "activity", "consistency", "recently-played"];
+		const custom = [
+			"top-lists",
+			"overview",
+			"top-genres",
+			"activity",
+			"consistency",
+			"recently-played",
+		];
 		setPreference("sectionOrder", custom);
 		setPreference("use24HourTime", true);
 		const prefs = getPreferences();
@@ -401,7 +415,15 @@ describe("preferences overviewOrder", () => {
 
 	it("persists overviewOrder via setPreference and round-trips", () => {
 		const custom = {
-			local: ["skip-rate", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "est-payout"],
+			local: [
+				"skip-rate",
+				"tracks",
+				"unique-artists",
+				"streak",
+				"new-artists",
+				"peak-hour",
+				"est-payout",
+			],
 			statsfm: ["est-payout", "unique-artists", "new-artists", "top-genre"],
 		};
 		setPreference("overviewOrder", custom);
@@ -412,7 +434,15 @@ describe("preferences overviewOrder", () => {
 
 	it("setPreference overviewOrder preserves both provider arrays", () => {
 		const next = {
-			local: ["streak", "skip-rate", "tracks", "unique-artists", "new-artists", "peak-hour", "est-payout"],
+			local: [
+				"streak",
+				"skip-rate",
+				"tracks",
+				"unique-artists",
+				"new-artists",
+				"peak-hour",
+				"est-payout",
+			],
 			statsfm: ["top-genre", "est-payout", "unique-artists", "new-artists"],
 		};
 		setPreference("overviewOrder", next);
@@ -425,7 +455,10 @@ describe("preferences overviewOrder", () => {
 		localStorage.setItem(
 			"listening-stats:preferences",
 			JSON.stringify({
-				overviewOrder: { local: ["tracks", "unknown-card"], statsfm: [...OVERVIEW_CARD_IDS.statsfm] },
+				overviewOrder: {
+					local: ["tracks", "unknown-card"],
+					statsfm: [...OVERVIEW_CARD_IDS.statsfm],
+				},
 			}),
 		);
 		const prefs = getPreferences();
@@ -442,7 +475,15 @@ describe("preferences overviewOrder", () => {
 	});
 
 	it("reconciles overviewOrder.statsfm independently from local order", () => {
-		const customLocal = ["skip-rate", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "est-payout"];
+		const customLocal = [
+			"skip-rate",
+			"tracks",
+			"unique-artists",
+			"streak",
+			"new-artists",
+			"peak-hour",
+			"est-payout",
+		];
 		const customStatsfm = ["est-payout", "unique-artists", "new-artists", "top-genre"];
 		setPreference("overviewOrder", { local: customLocal, statsfm: customStatsfm });
 		const prefs = getPreferences();
@@ -539,7 +580,14 @@ describe("preferences overviewOrder", () => {
 			JSON.stringify({
 				overviewOrder: {
 					local: [...OVERVIEW_CARD_IDS.local],
-					statsfm: ["unique-artists", "new-artists", "top-genre", "est-payout", "streak", "skip-rate"],
+					statsfm: [
+						"unique-artists",
+						"new-artists",
+						"top-genre",
+						"est-payout",
+						"streak",
+						"skip-rate",
+					],
 				},
 			}),
 		);

@@ -8,17 +8,14 @@ vi.mock("../shared/stats/statsfm-provider", () => ({
 	statsfmProvider: { init: vi.fn().mockResolvedValue(undefined) },
 }));
 
+import { ERROR_MESSAGES, readStatsFmConfig } from "../app/components/settings/ProvidersTab";
+import type { StatsFmConfig } from "../shared/api/statsfm-client";
 import { validateUsername } from "../shared/api/statsfm-client";
-import { statsfmProvider } from "../shared/stats/statsfm-provider";
+import { EVENTS } from "../shared/constants/events";
+import { LS_KEYS } from "../shared/constants/storage-keys";
 import { providerRegistry } from "../shared/stats/provider";
 import { statsCache } from "../shared/stats/stats-cache";
-import { LS_KEYS } from "../shared/constants/storage-keys";
-import { EVENTS } from "../shared/constants/events";
-import {
-	readStatsFmConfig,
-	ERROR_MESSAGES,
-} from "../app/components/settings/ProvidersTab";
-import type { StatsFmConfig } from "../shared/api/statsfm-client";
+import { statsfmProvider } from "../shared/stats/statsfm-provider";
 
 // Cast mocks to vi.Mock for type-safe .mockResolvedValue, .mockReturnValue etc.
 const mockValidateUsername = validateUsername as ReturnType<typeof vi.fn>;
@@ -26,12 +23,14 @@ const mockStatsfmProviderInit = statsfmProvider.init as ReturnType<typeof vi.fn>
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function setupConnectedConfig(overrides: Partial<{
-	username: string;
-	isPlus: boolean;
-	connectedAt: number;
-	lastValidated: number;
-}> = {}) {
+function setupConnectedConfig(
+	overrides: Partial<{
+		username: string;
+		isPlus: boolean;
+		connectedAt: number;
+		lastValidated: number;
+	}> = {},
+) {
 	const config = {
 		username: "testuser",
 		isPlus: false,
@@ -52,7 +51,10 @@ async function handleConnect(username: string) {
 
 	const result = await validateUsername(username.trim());
 	if (!result.valid) {
-		return { error: ERROR_MESSAGES[result.reason] ?? "Connection failed \u2014 check the console for details" };
+		return {
+			error:
+				ERROR_MESSAGES[result.reason] ?? "Connection failed \u2014 check the console for details",
+		};
 	}
 
 	const config = {
@@ -164,14 +166,36 @@ describe("ProvidersTab connect flow", () => {
 		// Register both providers so setActive("statsfm") doesn't throw
 		providerRegistry._resetForTesting();
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "local", name: "Local", description: "Local provider", capabilities: { hasActivityData: true, hasGenreData: true, hasStreakData: true, hasSkipRate: false, tier: "n/a" as const } }),
+			getProviderInfo: () => ({
+				id: "local",
+				name: "Local",
+				description: "Local provider",
+				capabilities: {
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: true,
+					hasSkipRate: false,
+					tier: "n/a" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),
 			destroy: vi.fn(),
 		});
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "statsfm", name: "stats.fm", description: "stats.fm provider", capabilities: { hasActivityData: false, hasGenreData: true, hasStreakData: false, hasSkipRate: false, tier: "free" as const } }),
+			getProviderInfo: () => ({
+				id: "statsfm",
+				name: "stats.fm",
+				description: "stats.fm provider",
+				capabilities: {
+					hasActivityData: false,
+					hasGenreData: true,
+					hasStreakData: false,
+					hasSkipRate: false,
+					tier: "free" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),
@@ -219,14 +243,36 @@ describe("ProvidersTab disconnect", () => {
 		vi.clearAllMocks();
 		providerRegistry._resetForTesting();
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "local", name: "Local", description: "Local provider", capabilities: { hasActivityData: true, hasGenreData: true, hasStreakData: true, hasSkipRate: false, tier: "n/a" as const } }),
+			getProviderInfo: () => ({
+				id: "local",
+				name: "Local",
+				description: "Local provider",
+				capabilities: {
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: true,
+					hasSkipRate: false,
+					tier: "n/a" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),
 			destroy: vi.fn(),
 		});
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "statsfm", name: "stats.fm", description: "stats.fm provider", capabilities: { hasActivityData: false, hasGenreData: true, hasStreakData: false, hasSkipRate: false, tier: "free" as const } }),
+			getProviderInfo: () => ({
+				id: "statsfm",
+				name: "stats.fm",
+				description: "stats.fm provider",
+				capabilities: {
+					hasActivityData: false,
+					hasGenreData: true,
+					hasStreakData: false,
+					hasSkipRate: false,
+					tier: "free" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),
@@ -272,14 +318,36 @@ describe("ProvidersTab provider switch", () => {
 		vi.clearAllMocks();
 		providerRegistry._resetForTesting();
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "local", name: "Local", description: "Local provider", capabilities: { hasActivityData: true, hasGenreData: true, hasStreakData: true, hasSkipRate: false, tier: "n/a" as const } }),
+			getProviderInfo: () => ({
+				id: "local",
+				name: "Local",
+				description: "Local provider",
+				capabilities: {
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: true,
+					hasSkipRate: false,
+					tier: "n/a" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),
 			destroy: vi.fn(),
 		});
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "statsfm", name: "stats.fm", description: "stats.fm provider", capabilities: { hasActivityData: false, hasGenreData: true, hasStreakData: false, hasSkipRate: false, tier: "free" as const } }),
+			getProviderInfo: () => ({
+				id: "statsfm",
+				name: "stats.fm",
+				description: "stats.fm provider",
+				capabilities: {
+					hasActivityData: false,
+					hasGenreData: true,
+					hasStreakData: false,
+					hasSkipRate: false,
+					tier: "free" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),
@@ -318,14 +386,36 @@ describe("ProvidersTab provider switch cache order", () => {
 		vi.clearAllMocks();
 		providerRegistry._resetForTesting();
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "local", name: "Local", description: "Local provider", capabilities: { hasActivityData: true, hasGenreData: true, hasStreakData: true, hasSkipRate: false, tier: "n/a" as const } }),
+			getProviderInfo: () => ({
+				id: "local",
+				name: "Local",
+				description: "Local provider",
+				capabilities: {
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: true,
+					hasSkipRate: false,
+					tier: "n/a" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),
 			destroy: vi.fn(),
 		});
 		providerRegistry.register({
-			getProviderInfo: () => ({ id: "statsfm", name: "stats.fm", description: "stats.fm provider", capabilities: { hasActivityData: false, hasGenreData: true, hasStreakData: false, hasSkipRate: false, tier: "free" as const } }),
+			getProviderInfo: () => ({
+				id: "statsfm",
+				name: "stats.fm",
+				description: "stats.fm provider",
+				capabilities: {
+					hasActivityData: false,
+					hasGenreData: true,
+					hasStreakData: false,
+					hasSkipRate: false,
+					tier: "free" as const,
+				},
+			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
 			calculateStats: vi.fn().mockResolvedValue({}),
 			init: vi.fn().mockResolvedValue(undefined),
@@ -370,8 +460,11 @@ describe("ProvidersTab deriveTierBadge", () => {
 				name: "Local",
 				description: "Local provider",
 				capabilities: {
-					hasActivityData: true, hasGenreData: true, hasStreakData: true,
-					hasSkipRate: false, tier: "n/a" as const,
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: true,
+					hasSkipRate: false,
+					tier: "n/a" as const,
 				},
 			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
@@ -385,8 +478,11 @@ describe("ProvidersTab deriveTierBadge", () => {
 				name: "stats.fm",
 				description: "stats.fm provider",
 				capabilities: {
-					hasActivityData: true, hasGenreData: true, hasStreakData: false,
-					hasSkipRate: true, tier: "plus" as const,
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: false,
+					hasSkipRate: true,
+					tier: "plus" as const,
 				},
 			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
@@ -408,8 +504,11 @@ describe("ProvidersTab deriveTierBadge", () => {
 				name: "Local",
 				description: "Local provider",
 				capabilities: {
-					hasActivityData: true, hasGenreData: true, hasStreakData: true,
-					hasSkipRate: false, tier: "n/a" as const,
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: true,
+					hasSkipRate: false,
+					tier: "n/a" as const,
 				},
 			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
@@ -423,8 +522,11 @@ describe("ProvidersTab deriveTierBadge", () => {
 				name: "stats.fm",
 				description: "stats.fm provider",
 				capabilities: {
-					hasActivityData: false, hasGenreData: true, hasStreakData: false,
-					hasSkipRate: false, tier: "free" as const,
+					hasActivityData: false,
+					hasGenreData: true,
+					hasStreakData: false,
+					hasSkipRate: false,
+					tier: "free" as const,
 				},
 			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
@@ -454,8 +556,11 @@ describe("ProvidersTab deriveTierBadge", () => {
 				name: "Local",
 				description: "Local provider",
 				capabilities: {
-					hasActivityData: true, hasGenreData: true, hasStreakData: true,
-					hasSkipRate: false, tier: "n/a" as const,
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: true,
+					hasSkipRate: false,
+					tier: "n/a" as const,
 				},
 			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
@@ -473,17 +578,26 @@ describe("ProvidersTab deriveTierBadge", () => {
 	it("does not source tier from config.isPlus  -  Free localStorage config + Plus registry capability returns 'plus'", () => {
 		// Smoke test: even if localStorage says isPlus: false, the registry's capabilities
 		// are the source of truth. This guards against regressions to the old config.isPlus path.
-		localStorage.setItem(LS_KEYS.STATSFM_CONFIG, JSON.stringify({
-			username: "tester", isPlus: false, connectedAt: Date.now(), lastValidated: Date.now(),
-		}));
+		localStorage.setItem(
+			LS_KEYS.STATSFM_CONFIG,
+			JSON.stringify({
+				username: "tester",
+				isPlus: false,
+				connectedAt: Date.now(),
+				lastValidated: Date.now(),
+			}),
+		);
 		providerRegistry.register({
 			getProviderInfo: () => ({
 				id: "statsfm",
 				name: "stats.fm",
 				description: "stats.fm provider",
 				capabilities: {
-					hasActivityData: true, hasGenreData: true, hasStreakData: false,
-					hasSkipRate: true, tier: "plus" as const,
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: false,
+					hasSkipRate: true,
+					tier: "plus" as const,
 				},
 			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
@@ -506,8 +620,7 @@ async function handleRevalidate(config: StatsFmConfig | null) {
 	const result = await validateUsername(config.username);
 	if (!result.valid) {
 		return {
-			error: ERROR_MESSAGES[result.reason] ??
-				"Validation failed. Check the console for details.",
+			error: ERROR_MESSAGES[result.reason] ?? "Validation failed. Check the console for details.",
 		};
 	}
 
@@ -542,8 +655,11 @@ describe("ProvidersTab re-validate flow", () => {
 				name: "Local",
 				description: "Local provider",
 				capabilities: {
-					hasActivityData: true, hasGenreData: true, hasStreakData: true,
-					hasSkipRate: false, tier: "n/a" as const,
+					hasActivityData: true,
+					hasGenreData: true,
+					hasStreakData: true,
+					hasSkipRate: false,
+					tier: "n/a" as const,
 				},
 			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
@@ -557,8 +673,11 @@ describe("ProvidersTab re-validate flow", () => {
 				name: "stats.fm",
 				description: "stats.fm provider",
 				capabilities: {
-					hasActivityData: false, hasGenreData: true, hasStreakData: false,
-					hasSkipRate: false, tier: "free" as const,
+					hasActivityData: false,
+					hasGenreData: true,
+					hasStreakData: false,
+					hasSkipRate: false,
+					tier: "free" as const,
 				},
 			}),
 			getSupportedPeriods: vi.fn().mockReturnValue([]),
@@ -642,7 +761,11 @@ describe("ProvidersTab re-validate flow", () => {
 	});
 
 	it("network validation failure leaves storage untouched and skips provider init", async () => {
-		const config = setupConnectedConfig({ isPlus: false, connectedAt: 1700000000000, lastValidated: 1700000000000 });
+		const config = setupConnectedConfig({
+			isPlus: false,
+			connectedAt: 1700000000000,
+			lastValidated: 1700000000000,
+		});
 		const originalStored = localStorage.getItem(LS_KEYS.STATSFM_CONFIG);
 		mockValidateUsername.mockResolvedValue({ valid: false, reason: "network" });
 

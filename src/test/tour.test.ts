@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { LS_KEYS } from "../shared/constants/storage-keys";
 
 describe("Tour logic", () => {
@@ -82,7 +82,16 @@ describe("Tour logic", () => {
 		it("step ids match expected sequence", async () => {
 			const { TOUR_STEPS } = await import("../app/tour");
 			const ids = TOUR_STEPS.map((s) => s.id);
-			expect(ids).toEqual(["health", "page-tabs", "period", "overview", "lists", "activity", "share", "gear"]);
+			expect(ids).toEqual([
+				"health",
+				"page-tabs",
+				"period",
+				"overview",
+				"lists",
+				"activity",
+				"share",
+				"gear",
+			]);
 		});
 
 		it("each step has a valid CSS selector", async () => {

@@ -1,6 +1,6 @@
-import type { ArtistRecord } from "../types/stats";
 import { cosmosGet } from "../api/cosmos-async";
 import { db } from "../storage/db";
+import type { ArtistRecord } from "../types/stats";
 
 const BATCH_SIZE = 50;
 const ENRICHMENT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours

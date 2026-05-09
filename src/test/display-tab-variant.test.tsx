@@ -1,7 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPreferences, setPreference } from "../app/preferences";
-import { providerRegistry } from "../shared/stats/provider";
 import { localProvider } from "../shared/stats/local-provider";
+import { providerRegistry } from "../shared/stats/provider";
 
 describe("DisplayTab playCountVariant toggle", () => {
 	let container: HTMLDivElement;

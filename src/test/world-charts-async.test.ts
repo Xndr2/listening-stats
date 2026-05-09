@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import React from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../app/world-charts-service", async (importOriginal) => {
 	const orig = await importOriginal<typeof import("../app/world-charts-service")>();
@@ -11,7 +11,14 @@ vi.mock("../app/world-charts-service", async (importOriginal) => {
 	};
 });
 
-import { getChartsAsync, getArtistChartsAsync, WORLD_TRACKS, WORLD_ARTISTS } from "../app/world-charts-service";
+import {
+	getArtistChartsAsync,
+	getChartsAsync,
+	WORLD_ARTISTS,
+	WORLD_TRACKS,
+} from "../app/world-charts-service";
+import type { LastfmResult } from "../shared/api/lastfm-client";
+
 const getChartsAsyncMock = vi.mocked(getChartsAsync);
 const getArtistChartsAsyncMock = vi.mocked(getArtistChartsAsync);
 
@@ -33,8 +40,12 @@ afterEach(() => {
 
 describe("WorldChartsPage  -  async loading", () => {
 	it("shows skeleton loading state while fetching", async () => {
-		let resolveCharts: (v: { ok: true; data: typeof WORLD_TRACKS extends readonly (infer T)[] ? T[] : never }) => void;
-		getChartsAsyncMock.mockReturnValue(new Promise((r) => { resolveCharts = r as typeof resolveCharts; }));
+		let resolveCharts!: (value: LastfmResult) => void;
+		getChartsAsyncMock.mockReturnValue(
+			new Promise<LastfmResult>((resolve) => {
+				resolveCharts = resolve;
+			}),
+		);
 		getArtistChartsAsyncMock.mockReturnValue(new Promise(() => {}));
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
@@ -44,7 +55,7 @@ describe("WorldChartsPage  -  async loading", () => {
 		expect(skeleton).not.toBeNull();
 		const shimmerRows = skeleton!.querySelectorAll(".skeleton-shimmer");
 		expect(shimmerRows.length).toBeGreaterThan(0);
-		resolveCharts!({ ok: true, data: [...WORLD_TRACKS] });
+		resolveCharts({ ok: true, data: [...WORLD_TRACKS] });
 	});
 
 	it("skeleton includes tile placeholders for each item row", async () => {
@@ -55,6 +66,7 @@ describe("WorldChartsPage  -  async loading", () => {
 		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
 
 		const skeleton = container.querySelector(".world-charts-skeleton");
+		expect(skeleton).not.toBeNull();
 		const tilePlaceholders = skeleton!.querySelectorAll(".skeleton-tile");
 		expect(tilePlaceholders.length).toBe(16);
 	});
@@ -73,7 +85,11 @@ describe("WorldChartsPage  -  async loading", () => {
 
 	it("renders InlineErrorCard on API failure", async () => {
 		getChartsAsyncMock.mockResolvedValue({ ok: false, status: 403, message: "Invalid API key" });
-		getArtistChartsAsyncMock.mockResolvedValue({ ok: false, status: 403, message: "Invalid API key" });
+		getArtistChartsAsyncMock.mockResolvedValue({
+			ok: false,
+			status: 403,
+			message: "Invalid API key",
+		});
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
 		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
@@ -86,7 +102,11 @@ describe("WorldChartsPage  -  async loading", () => {
 
 	it("error card shows InvalidApiKey variant for 403", async () => {
 		getChartsAsyncMock.mockResolvedValue({ ok: false, status: 403, message: "Invalid API key" });
-		getArtistChartsAsyncMock.mockResolvedValue({ ok: false, status: 403, message: "Invalid API key" });
+		getArtistChartsAsyncMock.mockResolvedValue({
+			ok: false,
+			status: 403,
+			message: "Invalid API key",
+		});
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
 		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
@@ -133,7 +153,7 @@ describe("WorldChartsPage  -  async loading", () => {
 		});
 
 		const scopeTabs = container.querySelector("[data-tabs='scope']");
-		const usBtn = scopeTabs!.querySelectorAll("button")[1];
+		const usBtn = scopeTabs!.querySelectorAll("button")[1]!;
 		fireEvent.click(usBtn);
 
 		await vi.waitFor(() => {

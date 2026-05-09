@@ -8,8 +8,18 @@ function makeResponse(status: number, body: unknown = null): Response {
 const LASTFM_RESPONSE = {
 	tracks: {
 		track: [
-			{ name: "Espresso", artist: { name: "Sabrina Carpenter" }, playcount: "12400000", listeners: "500000" },
-			{ name: "Beautiful Things", artist: { name: "Benson Boone" }, playcount: "9800000", listeners: "400000" },
+			{
+				name: "Espresso",
+				artist: { name: "Sabrina Carpenter" },
+				playcount: "12400000",
+				listeners: "500000",
+			},
+			{
+				name: "Beautiful Things",
+				artist: { name: "Benson Boone" },
+				playcount: "9800000",
+				listeners: "400000",
+			},
 		],
 	},
 };

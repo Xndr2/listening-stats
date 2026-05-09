@@ -1,12 +1,35 @@
-import type { Period, StatsResult, TopTrack, TopArtist, TopAlbum, TopGenre, RecentPlay } from "../types/stats";
-import type { StatsProvider, ProviderInfo } from "./provider";
-import type { WaveCallback } from "./progressive";
-import { STATSFM_PERIODS, STATSFM_PERIODS_PLUS, getPriorPeriodBoundaries } from "./periods";
-import { statsCache } from "./stats-cache";
-import { sfmGet, sfmCircuitBreaker, validateUsername, type StatsFmConfig, type SfmResult } from "../api/statsfm-client";
-import { classifyStatsFmError, StatsFmError } from "../errors";
-import type { SfmTopTrack, SfmTopArtist, SfmTopAlbum, SfmTopGenre, SfmRecentStream, SfmStreamStats, SfmPerDayStats, SfmDateStats } from "../types/statsfm";
+import {
+	type SfmResult,
+	type StatsFmConfig,
+	sfmCircuitBreaker,
+	sfmGet,
+	validateUsername,
+} from "../api/statsfm-client";
 import { LS_KEYS } from "../constants/storage-keys";
+import { classifyStatsFmError, StatsFmError } from "../errors";
+import type {
+	Period,
+	RecentPlay,
+	StatsResult,
+	TopAlbum,
+	TopArtist,
+	TopGenre,
+	TopTrack,
+} from "../types/stats";
+import type {
+	SfmDateStats,
+	SfmPerDayStats,
+	SfmRecentStream,
+	SfmStreamStats,
+	SfmTopAlbum,
+	SfmTopArtist,
+	SfmTopGenre,
+	SfmTopTrack,
+} from "../types/statsfm";
+import { getPriorPeriodBoundaries, STATSFM_PERIODS, STATSFM_PERIODS_PLUS } from "./periods";
+import type { WaveCallback } from "./progressive";
+import type { ProviderInfo, StatsProvider } from "./provider";
+import { statsCache } from "./stats-cache";
 
 const CACHE_KEY_PREFIX = "statsfm";
 const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
@@ -28,7 +51,9 @@ function extractData<T>(result: PromiseSettledResult<SfmResult<T>>): T | null {
 	return null;
 }
 
-function extractFailure(result: PromiseSettledResult<SfmResult<unknown>>): { status: number; message: string } | null {
+function extractFailure(
+	result: PromiseSettledResult<SfmResult<unknown>>,
+): { status: number; message: string } | null {
 	if (result.status === "fulfilled" && !result.value.ok) {
 		return { status: result.value.status, message: result.value.message };
 	}
@@ -39,13 +64,16 @@ function extractFailure(result: PromiseSettledResult<SfmResult<unknown>>): { sta
 }
 
 function deriveAlbumsFromTracks(tracks: SfmTopTrack[]): TopAlbum[] {
-	const albumMap = new Map<string, {
-		albumName: string;
-		artistName: string;
-		albumArt: string;
-		albumUri: string;
-		streams: number;
-	}>();
+	const albumMap = new Map<
+		string,
+		{
+			albumName: string;
+			artistName: string;
+			albumArt: string;
+			albumUri: string;
+			streams: number;
+		}
+	>();
 
 	for (const tt of tracks) {
 		const album = tt.track.albums[0];
@@ -146,20 +174,35 @@ export class StatsFmProvider implements StatsProvider {
 				})
 			: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopArtist[]>);
 
-		const [tracksRes, artistsRes, genresRes, statsRes, recentRes, albumsRes, perDayRes, datesRes, priorArtistsRes] =
-			await Promise.allSettled([
-				sfmGet<SfmTopTrack[]>(`/users/${username}/top/tracks`, rangeParams),
-				sfmGet<SfmTopArtist[]>(`/users/${username}/top/artists`, rangeParams),
-				sfmGet<SfmTopGenre[]>(`/users/${username}/top/genres`, rangeParams),
-				sfmGet<SfmStreamStats>(`/users/${username}/streams/stats`, rangeParams),
-				sfmGet<SfmRecentStream[]>(`/users/${username}/streams/recent`, { limit: "12" }),
-				isPlus
-					? sfmGet<SfmTopAlbum[]>(`/users/${username}/top/albums`, rangeParams)
-					: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopAlbum[]>),
-				sfmGet<SfmPerDayStats>(`/users/${username}/streams/stats/per-day`, { range: "lifetime", timeZone }),
-				sfmGet<{ items: SfmDateStats }>(`/users/${username}/streams/stats/dates`, { range, timeZone }),
-				priorPromise,
-			]);
+		const [
+			tracksRes,
+			artistsRes,
+			_genresRes,
+			statsRes,
+			recentRes,
+			albumsRes,
+			perDayRes,
+			datesRes,
+			priorArtistsRes,
+		] = await Promise.allSettled([
+			sfmGet<SfmTopTrack[]>(`/users/${username}/top/tracks`, rangeParams),
+			sfmGet<SfmTopArtist[]>(`/users/${username}/top/artists`, rangeParams),
+			sfmGet<SfmTopGenre[]>(`/users/${username}/top/genres`, rangeParams),
+			sfmGet<SfmStreamStats>(`/users/${username}/streams/stats`, rangeParams),
+			sfmGet<SfmRecentStream[]>(`/users/${username}/streams/recent`, { limit: "12" }),
+			isPlus
+				? sfmGet<SfmTopAlbum[]>(`/users/${username}/top/albums`, rangeParams)
+				: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopAlbum[]>),
+			sfmGet<SfmPerDayStats>(`/users/${username}/streams/stats/per-day`, {
+				range: "lifetime",
+				timeZone,
+			}),
+			sfmGet<{ items: SfmDateStats }>(`/users/${username}/streams/stats/dates`, {
+				range,
+				timeZone,
+			}),
+			priorPromise,
+		]);
 
 		const tracksErr = extractFailure(tracksRes);
 		const artistsErr = extractFailure(artistsRes);
@@ -200,8 +243,8 @@ export class StatsFmProvider implements StatsProvider {
 
 		const dailyPlayCounts = perDayData?.days
 			? Object.entries(perDayData.days)
-				.map(([date, d]) => ({ date, count: d.count }))
-				.sort((a, b) => a.date.localeCompare(b.date))
+					.map(([date, d]) => ({ date, count: d.count }))
+					.sort((a, b) => a.date.localeCompare(b.date))
 			: undefined;
 
 		// Sum lifetime per-day durations falling in the prior window (same perDay payload).
@@ -228,14 +271,19 @@ export class StatsFmProvider implements StatsProvider {
 				if (hr >= 0 && hr < 24) hourlyDistribution[hr] = val.count;
 			}
 		}
-		const peakHour = hourlyDistribution.reduce((maxIdx, val, idx, arr) => val > arr[maxIdx] ? idx : maxIdx, 0);
+		const peakHour = hourlyDistribution.reduce(
+			(maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx),
+			0,
+		);
 
 		// weekdayDistribution: 7-element array, index 0=Monday through 6=Sunday
 		// API weekDays keys: 1=Monday through 7=Sunday -> subtract 1 for zero-indexed array
 		let weekdayDistribution: number[] | undefined;
 		let peakWeekday: number | undefined;
-		const hasDateData = dateItems != null &&
-			(Object.keys(dateItems.hours ?? {}).length > 0 || Object.keys(dateItems.weekDays ?? {}).length > 0);
+		const hasDateData =
+			dateItems != null &&
+			(Object.keys(dateItems.hours ?? {}).length > 0 ||
+				Object.keys(dateItems.weekDays ?? {}).length > 0);
 
 		if (hasDateData && dateItems?.weekDays) {
 			weekdayDistribution = new Array(7).fill(0) as number[];
@@ -243,18 +291,23 @@ export class StatsFmProvider implements StatsProvider {
 				const idx = Number(key) - 1; // 1-7 -> 0-6
 				if (idx >= 0 && idx < 7) weekdayDistribution[idx] = val.count;
 			}
-			peakWeekday = weekdayDistribution.reduce((maxIdx, val, idx, arr) => val > arr[maxIdx] ? idx : maxIdx, 0);
+			peakWeekday = weekdayDistribution.reduce(
+				(maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx),
+				0,
+			);
 		}
 
 		// Map tracks
 		const topTracks: TopTrack[] = tracks.map((tt) => ({
 			rank: tt.position,
-			trackUri: prefixUri(tt.track.externalIds?.spotify?.[0], "track")
-				?? `listening-stats:track:${tt.track.name}${tt.track.artists[0]?.name ?? ""}`,
+			trackUri:
+				prefixUri(tt.track.externalIds?.spotify?.[0], "track") ??
+				`listening-stats:track:${tt.track.name}${tt.track.artists[0]?.name ?? ""}`,
 			trackName: tt.track.name,
 			artistName: tt.track.artists[0]?.name ?? "",
-			artistUri: prefixUri(tt.track.artists[0]?.externalIds?.spotify?.[0], "artist")
-				?? `listening-stats:artist:${tt.track.artists[0]?.name ?? ""}`,
+			artistUri:
+				prefixUri(tt.track.artists[0]?.externalIds?.spotify?.[0], "artist") ??
+				`listening-stats:artist:${tt.track.artists[0]?.name ?? ""}`,
 			albumName: tt.track.albums[0]?.name ?? "",
 			albumUri: prefixUri(tt.track.albums[0]?.externalIds?.spotify?.[0], "album") ?? "",
 			albumArt: tt.track.albums[0]?.image,
@@ -265,8 +318,9 @@ export class StatsFmProvider implements StatsProvider {
 		// Genres from stats.fm artist payload (no extra Spotify batch here)
 		const topArtists: TopArtist[] = artists.map((ta) => ({
 			rank: ta.position,
-			artistUri: prefixUri(ta.artist.externalIds?.spotify?.[0], "artist")
-				?? `listening-stats:artist:${ta.artist.name}`,
+			artistUri:
+				prefixUri(ta.artist.externalIds?.spotify?.[0], "artist") ??
+				`listening-stats:artist:${ta.artist.name}`,
 			artistName: ta.artist.name,
 			count: ta.streams,
 			durationMs: ta.playedMs ?? 0,
@@ -278,8 +332,9 @@ export class StatsFmProvider implements StatsProvider {
 		const topAlbums: TopAlbum[] = isPlus
 			? albumsData.map((ab) => ({
 					rank: ab.position,
-					albumUri: prefixUri(ab.album.externalIds?.spotify?.[0], "album")
-						?? `listening-stats:album:${ab.album.name}${ab.album.artists[0]?.name ?? ""}`,
+					albumUri:
+						prefixUri(ab.album.externalIds?.spotify?.[0], "album") ??
+						`listening-stats:album:${ab.album.name}${ab.album.artists[0]?.name ?? ""}`,
 					albumName: ab.album.name,
 					artistName: ab.album.artists[0]?.name ?? "",
 					albumArt: ab.album.image,
@@ -301,8 +356,9 @@ export class StatsFmProvider implements StatsProvider {
 
 		// Recent plays
 		const recentPlays: RecentPlay[] = recent.map((s) => ({
-			trackUri: prefixUri(s.track.externalIds?.spotify?.[0], "track")
-				?? `listening-stats:track:${s.track.name}${s.track.artists[0]?.name ?? ""}`,
+			trackUri:
+				prefixUri(s.track.externalIds?.spotify?.[0], "track") ??
+				`listening-stats:track:${s.track.name}${s.track.artists[0]?.name ?? ""}`,
 			trackName: s.track.name,
 			artistName: s.track.artists[0]?.name ?? "",
 			albumArt: s.track.albums[0]?.image,
@@ -378,14 +434,22 @@ export class StatsFmProvider implements StatsProvider {
 
 		// Fire ALL API calls concurrently for max parallelism
 		const statsPromise = sfmGet<SfmStreamStats>(`/users/${username}/streams/stats`, rangeParams);
-		const recentPromise = sfmGet<SfmRecentStream[]>(`/users/${username}/streams/recent`, { limit: "12" });
+		const recentPromise = sfmGet<SfmRecentStream[]>(`/users/${username}/streams/recent`, {
+			limit: "12",
+		});
 		const tracksPromise = sfmGet<SfmTopTrack[]>(`/users/${username}/top/tracks`, rangeParams);
 		const artistsPromise = sfmGet<SfmTopArtist[]>(`/users/${username}/top/artists`, rangeParams);
 		const albumsPromise = isPlus
 			? sfmGet<SfmTopAlbum[]>(`/users/${username}/top/albums`, rangeParams)
 			: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopAlbum[]>);
-		const perDayPromise = sfmGet<SfmPerDayStats>(`/users/${username}/streams/stats/per-day`, { range: "lifetime", timeZone });
-		const datesPromise = sfmGet<{ items: SfmDateStats }>(`/users/${username}/streams/stats/dates`, { range, timeZone });
+		const perDayPromise = sfmGet<SfmPerDayStats>(`/users/${username}/streams/stats/per-day`, {
+			range: "lifetime",
+			timeZone,
+		});
+		const datesPromise = sfmGet<{ items: SfmDateStats }>(`/users/${username}/streams/stats/dates`, {
+			range,
+			timeZone,
+		});
 
 		// ── Wave 1: overview basics + recent plays ──
 		const [statsRes, recentRes] = await Promise.allSettled([statsPromise, recentPromise]);
@@ -393,22 +457,26 @@ export class StatsFmProvider implements StatsProvider {
 		const recent = extractData<SfmRecentStream[]>(recentRes) ?? [];
 
 		const recentPlays: RecentPlay[] = recent.map((s) => ({
-			trackUri: prefixUri(s.track.externalIds?.spotify?.[0], "track")
-				?? `listening-stats:track:${s.track.name}${s.track.artists[0]?.name ?? ""}`,
+			trackUri:
+				prefixUri(s.track.externalIds?.spotify?.[0], "track") ??
+				`listening-stats:track:${s.track.name}${s.track.artists[0]?.name ?? ""}`,
 			trackName: s.track.name,
 			artistName: s.track.artists[0]?.name ?? "",
 			albumArt: s.track.albums[0]?.image,
 			playedAt: new Date(s.endTime).getTime() || Date.now(),
 		}));
 
-		onWave({
-			totalPlays: streamStats?.count ?? 0,
-			totalDuration: streamStats?.durationMs ?? 0,
-			uniqueTrackCount: streamStats?.cardinality.tracks ?? 0,
-			uniqueArtistCount: streamStats?.cardinality.artists ?? 0,
-			skipRate: 0,
-			recentPlays,
-		}, 1);
+		onWave(
+			{
+				totalPlays: streamStats?.count ?? 0,
+				totalDuration: streamStats?.durationMs ?? 0,
+				uniqueTrackCount: streamStats?.cardinality.tracks ?? 0,
+				uniqueArtistCount: streamStats?.cardinality.artists ?? 0,
+				skipRate: 0,
+				recentPlays,
+			},
+			1,
+		);
 
 		// ── Wave 2: truly progressive partial hydration ──
 		let tracks: SfmTopTrack[] = [];
@@ -447,12 +515,14 @@ export class StatsFmProvider implements StatsProvider {
 				tracks = res.ok ? res.data : [];
 				topTracks = tracks.map((tt) => ({
 					rank: tt.position,
-					trackUri: prefixUri(tt.track.externalIds?.spotify?.[0], "track")
-						?? `listening-stats:track:${tt.track.name}${tt.track.artists[0]?.name ?? ""}`,
+					trackUri:
+						prefixUri(tt.track.externalIds?.spotify?.[0], "track") ??
+						`listening-stats:track:${tt.track.name}${tt.track.artists[0]?.name ?? ""}`,
 					trackName: tt.track.name,
 					artistName: tt.track.artists[0]?.name ?? "",
-					artistUri: prefixUri(tt.track.artists[0]?.externalIds?.spotify?.[0], "artist")
-						?? `listening-stats:artist:${tt.track.artists[0]?.name ?? ""}`,
+					artistUri:
+						prefixUri(tt.track.artists[0]?.externalIds?.spotify?.[0], "artist") ??
+						`listening-stats:artist:${tt.track.artists[0]?.name ?? ""}`,
 					albumName: tt.track.albums[0]?.name ?? "",
 					albumUri: prefixUri(tt.track.albums[0]?.externalIds?.spotify?.[0], "album") ?? "",
 					albumArt: tt.track.albums[0]?.image,
@@ -469,8 +539,9 @@ export class StatsFmProvider implements StatsProvider {
 				artists = res.ok ? res.data : [];
 				topArtists = artists.map((ta) => ({
 					rank: ta.position,
-					artistUri: prefixUri(ta.artist.externalIds?.spotify?.[0], "artist")
-						?? `listening-stats:artist:${ta.artist.name}`,
+					artistUri:
+						prefixUri(ta.artist.externalIds?.spotify?.[0], "artist") ??
+						`listening-stats:artist:${ta.artist.name}`,
 					artistName: ta.artist.name,
 					count: ta.streams,
 					durationMs: ta.playedMs ?? 0,
@@ -496,8 +567,9 @@ export class StatsFmProvider implements StatsProvider {
 				albumsData = res.ok ? res.data : [];
 				topAlbums = albumsData.map((ab) => ({
 					rank: ab.position,
-					albumUri: prefixUri(ab.album.externalIds?.spotify?.[0], "album")
-						?? `listening-stats:album:${ab.album.name}${ab.album.artists[0]?.name ?? ""}`,
+					albumUri:
+						prefixUri(ab.album.externalIds?.spotify?.[0], "album") ??
+						`listening-stats:album:${ab.album.name}${ab.album.artists[0]?.name ?? ""}`,
 					albumName: ab.album.name,
 					artistName: ab.album.artists[0]?.name ?? "",
 					albumArt: ab.album.image,
@@ -513,8 +585,8 @@ export class StatsFmProvider implements StatsProvider {
 					: undefined;
 				dailyPlayCounts = perDayData?.days
 					? Object.entries(perDayData.days)
-						.map(([date, d]) => ({ date, count: d.count }))
-						.sort((a, b) => a.date.localeCompare(b.date))
+							.map(([date, d]) => ({ date, count: d.count }))
+							.sort((a, b) => a.date.localeCompare(b.date))
 					: undefined;
 
 				if (priorBoundaries && perDayData?.days) {
@@ -550,12 +622,17 @@ export class StatsFmProvider implements StatsProvider {
 				if (hr >= 0 && hr < 24) hourlyDistribution[hr] = val.count;
 			}
 		}
-		const peakHour = hourlyDistribution.reduce((maxIdx, val, idx, arr) => val > arr[maxIdx] ? idx : maxIdx, 0);
+		const peakHour = hourlyDistribution.reduce(
+			(maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx),
+			0,
+		);
 
 		let weekdayDistribution: number[] | undefined;
 		let peakWeekday: number | undefined;
-		const hasDateData = dateItems != null &&
-			(Object.keys(dateItems.hours ?? {}).length > 0 || Object.keys(dateItems.weekDays ?? {}).length > 0);
+		const hasDateData =
+			dateItems != null &&
+			(Object.keys(dateItems.hours ?? {}).length > 0 ||
+				Object.keys(dateItems.weekDays ?? {}).length > 0);
 
 		if (hasDateData && dateItems?.weekDays) {
 			weekdayDistribution = new Array(7).fill(0) as number[];
@@ -563,23 +640,33 @@ export class StatsFmProvider implements StatsProvider {
 				const idx = Number(k) - 1;
 				if (idx >= 0 && idx < 7) weekdayDistribution[idx] = val.count;
 			}
-			peakWeekday = weekdayDistribution.reduce((maxIdx, val, idx, arr) => val > arr[maxIdx] ? idx : maxIdx, 0);
+			peakWeekday = weekdayDistribution.reduce(
+				(maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx),
+				0,
+			);
 		}
 
 		if (datesFailure) {
-			onWave({
-				hourlyDistribution: new Array(24).fill(0) as number[],
-				peakHour: 0,
-				hasListeningPatterns: false,
-			}, 3, classifyStatsFmError(datesFailure.status, datesFailure.message));
+			onWave(
+				{
+					hourlyDistribution: new Array(24).fill(0) as number[],
+					peakHour: 0,
+					hasListeningPatterns: false,
+				},
+				3,
+				classifyStatsFmError(datesFailure.status, datesFailure.message),
+			);
 		} else {
-			onWave({
-				hourlyDistribution,
-				peakHour,
-				weekdayDistribution,
-				peakWeekday,
-				hasListeningPatterns: hasDateData,
-			}, 3);
+			onWave(
+				{
+					hourlyDistribution,
+					peakHour,
+					weekdayDistribution,
+					peakWeekday,
+					hasListeningPatterns: hasDateData,
+				},
+				3,
+			);
 		}
 
 		// Build full result (no cache write  -  caller decides via cache gating)

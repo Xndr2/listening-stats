@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	buildLocalTooltip,
+	buildStatsFmTooltip,
+	getHealthColor,
+	getStatsFmHealthColor,
+} from "../app/components/Header";
 import type { HealthPayload } from "../extension/tracker/health";
 import type { StatsFmHealthPayload } from "../shared/api/statsfm-client";
-import { getHealthColor, buildLocalTooltip, buildStatsFmTooltip, getLocalHealthColor, getStatsFmHealthColor } from "../app/components/Header";
+import { localProvider } from "../shared/stats/local-provider";
 import { LOCAL_PERIODS } from "../shared/stats/periods";
 import { providerRegistry } from "../shared/stats/provider";
-import { localProvider } from "../shared/stats/local-provider";
 import { statsfmProvider } from "../shared/stats/statsfm-provider";
 
 function setActiveProvider(id: "local" | "statsfm"): void {
@@ -202,7 +207,6 @@ describe("buildLocalTooltip", () => {
 		expect(result).toContain("...");
 		const trackPart = result.split(" - ")[1];
 		expect(trackPart).toBe("A Very Long Track Name That Exceeds The " + "...");
-
 	});
 
 	it("omits track suffix when lastTrackName is null", () => {
@@ -264,7 +268,8 @@ describe("buildStatsFmTooltip", () => {
 	});
 
 	it("truncates lastError > 60 chars with ellipsis", () => {
-		const longError = "This is a very long error message that exceeds sixty characters in total length";
+		const longError =
+			"This is a very long error message that exceeds sixty characters in total length";
 		const health: StatsFmHealthPayload = {
 			lastFetchAt: FROZEN_MS,
 			lastSuccessAt: null,
@@ -406,7 +411,7 @@ describe("EmptyState component", () => {
 		const onOpenSettings = vi.fn();
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(EmptyState, { onOpenSettings }),
-			container
+			container,
 		);
 		expect(container.textContent).toContain("No listening data yet");
 	});
@@ -416,7 +421,7 @@ describe("EmptyState component", () => {
 		const onOpenSettings = vi.fn();
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(EmptyState, { onOpenSettings }),
-			container
+			container,
 		);
 		expect(container.textContent).toContain("Open Settings");
 	});
@@ -426,7 +431,7 @@ describe("EmptyState component", () => {
 		const onOpenSettings = vi.fn();
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(EmptyState, { onOpenSettings }),
-			container
+			container,
 		);
 		const button = container.querySelector("button");
 		button?.click();
@@ -452,7 +457,7 @@ describe("ErrorState component", () => {
 		const onRetry = vi.fn();
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(ErrorState, { sectionName: "Top Tracks", onRetry }),
-			container
+			container,
 		);
 		expect(container.textContent).toContain("Top Tracks");
 	});
@@ -462,7 +467,7 @@ describe("ErrorState component", () => {
 		const onRetry = vi.fn();
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(ErrorState, { sectionName: "Activity Chart", onRetry }),
-			container
+			container,
 		);
 		expect(container.textContent).toContain("Retry Load");
 	});
@@ -472,7 +477,7 @@ describe("ErrorState component", () => {
 		const onRetry = vi.fn();
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(ErrorState, { sectionName: "Top Tracks", onRetry }),
-			container
+			container,
 		);
 		const button = container.querySelector("button");
 		button?.click();
@@ -502,7 +507,7 @@ describe("PeriodTabs component", () => {
 				activePeriod: LOCAL_PERIODS[0],
 				onPeriodChange,
 			}),
-			container
+			container,
 		);
 		const buttons = container.querySelectorAll("button");
 		expect(buttons).toHaveLength(5);
@@ -517,7 +522,7 @@ describe("PeriodTabs component", () => {
 				activePeriod: LOCAL_PERIODS[0],
 				onPeriodChange,
 			}),
-			container
+			container,
 		);
 		const activeButton = container.querySelector('button[aria-selected="true"]');
 		expect(activeButton).not.toBeNull();
@@ -533,7 +538,7 @@ describe("PeriodTabs component", () => {
 				activePeriod: LOCAL_PERIODS[0],
 				onPeriodChange,
 			}),
-			container
+			container,
 		);
 		const buttons = container.querySelectorAll("button");
 		buttons[1].click(); // "This Week"
@@ -581,7 +586,7 @@ describe("OverviewCards tooltips", () => {
 				stats: baseStats,
 				activePeriod: LOCAL_PERIODS[0],
 			}),
-			container
+			container,
 		);
 		// Six overview tiles when new-artists is hidden without a count
 		const cards = container.querySelectorAll(".overview-card");
@@ -595,19 +600,31 @@ describe("OverviewCards tooltips", () => {
 		const { filterOverviewCards } = await import("../app/components/OverviewCards");
 		// Verify filterOverviewCards preserves tooltip field
 		const testCards = [
-			{ label: "Streak", value: "5d", tooltip: "Consecutive calendar days with at least one play (local timezone)" },
+			{
+				label: "Streak",
+				value: "5d",
+				tooltip: "Consecutive calendar days with at least one play (local timezone)",
+			},
 		];
 		const filtered = filterOverviewCards(testCards, localCaps);
-		expect(filtered[0].tooltip).toBe("Consecutive calendar days with at least one play (local timezone)");
+		expect(filtered[0].tooltip).toBe(
+			"Consecutive calendar days with at least one play (local timezone)",
+		);
 	});
 
 	it("shows Listening Days tooltip for stats.fm provider", async () => {
 		const { filterOverviewCards } = await import("../app/components/OverviewCards");
 		const testCards = [
-			{ label: "Listening Days", value: "12", tooltip: "Number of days with at least one play in the selected period" },
+			{
+				label: "Listening Days",
+				value: "12",
+				tooltip: "Number of days with at least one play in the selected period",
+			},
 		];
 		const filtered = filterOverviewCards(testCards, statsfmFreeCaps);
-		expect(filtered[0].tooltip).toBe("Number of days with at least one play in the selected period");
+		expect(filtered[0].tooltip).toBe(
+			"Number of days with at least one play in the selected period",
+		);
 	});
 
 	it("renders stat grid cards for stats.fm provider plus hero cell", async () => {
@@ -619,7 +636,7 @@ describe("OverviewCards tooltips", () => {
 				stats: { ...baseStats, listeningDays: 10, newArtistCount: 5 },
 				activePeriod: LOCAL_PERIODS[0],
 			}),
-			container
+			container,
 		);
 		const cards = container.querySelectorAll(".overview-card");
 		expect(cards.length).toBeGreaterThanOrEqual(3);
@@ -645,7 +662,7 @@ describe("RecentlyPlayedSkeleton component", () => {
 		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(RecentlyPlayedSkeleton, null),
-			container
+			container,
 		);
 		const items = container.querySelectorAll(".recently-played-item");
 		expect(items).toHaveLength(6);
@@ -655,7 +672,7 @@ describe("RecentlyPlayedSkeleton component", () => {
 		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(RecentlyPlayedSkeleton, null),
-			container
+			container,
 		);
 		const arts = container.querySelectorAll(".recently-played-skeleton-art");
 		expect(arts).toHaveLength(6);
@@ -668,7 +685,7 @@ describe("RecentlyPlayedSkeleton component", () => {
 		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(RecentlyPlayedSkeleton, null),
-			container
+			container,
 		);
 		const texts = container.querySelectorAll(".recently-played-skeleton-text");
 		const subtexts = container.querySelectorAll(".recently-played-skeleton-subtext");
@@ -680,7 +697,7 @@ describe("RecentlyPlayedSkeleton component", () => {
 		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(RecentlyPlayedSkeleton, null),
-			container
+			container,
 		);
 		const wrapper = container.querySelector(".recently-played");
 		expect(wrapper).not.toBeNull();
@@ -727,7 +744,7 @@ describe("OverviewSection component", () => {
 				stats,
 				activePeriod: LOCAL_PERIODS[0],
 			}),
-			container
+			container,
 		);
 		const cards = container.querySelectorAll(".overview-card");
 		expect(cards.length).toBeGreaterThanOrEqual(4);
@@ -758,7 +775,7 @@ describe("OverviewSection component", () => {
 				stats,
 				activePeriod: LOCAL_PERIODS[0],
 			}),
-			container
+			container,
 		);
 		expect(container.querySelector(".overview-hero-cell")?.textContent).toContain("Total time");
 		// The "h" unit is present in the hero
@@ -789,7 +806,7 @@ describe("OverviewSection component", () => {
 				stats,
 				activePeriod: LOCAL_PERIODS[0],
 			}),
-			container
+			container,
 		);
 		// Skip Rate is in stat grid for local provider
 		expect(container.textContent).toContain("25%");

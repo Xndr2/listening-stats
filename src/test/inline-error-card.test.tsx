@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, fireEvent } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import React from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { InlineErrorCard } from "../app/components/InlineErrorCard";
 import type { AppError } from "../shared/errors";
 
@@ -80,8 +80,8 @@ describe("InlineErrorCard", () => {
 		);
 		const btn = container.querySelector("button");
 		expect(btn).not.toBeNull();
-		expect(btn!.textContent).toContain("Retry");
-		btn!.click();
+		expect(btn?.textContent).toContain("Retry");
+		btn?.click();
 		expect(onRetry).toHaveBeenCalledOnce();
 	});
 
@@ -96,8 +96,8 @@ describe("InlineErrorCard", () => {
 		);
 		const btn = container.querySelector("button");
 		expect(btn).not.toBeNull();
-		expect(btn!.textContent).toContain("Settings");
-		btn!.click();
+		expect(btn?.textContent).toContain("Settings");
+		btn?.click();
 		expect(onOpenSettings).toHaveBeenCalledOnce();
 	});
 

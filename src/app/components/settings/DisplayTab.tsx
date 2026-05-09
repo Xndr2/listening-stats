@@ -1,29 +1,29 @@
-import {
-	getPreferences,
-	SECTION_IDS,
-	COLUMN_IDS,
-	OVERVIEW_CARD_IDS,
-	setPreference,
-	OVERVIEW_CARD_LABELS,
-	COLUMN_LABELS,
-	type OverviewProviderKey,
-	type PlayCountVariant,
-} from "../../preferences";
 import { EVENTS } from "../../../shared/constants/events";
-import { useSettingsSortable } from "../../hooks/useSettingsSortable";
-import { SortableRow } from "./SortableRow";
-import { SortableTile } from "./SortableTile";
 import { providerRegistry } from "../../../shared/stats/provider";
 import { getSectionsForProvider } from "../../capabilities";
+import { useSettingsSortable } from "../../hooks/useSettingsSortable";
+import {
+	COLUMN_IDS,
+	COLUMN_LABELS,
+	getPreferences,
+	OVERVIEW_CARD_IDS,
+	OVERVIEW_CARD_LABELS,
+	type OverviewProviderKey,
+	type PlayCountVariant,
+	SECTION_IDS,
+	setPreference,
+} from "../../preferences";
+import { SortableRow } from "./SortableRow";
+import { SortableTile } from "./SortableTile";
 
 const { useState, useRef, useCallback, useEffect } = Spicetify.React;
 
 const SECTION_LABELS: Record<string, string> = {
-	"overview": "Overview",
+	overview: "Overview",
 	"top-genres": "Top Genres",
 	"top-lists": "Top Lists",
-	"activity": "Activity",
-	"consistency": "Consistency",
+	activity: "Activity",
+	consistency: "Consistency",
 	"recently-played": "Recently Played",
 };
 
@@ -143,16 +143,19 @@ export function DisplayTab({
 		dispatchPrefsChanged();
 	};
 
-	const handleSectionReorder = useCallback((next: string[]) => {
-		const untouched = prefs.sectionOrder.filter((id) => !next.includes(id));
-		const merged = [...next, ...untouched];
-		setPreference("sectionOrder", merged);
-		setPrefs((p) => ({ ...p, sectionOrder: merged }));
-		dispatchPrefsChanged();
-	}, [prefs.sectionOrder, dispatchPrefsChanged]);
+	const handleSectionReorder = useCallback(
+		(next: string[]) => {
+			const untouched = prefs.sectionOrder.filter((id) => !next.includes(id));
+			const merged = [...next, ...untouched];
+			setPreference("sectionOrder", merged);
+			setPrefs((p) => ({ ...p, sectionOrder: merged }));
+			dispatchPrefsChanged();
+		},
+		[prefs.sectionOrder, dispatchPrefsChanged],
+	);
 
-	const [providerKey, setProviderKey] = useState<OverviewProviderKey>(
-		() => (providerRegistry.getActiveId() === "statsfm" ? "statsfm" : "local")
+	const [providerKey, setProviderKey] = useState<OverviewProviderKey>(() =>
+		providerRegistry.getActiveId() === "statsfm" ? "statsfm" : "local",
 	);
 	const providerCaps = providerRegistry.getActive()?.getProviderInfo().capabilities ?? {
 		hasActivityData: true,
@@ -164,7 +167,9 @@ export function DisplayTab({
 	};
 	const knownSet = new Set<string>(SECTION_IDS as readonly string[]);
 	const allowedSections = new Set(getSectionsForProvider(providerCaps).map((s) => s.id));
-	const sectionOrder = prefs.sectionOrder.filter((id) => knownSet.has(id) && allowedSections.has(id));
+	const sectionOrder = prefs.sectionOrder.filter(
+		(id) => knownSet.has(id) && allowedSections.has(id),
+	);
 
 	const sortable = useSettingsSortable({
 		order: sectionOrder,
@@ -184,13 +189,16 @@ export function DisplayTab({
 	const overviewTop = overviewOrder.slice(0, 4);
 	const overviewBottom = overviewOrder.slice(4);
 
-	const handleOverviewTopReorder = useCallback((next: string[]) => {
-		const full = [...next, ...prefs.overviewOrder[providerKey].slice(4)];
-		const merged = { ...prefs.overviewOrder, [providerKey]: full };
-		setPreference("overviewOrder", merged);
-		setPrefs((p) => ({ ...p, overviewOrder: merged }));
-		dispatchPrefsChanged();
-	}, [prefs.overviewOrder, providerKey, dispatchPrefsChanged]);
+	const handleOverviewTopReorder = useCallback(
+		(next: string[]) => {
+			const full = [...next, ...prefs.overviewOrder[providerKey].slice(4)];
+			const merged = { ...prefs.overviewOrder, [providerKey]: full };
+			setPreference("overviewOrder", merged);
+			setPrefs((p) => ({ ...p, overviewOrder: merged }));
+			dispatchPrefsChanged();
+		},
+		[prefs.overviewOrder, providerKey, dispatchPrefsChanged],
+	);
 
 	const overviewTopSortable = useSettingsSortable({
 		order: overviewTop,
@@ -198,13 +206,16 @@ export function DisplayTab({
 		onReorder: handleOverviewTopReorder,
 	});
 
-	const handleOverviewBottomReorder = useCallback((next: string[]) => {
-		const full = [...prefs.overviewOrder[providerKey].slice(0, 4), ...next];
-		const merged = { ...prefs.overviewOrder, [providerKey]: full };
-		setPreference("overviewOrder", merged);
-		setPrefs((p) => ({ ...p, overviewOrder: merged }));
-		dispatchPrefsChanged();
-	}, [prefs.overviewOrder, providerKey, dispatchPrefsChanged]);
+	const handleOverviewBottomReorder = useCallback(
+		(next: string[]) => {
+			const full = [...prefs.overviewOrder[providerKey].slice(0, 4), ...next];
+			const merged = { ...prefs.overviewOrder, [providerKey]: full };
+			setPreference("overviewOrder", merged);
+			setPrefs((p) => ({ ...p, overviewOrder: merged }));
+			dispatchPrefsChanged();
+		},
+		[prefs.overviewOrder, providerKey, dispatchPrefsChanged],
+	);
 
 	const overviewBottomSortable = useSettingsSortable({
 		order: overviewBottom,
@@ -212,11 +223,14 @@ export function DisplayTab({
 		onReorder: handleOverviewBottomReorder,
 	});
 
-	const handleColumnReorder = useCallback((next: string[]) => {
-		setPreference("columnOrder", next);
-		setPrefs((p) => ({ ...p, columnOrder: next }));
-		dispatchPrefsChanged();
-	}, [dispatchPrefsChanged]);
+	const handleColumnReorder = useCallback(
+		(next: string[]) => {
+			setPreference("columnOrder", next);
+			setPrefs((p) => ({ ...p, columnOrder: next }));
+			dispatchPrefsChanged();
+		},
+		[dispatchPrefsChanged],
+	);
 
 	const columnSortable = useSettingsSortable({
 		order: prefs.columnOrder,
@@ -226,7 +240,7 @@ export function DisplayTab({
 
 	const topListsCoarseHidden = prefs.hiddenSections.includes("top-lists");
 
-	const Toggle = Spicetify.ReactComponent?.Toggle;
+	const Toggle = Spicetify.ReactComponent.Toggle;
 
 	const renderSortableTile = (
 		id: string,
@@ -245,7 +259,15 @@ export function DisplayTab({
 			<div
 				key={id}
 				ref={(el: HTMLDivElement | null) => sortable.registerItem(id, el)}
-				style={isDropTarget ? { outline: "2px solid var(--spice-button-active)", outlineOffset: "-2px", borderRadius: "6px" } : undefined}
+				style={
+					isDropTarget
+						? {
+								outline: "2px solid var(--spice-button-active)",
+								outlineOffset: "-2px",
+								borderRadius: "6px",
+							}
+						: undefined
+				}
 			>
 				<SortableTile
 					id={id}
@@ -254,17 +276,12 @@ export function DisplayTab({
 					style={sortable.getItemStyle(id)}
 				>
 					{Toggle ? (
-						<Toggle
-							value={visible}
-							onSelected={(val: boolean) => handleToggleSection(id, val)}
-						/>
+						<Toggle value={visible} onSelected={(val: boolean) => handleToggleSection(id, val)} />
 					) : (
 						<input
 							type="checkbox"
 							checked={visible}
-							onChange={(e: Event) =>
-								handleToggleSection(id, (e.target as HTMLInputElement).checked)
-							}
+							onChange={(e) => handleToggleSection(id, e.currentTarget.checked)}
 						/>
 					)}
 				</SortableTile>
@@ -316,7 +333,7 @@ export function DisplayTab({
 					<input
 						type="checkbox"
 						checked={prefs.use24HourTime}
-						onChange={(e: Event) => handle24HourTime((e.target as HTMLInputElement).checked)}
+						onChange={(e) => handle24HourTime(e.currentTarget.checked)}
 					/>
 				)}
 			</div>
@@ -325,8 +342,8 @@ export function DisplayTab({
 				<div>
 					<div className="settings-label">Announcement banner</div>
 					<div className="settings-sublabel">
-						Show the banner when one is available (GitHub or version splash). Turning off hides it until the
-						announcement changes or you turn this back on.
+						Show the banner when one is available (GitHub or version splash). Turning off hides it
+						until the announcement changes or you turn this back on.
 					</div>
 				</div>
 				{Toggle ? (
@@ -335,9 +352,7 @@ export function DisplayTab({
 					<input
 						type="checkbox"
 						checked={prefs.showAnnouncementBanner}
-						onChange={(e: Event) =>
-							handleShowAnnouncementBanner((e.target as HTMLInputElement).checked)
-						}
+						onChange={(e) => handleShowAnnouncementBanner(e.currentTarget.checked)}
 					/>
 				)}
 			</div>
@@ -387,7 +402,11 @@ export function DisplayTab({
 				</div>
 				<div
 					className="settings-drop-line"
-					data-active={sortable.dragState.isDragging && sortable.dragState.dropSlotIndex === 0 ? "true" : "false"}
+					data-active={
+						sortable.dragState.isDragging && sortable.dragState.dropSlotIndex === 0
+							? "true"
+							: "false"
+					}
 				/>
 				{sectionOrder.map((id, idx) => {
 					const visible = !prefs.hiddenSections.includes(id);
@@ -416,16 +435,18 @@ export function DisplayTab({
 										<input
 											type="checkbox"
 											checked={visible}
-											onChange={(e: Event) =>
-												handleToggleSection(id, (e.target as HTMLInputElement).checked)
-											}
+											onChange={(e) => handleToggleSection(id, e.currentTarget.checked)}
 										/>
 									)}
 								</SortableRow>
 							</div>
 							<div
 								className="settings-drop-line"
-								data-active={sortable.dragState.isDragging && sortable.dragState.dropSlotIndex === idx + 1 ? "true" : "false"}
+								data-active={
+									sortable.dragState.isDragging && sortable.dragState.dropSlotIndex === idx + 1
+										? "true"
+										: "false"
+								}
 							/>
 						</Spicetify.React.Fragment>
 					);
@@ -442,12 +463,16 @@ export function DisplayTab({
 						<div className="overview-settings-hero-sub">Fixed</div>
 					</div>
 					<div className="sortable-grid sortable-grid--2x2">
-						{overviewTop.map((id) => renderSortableTile(id, OVERVIEW_CARD_LABELS, overviewTopSortable, overviewTop))}
+						{overviewTop.map((id) =>
+							renderSortableTile(id, OVERVIEW_CARD_LABELS, overviewTopSortable, overviewTop),
+						)}
 					</div>
 				</div>
 				{overviewBottom.length > 0 && (
 					<div className="sortable-grid sortable-grid--1x3" data-testid="overview-bottom-row">
-						{overviewBottom.map((id) => renderSortableTile(id, OVERVIEW_CARD_LABELS, overviewBottomSortable, overviewBottom))}
+						{overviewBottom.map((id) =>
+							renderSortableTile(id, OVERVIEW_CARD_LABELS, overviewBottomSortable, overviewBottom),
+						)}
 					</div>
 				)}
 			</div>
@@ -469,7 +494,9 @@ export function DisplayTab({
 					</div>
 				)}
 				<div className="sortable-grid sortable-grid--1x3">
-					{prefs.columnOrder.map((id) => renderSortableTile(id, COLUMN_LABELS, columnSortable, prefs.columnOrder))}
+					{prefs.columnOrder.map((id) =>
+						renderSortableTile(id, COLUMN_LABELS, columnSortable, prefs.columnOrder),
+					)}
 				</div>
 			</div>
 

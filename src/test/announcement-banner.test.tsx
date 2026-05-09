@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LS_KEYS } from "../shared/constants/storage-keys";
 
 describe("AnnouncementBanner", () => {
@@ -21,8 +21,8 @@ describe("AnnouncementBanner", () => {
 			const { getActiveBanner } = await import("../app/banners");
 			const banner = getActiveBanner("2.6");
 			expect(banner).not.toBeNull();
-			expect(banner!.title).toBeTruthy();
-			expect(banner!.body).toBeTruthy();
+			expect(banner?.title).toBeTruthy();
+			expect(banner?.body).toBeTruthy();
 		});
 
 		it("getActiveBanner returns null when version has no configured banner", async () => {
@@ -66,9 +66,9 @@ describe("AnnouncementBanner", () => {
 			);
 			const banner = container.querySelector(".announcement-banner");
 			expect(banner).not.toBeNull();
-			expect(banner!.textContent).toContain("v2.6 is here");
-			expect(banner!.textContent).toContain("section streaming, share cards.");
-			expect(banner!.textContent).toContain("What's new →");
+			expect(banner?.textContent).toContain("v2.6 is here");
+			expect(banner?.textContent).toContain("section streaming, share cards.");
+			expect(banner?.textContent).toContain("What's new →");
 		});
 
 		it("calls onDismiss when dismiss button is clicked", async () => {
@@ -83,7 +83,9 @@ describe("AnnouncementBanner", () => {
 				}),
 				container,
 			);
-			const dismissBtn = container.querySelector(".announcement-banner-dismiss") as HTMLButtonElement;
+			const dismissBtn = container.querySelector(
+				".announcement-banner-dismiss",
+			) as HTMLButtonElement;
 			expect(dismissBtn).not.toBeNull();
 			dismissBtn.click();
 			expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -118,8 +120,8 @@ describe("AnnouncementBanner", () => {
 			);
 			const text = container.querySelector(".announcement-banner-text");
 			expect(text).not.toBeNull();
-			expect(text!.textContent).toContain("Version 9 is live");
-			expect(text!.textContent).not.toContain("This extra copy should not appear");
+			expect(text?.textContent).toContain("Version 9 is live");
+			expect(text?.textContent).not.toContain("This extra copy should not appear");
 		});
 	});
 
@@ -136,6 +138,5 @@ describe("AnnouncementBanner", () => {
 			dismissBanner("2.6");
 			expect(getActiveBanner("2.6")).toBeNull();
 		});
-
 	});
 });

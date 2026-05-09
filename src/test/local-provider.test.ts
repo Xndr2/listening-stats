@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { db } from "../shared/storage/db";
-import type { PlayEvent } from "../shared/types/play-event";
-import type { Period, StatsResult } from "../shared/types/stats";
 import { LOCAL_PERIODS } from "../shared/stats/periods";
 import { statsCache } from "../shared/stats/stats-cache";
+import { db } from "../shared/storage/db";
+import type { PlayEvent } from "../shared/types/play-event";
+import type { StatsResult } from "../shared/types/stats";
 
 // Mock enrichArtists to avoid real API calls
 vi.mock("../shared/stats/artist-enrichment", () => ({
@@ -130,9 +130,24 @@ describe("LocalProvider", () => {
 
 		it("returns topAlbums grouped by albumUri with correct count/duration", async () => {
 			await db.playEvents.bulkAdd([
-				makePlayEvent({ albumUri: "spotify:album:ok", albumName: "OK Computer", playedMs: 100, startedAt: 1000 }),
-				makePlayEvent({ albumUri: "spotify:album:ok", albumName: "OK Computer", playedMs: 200, startedAt: 2000 }),
-				makePlayEvent({ albumUri: "spotify:album:kb", albumName: "Kid A", playedMs: 150, startedAt: 3000 }),
+				makePlayEvent({
+					albumUri: "spotify:album:ok",
+					albumName: "OK Computer",
+					playedMs: 100,
+					startedAt: 1000,
+				}),
+				makePlayEvent({
+					albumUri: "spotify:album:ok",
+					albumName: "OK Computer",
+					playedMs: 200,
+					startedAt: 2000,
+				}),
+				makePlayEvent({
+					albumUri: "spotify:album:kb",
+					albumName: "Kid A",
+					playedMs: 150,
+					startedAt: 3000,
+				}),
 			]);
 
 			const result = await provider.calculateStats(allTimePeriod);
@@ -173,14 +188,22 @@ describe("LocalProvider", () => {
 		});
 
 		it("calculateStats for 'today' period only includes events with startedAt within today boundaries", async () => {
-			const { start: todayStart, end: todayEnd } = todayPeriod.getBoundaries();
+			const { start: todayStart } = todayPeriod.getBoundaries();
 			// An event from yesterday (before today start)
 			await db.playEvents.add(
-				makePlayEvent({ trackUri: "spotify:track:yesterday", trackName: "Yesterday", startedAt: todayStart - 1 }),
+				makePlayEvent({
+					trackUri: "spotify:track:yesterday",
+					trackName: "Yesterday",
+					startedAt: todayStart - 1,
+				}),
 			);
 			// An event from today
 			await db.playEvents.add(
-				makePlayEvent({ trackUri: "spotify:track:today", trackName: "Today", startedAt: todayStart + 1 }),
+				makePlayEvent({
+					trackUri: "spotify:track:today",
+					trackName: "Today",
+					startedAt: todayStart + 1,
+				}),
 			);
 
 			const result = await provider.calculateStats(todayPeriod);
@@ -202,7 +225,19 @@ describe("LocalProvider", () => {
 
 		it("calculateStats checks statsCache first  -  returns cached data if hit", async () => {
 			const fakeStats: StatsResult = {
-				topTracks: [{ rank: 1, trackUri: "cached", trackName: "Cached Track", artistName: "Cached Artist", artistUri: "uri", albumName: "album", albumUri: "album-uri", count: 99, durationMs: 999 }],
+				topTracks: [
+					{
+						rank: 1,
+						trackUri: "cached",
+						trackName: "Cached Track",
+						artistName: "Cached Artist",
+						artistUri: "uri",
+						albumName: "album",
+						albumUri: "album-uri",
+						count: 99,
+						durationMs: 999,
+					},
+				],
 				topArtists: [],
 				topAlbums: [],
 				topGenres: [],
@@ -258,7 +293,9 @@ describe("LocalProvider", () => {
 
 		it("calculateStats calls enrichArtists with artist URIs from results", async () => {
 			const artistUri = "spotify:artist:enrich_me";
-			await db.playEvents.add(makePlayEvent({ artistUri, artistName: "Enrich Me", startedAt: 1000 }));
+			await db.playEvents.add(
+				makePlayEvent({ artistUri, artistName: "Enrich Me", startedAt: 1000 }),
+			);
 
 			await provider.calculateStats(allTimePeriod);
 
@@ -269,7 +306,9 @@ describe("LocalProvider", () => {
 
 		it("topGenres populated from db.artists enrichment data", async () => {
 			const artistUri = "spotify:artist:genretest";
-			await db.playEvents.add(makePlayEvent({ artistUri, artistName: "Genre Test", startedAt: 1000 }));
+			await db.playEvents.add(
+				makePlayEvent({ artistUri, artistName: "Genre Test", startedAt: 1000 }),
+			);
 
 			// Pre-populate db.artists with genre data (simulating already-enriched)
 			await db.artists.put({
@@ -373,89 +412,89 @@ describe("LocalProvider", () => {
 		});
 	});
 
-		describe("streak computation", () => {
-			it("returns streak=5 when events exist on 5 consecutive days ending today", async () => {
-				// today = April 1, yesterday = March 31, ..., 4 days ago = March 28
-				// Use local midnight + 12h for each day
-				await db.playEvents.bulkAdd([
-					makePlayEvent({ startedAt: new Date(2026, 3, 1, 12, 0, 0).getTime() }),  // today
-					makePlayEvent({ startedAt: new Date(2026, 2, 31, 12, 0, 0).getTime() }), // yesterday
-					makePlayEvent({ startedAt: new Date(2026, 2, 30, 12, 0, 0).getTime() }), // 2 days ago
-					makePlayEvent({ startedAt: new Date(2026, 2, 29, 12, 0, 0).getTime() }), // 3 days ago
-					makePlayEvent({ startedAt: new Date(2026, 2, 28, 12, 0, 0).getTime() }), // 4 days ago
-				]);
+	describe("streak computation", () => {
+		it("returns streak=5 when events exist on 5 consecutive days ending today", async () => {
+			// today = April 1, yesterday = March 31, ..., 4 days ago = March 28
+			// Use local midnight + 12h for each day
+			await db.playEvents.bulkAdd([
+				makePlayEvent({ startedAt: new Date(2026, 3, 1, 12, 0, 0).getTime() }), // today
+				makePlayEvent({ startedAt: new Date(2026, 2, 31, 12, 0, 0).getTime() }), // yesterday
+				makePlayEvent({ startedAt: new Date(2026, 2, 30, 12, 0, 0).getTime() }), // 2 days ago
+				makePlayEvent({ startedAt: new Date(2026, 2, 29, 12, 0, 0).getTime() }), // 3 days ago
+				makePlayEvent({ startedAt: new Date(2026, 2, 28, 12, 0, 0).getTime() }), // 4 days ago
+			]);
 
-				const result = await provider.calculateStats(allTimePeriod);
-				expect(result.streak).toBe(5);
-			});
-
-			it("returns streak=5 with grace period  -  events on 5 consecutive days ending yesterday, none today", async () => {
-				// No event today, events from yesterday through 5 days ago
-				await db.playEvents.bulkAdd([
-					makePlayEvent({ startedAt: new Date(2026, 2, 31, 12, 0, 0).getTime() }), // yesterday
-					makePlayEvent({ startedAt: new Date(2026, 2, 30, 12, 0, 0).getTime() }), // 2 days ago
-					makePlayEvent({ startedAt: new Date(2026, 2, 29, 12, 0, 0).getTime() }), // 3 days ago
-					makePlayEvent({ startedAt: new Date(2026, 2, 28, 12, 0, 0).getTime() }), // 4 days ago
-					makePlayEvent({ startedAt: new Date(2026, 2, 27, 12, 0, 0).getTime() }), // 5 days ago
-				]);
-
-				const result = await provider.calculateStats(allTimePeriod);
-				expect(result.streak).toBe(5);
-			});
-
-			it("returns streak=0 when no play events exist (displays as em dash)", async () => {
-				// Empty DB
-				const result = await provider.calculateStats(allTimePeriod);
-				expect(result.streak).toBe(0);
-			});
-
-			it("returns streak=1 when only today has a play event", async () => {
-				await db.playEvents.add(
-					makePlayEvent({ startedAt: new Date(2026, 3, 1, 12, 0, 0).getTime() }),
-				);
-
-				const result = await provider.calculateStats(allTimePeriod);
-				expect(result.streak).toBe(1);
-			});
-
-			it("returns streak=0 when last play was 2+ days ago (grace period expired)", async () => {
-				// Event only 3 days ago  -  no event yesterday or today
-				await db.playEvents.add(
-					makePlayEvent({ startedAt: new Date(2026, 2, 29, 12, 0, 0).getTime() }),
-				);
-
-				const result = await provider.calculateStats(allTimePeriod);
-				expect(result.streak).toBe(0);
-			});
-
-			it("streak uses local timezone day boundaries, not UTC", async () => {
-				// Event at 11:30 PM local time  -  this must count as "today" in local TZ
-				// Using new Date(2026, 3, 1, 23, 30, 0) which is local timezone aware
-				await db.playEvents.add(
-					makePlayEvent({ startedAt: new Date(2026, 3, 1, 23, 30, 0).getTime() }),
-				);
-
-				const result = await provider.calculateStats(allTimePeriod);
-				// The 11:30 PM event should count as today, giving streak of 1
-				expect(result.streak).toBeGreaterThanOrEqual(1);
-			});
-
-			it("streak is period-independent  -  same value regardless of period argument", async () => {
-				// Insert events for 3 consecutive days
-				await db.playEvents.bulkAdd([
-					makePlayEvent({ startedAt: new Date(2026, 3, 1, 12, 0, 0).getTime() }),  // today
-					makePlayEvent({ startedAt: new Date(2026, 2, 31, 12, 0, 0).getTime() }), // yesterday
-					makePlayEvent({ startedAt: new Date(2026, 2, 30, 12, 0, 0).getTime() }), // 2 days ago
-				]);
-
-				const todayResult = await provider.calculateStats(todayPeriod);
-				statsCache.invalidate(); // clear cache so allTime recomputes
-				const allTimeResult = await provider.calculateStats(allTimePeriod);
-
-				expect(todayResult.streak).toBe(3);
-				expect(allTimeResult.streak).toBe(3);
-			});
+			const result = await provider.calculateStats(allTimePeriod);
+			expect(result.streak).toBe(5);
 		});
+
+		it("returns streak=5 with grace period  -  events on 5 consecutive days ending yesterday, none today", async () => {
+			// No event today, events from yesterday through 5 days ago
+			await db.playEvents.bulkAdd([
+				makePlayEvent({ startedAt: new Date(2026, 2, 31, 12, 0, 0).getTime() }), // yesterday
+				makePlayEvent({ startedAt: new Date(2026, 2, 30, 12, 0, 0).getTime() }), // 2 days ago
+				makePlayEvent({ startedAt: new Date(2026, 2, 29, 12, 0, 0).getTime() }), // 3 days ago
+				makePlayEvent({ startedAt: new Date(2026, 2, 28, 12, 0, 0).getTime() }), // 4 days ago
+				makePlayEvent({ startedAt: new Date(2026, 2, 27, 12, 0, 0).getTime() }), // 5 days ago
+			]);
+
+			const result = await provider.calculateStats(allTimePeriod);
+			expect(result.streak).toBe(5);
+		});
+
+		it("returns streak=0 when no play events exist (displays as em dash)", async () => {
+			// Empty DB
+			const result = await provider.calculateStats(allTimePeriod);
+			expect(result.streak).toBe(0);
+		});
+
+		it("returns streak=1 when only today has a play event", async () => {
+			await db.playEvents.add(
+				makePlayEvent({ startedAt: new Date(2026, 3, 1, 12, 0, 0).getTime() }),
+			);
+
+			const result = await provider.calculateStats(allTimePeriod);
+			expect(result.streak).toBe(1);
+		});
+
+		it("returns streak=0 when last play was 2+ days ago (grace period expired)", async () => {
+			// Event only 3 days ago  -  no event yesterday or today
+			await db.playEvents.add(
+				makePlayEvent({ startedAt: new Date(2026, 2, 29, 12, 0, 0).getTime() }),
+			);
+
+			const result = await provider.calculateStats(allTimePeriod);
+			expect(result.streak).toBe(0);
+		});
+
+		it("streak uses local timezone day boundaries, not UTC", async () => {
+			// Event at 11:30 PM local time  -  this must count as "today" in local TZ
+			// Using new Date(2026, 3, 1, 23, 30, 0) which is local timezone aware
+			await db.playEvents.add(
+				makePlayEvent({ startedAt: new Date(2026, 3, 1, 23, 30, 0).getTime() }),
+			);
+
+			const result = await provider.calculateStats(allTimePeriod);
+			// The 11:30 PM event should count as today, giving streak of 1
+			expect(result.streak).toBeGreaterThanOrEqual(1);
+		});
+
+		it("streak is period-independent  -  same value regardless of period argument", async () => {
+			// Insert events for 3 consecutive days
+			await db.playEvents.bulkAdd([
+				makePlayEvent({ startedAt: new Date(2026, 3, 1, 12, 0, 0).getTime() }), // today
+				makePlayEvent({ startedAt: new Date(2026, 2, 31, 12, 0, 0).getTime() }), // yesterday
+				makePlayEvent({ startedAt: new Date(2026, 2, 30, 12, 0, 0).getTime() }), // 2 days ago
+			]);
+
+			const todayResult = await provider.calculateStats(todayPeriod);
+			statsCache.invalidate(); // clear cache so allTime recomputes
+			const allTimeResult = await provider.calculateStats(allTimePeriod);
+
+			expect(todayResult.streak).toBe(3);
+			expect(allTimeResult.streak).toBe(3);
+		});
+	});
 
 	it("computes newArtistCount as set difference vs prior window", async () => {
 		// thisWeekPeriod boundaries (relative to 2026-04-01 14:00 UTC system time)
@@ -465,13 +504,43 @@ describe("LocalProvider", () => {
 
 		await db.playEvents.bulkAdd([
 			// Prior period: artists A, B
-			makePlayEvent({ artistUri: "spotify:artist:A", artistName: "A", startedAt: priorStart + 1000, playedMs: 200_000 }),
-			makePlayEvent({ artistUri: "spotify:artist:A", artistName: "A", startedAt: priorStart + 2000, playedMs: 180_000 }),
-			makePlayEvent({ artistUri: "spotify:artist:B", artistName: "B", startedAt: priorStart + 3000, playedMs: 150_000 }),
+			makePlayEvent({
+				artistUri: "spotify:artist:A",
+				artistName: "A",
+				startedAt: priorStart + 1000,
+				playedMs: 200_000,
+			}),
+			makePlayEvent({
+				artistUri: "spotify:artist:A",
+				artistName: "A",
+				startedAt: priorStart + 2000,
+				playedMs: 180_000,
+			}),
+			makePlayEvent({
+				artistUri: "spotify:artist:B",
+				artistName: "B",
+				startedAt: priorStart + 3000,
+				playedMs: 150_000,
+			}),
 			// Current period: artists B (returning), C, D (new)
-			makePlayEvent({ artistUri: "spotify:artist:B", artistName: "B", startedAt: curStart + 1000, playedMs: 100_000 }),
-			makePlayEvent({ artistUri: "spotify:artist:C", artistName: "C", startedAt: curStart + 2000, playedMs: 220_000 }),
-			makePlayEvent({ artistUri: "spotify:artist:D", artistName: "D", startedAt: curStart + 3000, playedMs: 175_000 }),
+			makePlayEvent({
+				artistUri: "spotify:artist:B",
+				artistName: "B",
+				startedAt: curStart + 1000,
+				playedMs: 100_000,
+			}),
+			makePlayEvent({
+				artistUri: "spotify:artist:C",
+				artistName: "C",
+				startedAt: curStart + 2000,
+				playedMs: 220_000,
+			}),
+			makePlayEvent({
+				artistUri: "spotify:artist:D",
+				artistName: "D",
+				startedAt: curStart + 3000,
+				playedMs: 175_000,
+			}),
 		]);
 
 		const result = await provider.calculateStats(thisWeekPeriod);

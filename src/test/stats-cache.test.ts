@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EVENTS } from "../shared/constants/events";
-import { StatsCache, statsCache } from "../shared/stats/stats-cache";
-import type { StatsResult } from "../shared/types/stats";
 import type { ProviderInfo, StatsProvider } from "../shared/stats/provider";
 import { ProviderRegistry } from "../shared/stats/provider";
+import { StatsCache, statsCache } from "../shared/stats/stats-cache";
+import type { StatsResult } from "../shared/types/stats";
 
 const makeMockStats = (): StatsResult => ({
 	topTracks: [],
@@ -13,6 +13,11 @@ const makeMockStats = (): StatsResult => ({
 	totalPlays: 42,
 	totalDuration: 12345,
 	recentPlays: [],
+	hourlyDistribution: Array(24).fill(0),
+	peakHour: 0,
+	skipRate: 0,
+	uniqueTrackCount: 0,
+	uniqueArtistCount: 0,
 });
 
 describe("StatsCache", () => {
@@ -128,7 +133,9 @@ describe("StatsProvider interface (type-level checks)", () => {
 
 	it("ProviderRegistry setActive throws when provider not registered", () => {
 		const registry = new ProviderRegistry();
-		expect(() => registry.setActive("nonexistent")).toThrow('Provider "nonexistent" not registered');
+		expect(() => registry.setActive("nonexistent")).toThrow(
+			'Provider "nonexistent" not registered',
+		);
 	});
 
 	it("ProviderRegistry getAll returns ProviderInfo for all registered providers", () => {

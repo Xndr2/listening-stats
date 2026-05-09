@@ -21,18 +21,26 @@ const ALL_SECTIONS: SectionConfig[] = [
 ];
 
 const LOCAL_TILES: readonly string[] = [
-	"tracks", "unique-artists", "streak", "new-artists",
-	"peak-hour", "skip-rate", "est-payout",
+	"tracks",
+	"unique-artists",
+	"streak",
+	"new-artists",
+	"peak-hour",
+	"skip-rate",
+	"est-payout",
 ];
 
 const STATSFM_TILES: readonly string[] = [
-	"unique-artists", "new-artists", "top-genre", "est-payout",
+	"unique-artists",
+	"new-artists",
+	"top-genre",
+	"est-payout",
 ];
 
 const TILE_LABELS: Record<string, string> = {
-	"tracks": "Tracks",
+	tracks: "Tracks",
 	"unique-artists": "Unique Artists",
-	"streak": "Streak",
+	streak: "Streak",
 	"new-artists": "New Artists",
 	"peak-hour": "Peak Hour",
 	"skip-rate": "Skip Rate",

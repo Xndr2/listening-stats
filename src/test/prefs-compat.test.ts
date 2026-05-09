@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+	getActivityMode,
+	getOverviewTilesForProvider,
+	getSectionsForProvider,
+} from "../app/capabilities";
+import {
 	COLUMN_IDS,
+	getPreferences,
 	OVERVIEW_CARD_IDS,
 	SECTION_IDS,
-	getPreferences,
 	setPreference,
 } from "../app/preferences";
-import {
-	getSectionsForProvider,
-	getOverviewTilesForProvider,
-	getActivityMode,
-} from "../app/capabilities";
 import type { ProviderCapabilities } from "../shared/stats/provider";
 
 const localCaps: ProviderCapabilities = {
@@ -143,7 +143,15 @@ describe("Preference migration/compat  -  pre-redesign preferences survive in re
 	});
 
 	it("v2.5 prefs with custom overviewOrder survive redesign", () => {
-		const customLocal = ["est-payout", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "skip-rate"];
+		const customLocal = [
+			"est-payout",
+			"tracks",
+			"unique-artists",
+			"streak",
+			"new-artists",
+			"peak-hour",
+			"skip-rate",
+		];
 		const customStatsfm = ["top-genre", "unique-artists", "new-artists", "est-payout"];
 		localStorage.setItem(
 			"listening-stats:preferences",
@@ -155,11 +163,24 @@ describe("Preference migration/compat  -  pre-redesign preferences survive in re
 	});
 
 	it("prefs written via setPreference then read back are stable across round-trip", () => {
-		setPreference("sectionOrder", ["top-lists", "overview", "recently-played", "top-genres", "activity"]);
+		setPreference("sectionOrder", [
+			"top-lists",
+			"overview",
+			"recently-played",
+			"top-genres",
+			"activity",
+		]);
 		setPreference("hiddenSections", ["overview"]);
 		setPreference("use24HourTime", true);
 		const prefs = getPreferences();
-		expect(prefs.sectionOrder).toEqual(["top-lists", "overview", "recently-played", "top-genres", "activity", "consistency"]);
+		expect(prefs.sectionOrder).toEqual([
+			"top-lists",
+			"overview",
+			"recently-played",
+			"top-genres",
+			"activity",
+			"consistency",
+		]);
 		expect(prefs.hiddenSections).toEqual(["overview"]);
 		expect(prefs.use24HourTime).toBe(true);
 		expect(prefs.overviewOrder.local).toEqual([...OVERVIEW_CARD_IDS.local]);
@@ -176,7 +197,15 @@ describe("Preference migration/compat  -  capability + prefs integration for pro
 	});
 
 	it("switching from local to statsfm: overviewOrder.statsfm is independent of local", () => {
-		const customLocal = ["skip-rate", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "est-payout"];
+		const customLocal = [
+			"skip-rate",
+			"tracks",
+			"unique-artists",
+			"streak",
+			"new-artists",
+			"peak-hour",
+			"est-payout",
+		];
 		setPreference("overviewOrder", {
 			local: customLocal,
 			statsfm: [...OVERVIEW_CARD_IDS.statsfm],

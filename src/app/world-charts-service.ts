@@ -1,16 +1,56 @@
-export type { WorldTrack, WorldScope, WorldWindow } from "../shared/types/world-charts";
-import type { WorldScope, WorldTrack, WorldWindow } from "../shared/types/world-charts";
-import { lastfmGetCharts, lastfmGetArtistCharts, type LastfmResult } from "../shared/api/lastfm-client";
-import { lastfmCache, chartCacheKey, artistCacheKey } from "../shared/api/lastfm-cache";
+export type { WorldScope, WorldTrack, WorldWindow } from "../shared/types/world-charts";
+
+import { artistCacheKey, chartCacheKey, lastfmCache } from "../shared/api/lastfm-cache";
+import {
+	type LastfmResult,
+	lastfmGetArtistCharts,
+	lastfmGetCharts,
+} from "../shared/api/lastfm-client";
 import { LS_KEYS } from "../shared/constants/storage-keys";
+import type { WorldScope, WorldTrack, WorldWindow } from "../shared/types/world-charts";
 
 export const WORLD_TRACKS: readonly WorldTrack[] = [
-	{ id: "w1", title: "Espresso", artist: "Sabrina Carpenter", country: "US", plays: "12.4M", delta: +2 },
-	{ id: "w2", title: "Beautiful Things", artist: "Benson Boone", country: "US", plays: "9.8M", delta: 0 },
+	{
+		id: "w1",
+		title: "Espresso",
+		artist: "Sabrina Carpenter",
+		country: "US",
+		plays: "12.4M",
+		delta: +2,
+	},
+	{
+		id: "w2",
+		title: "Beautiful Things",
+		artist: "Benson Boone",
+		country: "US",
+		plays: "9.8M",
+		delta: 0,
+	},
 	{ id: "w3", title: "Houdini", artist: "Dua Lipa", country: "GB", plays: "8.2M", delta: +5 },
-	{ id: "w4", title: "Lose Control", artist: "Teddy Swims", country: "US", plays: "7.9M", delta: -1 },
-	{ id: "w5", title: "Cruel Summer", artist: "Taylor Swift", country: "US", plays: "7.1M", delta: -3 },
-	{ id: "w6", title: "Stick Season", artist: "Noah Kahan", country: "US", plays: "6.4M", delta: +1 },
+	{
+		id: "w4",
+		title: "Lose Control",
+		artist: "Teddy Swims",
+		country: "US",
+		plays: "7.9M",
+		delta: -1,
+	},
+	{
+		id: "w5",
+		title: "Cruel Summer",
+		artist: "Taylor Swift",
+		country: "US",
+		plays: "7.1M",
+		delta: -3,
+	},
+	{
+		id: "w6",
+		title: "Stick Season",
+		artist: "Noah Kahan",
+		country: "US",
+		plays: "6.4M",
+		delta: +1,
+	},
 	{ id: "w7", title: "Bad Habit", artist: "Steve Lacy", country: "US", plays: "5.9M", delta: -2 },
 	{ id: "w8", title: "Pedro", artist: "Jaxomy & Agatino", country: "IT", plays: "5.3M", delta: +8 },
 ];
@@ -59,6 +99,9 @@ export function getChartsAsync(scope: WorldScope, window: WorldWindow): Promise<
 	return fetchWithCache(scope, window, WORLD_TRACKS, chartCacheKey, lastfmGetCharts);
 }
 
-export function getArtistChartsAsync(scope: WorldScope, window: WorldWindow): Promise<LastfmResult> {
+export function getArtistChartsAsync(
+	scope: WorldScope,
+	window: WorldWindow,
+): Promise<LastfmResult> {
 	return fetchWithCache(scope, window, WORLD_ARTISTS, artistCacheKey, lastfmGetArtistCharts);
 }

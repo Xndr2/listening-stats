@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LOCAL_PERIODS, getAdjacentPeriod, getPriorPeriodBoundaries } from "../shared/stats/periods";
+import {
+	getAdjacentPeriod,
+	getPriorPeriodBoundaries,
+	LOCAL_PERIODS,
+} from "../shared/stats/periods";
 import type { Period } from "../shared/types/stats";
 
 describe("Period boundary functions", () => {
@@ -28,6 +32,7 @@ describe("Period boundary functions", () => {
 
 		it("end is exactly start + 24 hours (next midnight)", () => {
 			const period = LOCAL_PERIODS.find((p) => p.id === "today");
+			expect(period).toBeDefined();
 			const { start, end } = period!.getBoundaries();
 			expect(end - start).toBe(24 * 60 * 60 * 1000);
 		});
@@ -37,6 +42,7 @@ describe("Period boundary functions", () => {
 		it("at Wednesday 2026-04-01 → start is Monday 2026-03-30 midnight", () => {
 			// 2026-04-01 is a Wednesday
 			const period = LOCAL_PERIODS.find((p) => p.id === "this-week");
+			expect(period).toBeDefined();
 			const { start } = period!.getBoundaries();
 			const startDate = new Date(start);
 			expect(startDate.getFullYear()).toBe(2026);
@@ -49,6 +55,7 @@ describe("Period boundary functions", () => {
 		it("at Monday 2026-03-30 → start is Monday 2026-03-30 midnight", () => {
 			vi.setSystemTime(new Date(2026, 2, 30, 9, 0, 0, 0)); // Monday March 30
 			const period = LOCAL_PERIODS.find((p) => p.id === "this-week");
+			expect(period).toBeDefined();
 			const { start } = period!.getBoundaries();
 			const startDate = new Date(start);
 			expect(startDate.getFullYear()).toBe(2026);
@@ -60,6 +67,7 @@ describe("Period boundary functions", () => {
 		it("at Sunday 2026-04-05 → start is Monday 2026-03-30 midnight", () => {
 			vi.setSystemTime(new Date(2026, 3, 5, 12, 0, 0, 0)); // Sunday April 5
 			const period = LOCAL_PERIODS.find((p) => p.id === "this-week");
+			expect(period).toBeDefined();
 			const { start } = period!.getBoundaries();
 			const startDate = new Date(start);
 			expect(startDate.getFullYear()).toBe(2026);
@@ -73,6 +81,7 @@ describe("Period boundary functions", () => {
 		it("at 2026-04-15 → start is April 1 midnight, end is May 1 midnight", () => {
 			vi.setSystemTime(new Date(2026, 3, 15, 10, 0, 0, 0));
 			const period = LOCAL_PERIODS.find((p) => p.id === "this-month");
+			expect(period).toBeDefined();
 			const { start, end } = period!.getBoundaries();
 			const startDate = new Date(start);
 			const endDate = new Date(end);
@@ -89,6 +98,7 @@ describe("Period boundary functions", () => {
 		it("at 2026-04-15 → start is October 1, 2025 midnight", () => {
 			vi.setSystemTime(new Date(2026, 3, 15, 10, 0, 0, 0));
 			const period = LOCAL_PERIODS.find((p) => p.id === "last-6-months");
+			expect(period).toBeDefined();
 			const { start } = period!.getBoundaries();
 			const startDate = new Date(start);
 			expect(startDate.getFullYear()).toBe(2025);
@@ -100,6 +110,7 @@ describe("Period boundary functions", () => {
 		it("end is next month 1st (May 1, 2026 midnight)", () => {
 			vi.setSystemTime(new Date(2026, 3, 15, 10, 0, 0, 0));
 			const period = LOCAL_PERIODS.find((p) => p.id === "last-6-months");
+			expect(period).toBeDefined();
 			const { end } = period!.getBoundaries();
 			const endDate = new Date(end);
 			expect(endDate.getFullYear()).toBe(2026);
@@ -112,6 +123,7 @@ describe("Period boundary functions", () => {
 	describe("getAllTimeBoundaries (via LOCAL_PERIODS[4])", () => {
 		it("start is 0, end is Number.MAX_SAFE_INTEGER", () => {
 			const period = LOCAL_PERIODS.find((p) => p.id === "all-time");
+			expect(period).toBeDefined();
 			const { start, end } = period!.getBoundaries();
 			expect(start).toBe(0);
 			expect(end).toBe(Number.MAX_SAFE_INTEGER);
@@ -139,13 +151,13 @@ describe("Period boundary functions", () => {
 		it("getAdjacentPeriod('today') returns 'this-week' period", () => {
 			const next = getAdjacentPeriod("today");
 			expect(next).not.toBeNull();
-			expect(next!.id).toBe("this-week");
+			expect(next?.id).toBe("this-week");
 		});
 
 		it("getAdjacentPeriod('this-week') returns 'this-month' period", () => {
 			const next = getAdjacentPeriod("this-week");
 			expect(next).not.toBeNull();
-			expect(next!.id).toBe("this-month");
+			expect(next?.id).toBe("this-month");
 		});
 
 		it("getAdjacentPeriod('all-time') returns null (no next period)", () => {
@@ -187,8 +199,8 @@ describe("getPriorPeriodBoundaries", () => {
 		const p = fakePeriod("4weeks", start, end);
 		const boundaries = getPriorPeriodBoundaries(p);
 		expect(boundaries).not.toBeNull();
-		expect(boundaries!.start).toBe(start - fourWeeksMs);
-		expect(boundaries!.end).toBe(start);
+		expect(boundaries?.start).toBe(start - fourWeeksMs);
+		expect(boundaries?.end).toBe(start);
 	});
 
 	it("returns null when prior start would be < 0", () => {

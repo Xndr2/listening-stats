@@ -1,13 +1,11 @@
-import { CircuitBreaker } from "./circuit-breaker";
-import { LS_KEYS } from "../constants/storage-keys";
 import { EVENTS } from "../constants/events";
+import { LS_KEYS } from "../constants/storage-keys";
 import type { SfmUserPublic } from "../types/statsfm";
+import { CircuitBreaker } from "./circuit-breaker";
 
 const BASE = "https://api.stats.fm/api/v1";
 
-export type SfmResult<T> =
-	| { ok: true; data: T }
-	| { ok: false; status: number; message: string };
+export type SfmResult<T> = { ok: true; data: T } | { ok: false; status: number; message: string };
 
 export interface StatsFmConfig {
 	username: string;
@@ -29,14 +27,18 @@ function readPreviousLastSuccessAt(): number | null {
 	try {
 		const raw = localStorage.getItem(LS_KEYS.STATSFM_HEALTH);
 		if (raw) return (JSON.parse(raw) as StatsFmHealthPayload).lastSuccessAt;
-	} catch { /* corrupted */ }
+	} catch {
+		/* corrupted */
+	}
 	return null;
 }
 
 function publishSfmHealth(payload: StatsFmHealthPayload): void {
 	try {
 		localStorage.setItem(LS_KEYS.STATSFM_HEALTH, JSON.stringify(payload));
-	} catch { /* storage full */ }
+	} catch {
+		/* storage full */
+	}
 	window.dispatchEvent(new CustomEvent(EVENTS.STATSFM_HEALTH_CHANGED, { detail: payload }));
 }
 
@@ -96,9 +98,10 @@ export async function sfmGet<T>(
 	} catch (err) {
 		clearTimeout(timeoutId);
 		sfmCircuitBreaker.recordFailure();
-		const errorMessage = (err instanceof Error || err instanceof DOMException) && err.name === "AbortError"
-			? "Request timed out after 10s"
-			: String(err);
+		const errorMessage =
+			(err instanceof Error || err instanceof DOMException) && err.name === "AbortError"
+				? "Request timed out after 10s"
+				: String(err);
 		publishSfmHealth({
 			lastFetchAt: Date.now(),
 			lastSuccessAt: readPreviousLastSuccessAt(),

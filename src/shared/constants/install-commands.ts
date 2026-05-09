@@ -1,6 +1,6 @@
 import { GITHUB_RAW_MAIN_BASE } from "./github-repo";
 
-/** One-liner: downloads `install.sh` from `main`, installs into Spicetify CustomApps, runs `spicetify apply`. */
+/** One-liner: installs Spicetify CLI if missing, then LS zip into CustomApps, then `spicetify apply`. */
 export const INSTALL_COMMAND_BASH = `curl -fsSL ${GITHUB_RAW_MAIN_BASE}/install.sh | bash`;
 
 /** One-liner for Windows PowerShell (same behavior as the bash script). */

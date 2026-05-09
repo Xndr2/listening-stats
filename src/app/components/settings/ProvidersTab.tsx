@@ -1,12 +1,12 @@
-import { validateUsername, type StatsFmConfig } from "../../../shared/api/statsfm-client";
-import { statsfmProvider } from "../../../shared/stats/statsfm-provider";
-import { providerRegistry } from "../../../shared/stats/provider";
-import type { ProviderRegistry } from "../../../shared/stats/provider";
-import { statsCache } from "../../../shared/stats/stats-cache";
-import { LS_KEYS } from "../../../shared/constants/storage-keys";
-import { EVENTS } from "../../../shared/constants/events";
-import { validateLastfmKey } from "../../../shared/api/lastfm-client";
 import { lastfmCache } from "../../../shared/api/lastfm-cache";
+import { validateLastfmKey } from "../../../shared/api/lastfm-client";
+import { type StatsFmConfig, validateUsername } from "../../../shared/api/statsfm-client";
+import { EVENTS } from "../../../shared/constants/events";
+import { LS_KEYS } from "../../../shared/constants/storage-keys";
+import type { ProviderRegistry } from "../../../shared/stats/provider";
+import { providerRegistry } from "../../../shared/stats/provider";
+import { statsCache } from "../../../shared/stats/stats-cache";
+import { statsfmProvider } from "../../../shared/stats/statsfm-provider";
 
 const { useState } = Spicetify.React;
 
@@ -68,8 +68,7 @@ export function ProvidersTab() {
 		const result = await validateUsername(username.trim());
 		if (!result.valid) {
 			setConnectError(
-				ERROR_MESSAGES[result.reason] ??
-					"Connection failed. Check the console for details.",
+				ERROR_MESSAGES[result.reason] ?? "Connection failed. Check the console for details.",
 			);
 			setPhase("error");
 			return;
@@ -112,8 +111,7 @@ export function ProvidersTab() {
 		const result = await validateUsername(config.username);
 		if (!result.valid) {
 			setRevalidateError(
-				ERROR_MESSAGES[result.reason] ??
-					"Validation failed. Check the console for details.",
+				ERROR_MESSAGES[result.reason] ?? "Validation failed. Check the console for details.",
 			);
 			setRevalidating(false);
 			return;
@@ -243,6 +241,7 @@ export function ProvidersTab() {
 							}}
 						/>
 						<button
+							type="button"
 							className="btn-primary"
 							onClick={handleConnect}
 							disabled={phase === "connecting"}
@@ -263,17 +262,14 @@ export function ProvidersTab() {
 			{phase === "connected" && config && (
 				<div className="provider-status-card">
 					<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-						<span style={{ color: "var(--spice-text)", fontWeight: 700 }}>
-							{config.username}
-						</span>
-						<span className={`tier-badge ${tierClass}`}>
-							{tierLabel}
-						</span>
+						<span style={{ color: "var(--spice-text)", fontWeight: 700 }}>{config.username}</span>
+						<span className={`tier-badge ${tierClass}`}>{tierLabel}</span>
 					</div>
 					<div className="settings-sublabel">
 						Connected since {new Date(config.connectedAt).toLocaleDateString()}
 					</div>
 					<button
+						type="button"
 						className="btn-secondary"
 						onClick={handleRevalidate}
 						disabled={revalidating}
@@ -293,6 +289,7 @@ export function ProvidersTab() {
 						</div>
 					)}
 					<button
+						type="button"
 						className="btn-destructive"
 						onClick={handleDisconnect}
 						aria-label="Disconnect stats.fm account"
@@ -316,10 +313,9 @@ export function ProvidersTab() {
 					<div role="status" style={{ color: "var(--spice-text)", fontWeight: 700 }}>
 						Connected
 					</div>
-					<div className="settings-sublabel">
-						Last.fm API key is configured and active.
-					</div>
+					<div className="settings-sublabel">Last.fm API key is configured and active.</div>
 					<button
+						type="button"
 						className="btn-destructive"
 						onClick={handleLastfmDisconnect}
 						style={{ marginTop: "8px", alignSelf: "flex-start" }}
@@ -351,6 +347,7 @@ export function ProvidersTab() {
 							}}
 						/>
 						<button
+							type="button"
 							className="btn-primary"
 							onClick={handleLastfmTest}
 							disabled={lastfmPhase === "testing" || !lastfmKey.trim()}

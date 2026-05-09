@@ -1,4 +1,4 @@
-import { TOUR_STEPS, type TargetRect, type TourStep } from "../tour";
+import { type TargetRect, TOUR_STEPS, type TourStep } from "../tour";
 
 const { useRef, useLayoutEffect, useState } = Spicetify.React;
 
@@ -41,7 +41,14 @@ export function computeStyle(rect: TargetRect, popoverHeight: number): React.CSS
 	};
 }
 
-export function TourPopover({ step, steps = TOUR_STEPS, onNext, onBack, onSkip, targetRect }: TourPopoverProps) {
+export function TourPopover({
+	step,
+	steps = TOUR_STEPS,
+	onNext,
+	onBack,
+	onSkip,
+	targetRect,
+}: TourPopoverProps) {
 	const ref = useRef<HTMLDivElement>(null);
 	const [style, setStyle] = useState<React.CSSProperties | undefined>(undefined);
 	const currentStep = steps[step];
@@ -68,23 +75,20 @@ export function TourPopover({ step, steps = TOUR_STEPS, onNext, onBack, onSkip, 
 			<div className="tour-text">{currentStep.text}</div>
 			<div className="tour-footer">
 				{onBack ? (
-					<button className="tour-btn-back" onClick={onBack}>
+					<button type="button" className="tour-btn-back" onClick={onBack}>
 						Back
 					</button>
 				) : (
-					<button className="tour-btn-skip" onClick={onSkip}>
+					<button type="button" className="tour-btn-skip" onClick={onSkip}>
 						Skip
 					</button>
 				)}
 				<div className="tour-dots">
 					{steps.map((_, i) => (
-						<span
-							key={i}
-							className={`tour-dot${i === step ? " active" : ""}`}
-						/>
+						<span key={i} className={`tour-dot${i === step ? " active" : ""}`} />
 					))}
 				</div>
-				<button className="tour-btn-next" onClick={onNext}>
+				<button type="button" className="tour-btn-next" onClick={onNext}>
 					{isLast ? "Finish" : "Next"}
 				</button>
 			</div>

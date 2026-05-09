@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
 	formatDuration,
+	formatEstimatedPayout,
 	formatHour,
 	formatRelativeTime,
-	formatEstimatedPayout,
 } from "../app/format";
 
 describe("formatDuration", () => {

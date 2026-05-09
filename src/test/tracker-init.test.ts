@@ -528,9 +528,7 @@ describe("tracker/index integrity and versionchange wiring", () => {
 		const { initTracker } = await import("../extension/tracker/index");
 		await initTracker();
 
-		expect(recordFailureSpy).toHaveBeenCalledWith(
-			"Data was wiped externally and no backup exists",
-		);
+		expect(recordFailureSpy).toHaveBeenCalledWith("Data was wiped externally and no backup exists");
 	});
 
 	it("initTracker() registers versionchange handler that calls health.recordFailure with disconnected message", async () => {

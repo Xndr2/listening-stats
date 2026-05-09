@@ -283,10 +283,10 @@ describe("TopLists section headings", () => {
 		);
 		const tracksCard = container.querySelector('[data-column-id="top-tracks"]');
 		expect(tracksCard).not.toBeNull();
-		const heading = tracksCard!.querySelector(".section-heading");
+		const heading = tracksCard?.querySelector(".section-heading");
 		expect(heading).not.toBeNull();
-		expect(heading!.querySelector(".section-kicker")?.textContent).toBe("Most played");
-		expect(heading!.querySelector(".section-title")?.textContent).toBe("Tracks");
+		expect(heading?.querySelector(".section-kicker")?.textContent).toBe("Most played");
+		expect(heading?.querySelector(".section-title")?.textContent).toBe("Tracks");
 	});
 
 	it("Artists column renders section-heading with kicker 'Top' and title 'Artists'", async () => {
@@ -297,24 +297,36 @@ describe("TopLists section headings", () => {
 		);
 		const artistsCard = container.querySelector('[data-column-id="top-artists"]');
 		expect(artistsCard).not.toBeNull();
-		const heading = artistsCard!.querySelector(".section-heading");
+		const heading = artistsCard?.querySelector(".section-heading");
 		expect(heading).not.toBeNull();
-		expect(heading!.querySelector(".section-kicker")?.textContent).toBe("Top");
-		expect(heading!.querySelector(".section-title")?.textContent).toBe("Artists");
+		expect(heading?.querySelector(".section-kicker")?.textContent).toBe("Top");
+		expect(heading?.querySelector(".section-title")?.textContent).toBe("Artists");
 	});
 
 	it("Albums column renders section-heading with kicker 'Top' and title 'Albums'", async () => {
 		const { TopLists } = await import("../app/components/TopLists");
-		const stats = makeStats({ topAlbums: [{ rank: 1, albumUri: "spotify:album:AL1", albumName: "Album 1", artistName: "Artist 1", albumArt: undefined, count: 10, durationMs: 200000 }] });
+		const stats = makeStats({
+			topAlbums: [
+				{
+					rank: 1,
+					albumUri: "spotify:album:AL1",
+					albumName: "Album 1",
+					artistName: "Artist 1",
+					albumArt: undefined,
+					count: 10,
+					durationMs: 200000,
+				},
+			],
+		});
 		const { container } = render(
 			React.createElement(TopLists, { stats, loading: false, hiddenSections: [] }),
 		);
 		const albumsCard = container.querySelector('[data-column-id="top-albums"]');
 		expect(albumsCard).not.toBeNull();
-		const heading = albumsCard!.querySelector(".section-heading");
+		const heading = albumsCard?.querySelector(".section-heading");
 		expect(heading).not.toBeNull();
-		expect(heading!.querySelector(".section-kicker")?.textContent).toBe("Top");
-		expect(heading!.querySelector(".section-title")?.textContent).toBe("Albums");
+		expect(heading?.querySelector(".section-kicker")?.textContent).toBe("Top");
+		expect(heading?.querySelector(".section-title")?.textContent).toBe("Albums");
 	});
 });
 

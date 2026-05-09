@@ -11,6 +11,7 @@ export default function PeriodTabs({ periods, activePeriod, onPeriodChange }: Pe
 		<div className="period-tabs" role="tablist">
 			{periods.map((p) => (
 				<button
+					type="button"
 					key={p.id}
 					className={`period-tab ${p.id === activePeriod.id ? "active" : ""}`}
 					role="tab"

@@ -1,5 +1,5 @@
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { SortableRow } from "../app/components/settings/SortableRow";
 import { SortableTile } from "../app/components/settings/SortableTile";
 
@@ -14,7 +14,7 @@ describe("SortableRow", () => {
 				id: "overview",
 				label: "Overview",
 				dragHandleProps: { onPointerDown: noop as any },
-			})
+			}),
 		);
 		const row = document.querySelector(".sortable-row")!;
 		const children = Array.from(row.children);
@@ -29,7 +29,7 @@ describe("SortableRow", () => {
 				id: "overview",
 				label: "Overview",
 				dragHandleProps: { onPointerDown: noop as any },
-			})
+			}),
 		);
 		const handle = document.querySelector(".settings-drag-handle") as HTMLButtonElement;
 		expect(handle).toBeTruthy();
@@ -42,7 +42,7 @@ describe("SortableRow", () => {
 				id: "top-lists",
 				label: "Top Lists",
 				dragHandleProps: { onPointerDown: noop as any },
-			})
+			}),
 		);
 		const row = document.querySelector(".sortable-row") as HTMLElement;
 		expect(row.getAttribute("data-row-id")).toBe("top-lists");
@@ -54,7 +54,7 @@ describe("SortableRow", () => {
 				id: "overview",
 				label: "Overview",
 				dragHandleProps: { onPointerDown: noop as any },
-			})
+			}),
 		);
 		const handle = document.querySelector(".settings-drag-handle") as HTMLButtonElement;
 		expect(handle.innerHTML).toContain("<svg");
@@ -70,8 +70,8 @@ describe("SortableRow", () => {
 					label: "Overview",
 					dragHandleProps: { onPointerDown: handleSpy as any },
 				},
-				Spicetify.React.createElement("button", { className: "toggle-btn" }, "toggle")
-			)
+				Spicetify.React.createElement("button", { className: "toggle-btn" }, "toggle"),
+			),
 		);
 		const handle = document.querySelector(".settings-drag-handle") as HTMLButtonElement;
 		const toggle = document.querySelector(".toggle-btn") as HTMLButtonElement;
@@ -91,7 +91,7 @@ describe("SortableRow", () => {
 				label: "Overview",
 				dragHandleProps: { onPointerDown: noop as any },
 				style,
-			})
+			}),
 		);
 		const row = document.querySelector(".sortable-row") as HTMLElement;
 		expect(row.style.transform).toBe("translate3d(0, 20px, 0)");
@@ -111,8 +111,8 @@ describe("SortableTile", () => {
 					label: "Tracks",
 					tileDragProps: { onPointerDown: noop as any },
 				},
-				Spicetify.React.createElement("button", {}, "toggle")
-			)
+				Spicetify.React.createElement("button", {}, "toggle"),
+			),
 		);
 		const tile = document.querySelector(".sortable-tile") as HTMLElement;
 		expect(tile).toBeTruthy();
@@ -128,7 +128,7 @@ describe("SortableTile", () => {
 				id: "tracks",
 				label: "Tracks",
 				tileDragProps: { onPointerDown: tileSpy as any },
-			})
+			}),
 		);
 		const tile = document.querySelector(".sortable-tile") as HTMLElement;
 		fireEvent.pointerDown(tile);
@@ -145,8 +145,8 @@ describe("SortableTile", () => {
 					label: "Tracks",
 					tileDragProps: { onPointerDown: tileSpy as any },
 				},
-				Spicetify.React.createElement("button", { className: "toggle-inner" }, "toggle")
-			)
+				Spicetify.React.createElement("button", { className: "toggle-inner" }, "toggle"),
+			),
 		);
 		const toggleArea = document.querySelector(".sortable-tile-toggle") as HTMLElement;
 		fireEvent.pointerDown(toggleArea);
@@ -162,7 +162,7 @@ describe("SortableTile", () => {
 				label: "Tracks",
 				tileDragProps: { onPointerDown: noop as any },
 				style,
-			})
+			}),
 		);
 		const tile = document.querySelector(".sortable-tile") as HTMLElement;
 		expect(tile.style.transform).toBe("translate3d(30px, 0, 0)");

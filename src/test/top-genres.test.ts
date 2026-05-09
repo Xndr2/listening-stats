@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const mockGenres = [
 	{ rank: 1, genre: "pop", count: 200 },
@@ -29,7 +29,7 @@ describe("TopGenres component", () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container
+			container,
 		);
 		const card = container.querySelector(".section-card");
 		expect(card).not.toBeNull();
@@ -40,7 +40,7 @@ describe("TopGenres component", () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container
+			container,
 		);
 		const kicker = container.querySelector(".section-kicker");
 		expect(kicker?.textContent).toBe("Composition");
@@ -52,7 +52,7 @@ describe("TopGenres component", () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: [] }),
-			container
+			container,
 		);
 		expect(container.innerHTML).toBe("");
 	});
@@ -61,7 +61,7 @@ describe("TopGenres component", () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: manyGenres }),
-			container
+			container,
 		);
 		const rows = container.querySelectorAll(".top-genres-row");
 		expect(rows.length).toBe(6);
@@ -71,7 +71,7 @@ describe("TopGenres component", () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container
+			container,
 		);
 		const bars = container.querySelectorAll(".top-genres-bar");
 		expect(bars[0]?.classList.contains("peak")).toBe(true);
@@ -81,7 +81,7 @@ describe("TopGenres component", () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container
+			container,
 		);
 		const bars = container.querySelectorAll(".top-genres-bar");
 		expect(bars[1]?.classList.contains("peak")).toBe(false);
@@ -92,7 +92,7 @@ describe("TopGenres component", () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container
+			container,
 		);
 		const bars = container.querySelectorAll<HTMLElement>(".top-genres-bar");
 		expect(bars[0]?.style.width).toBe("100%");
@@ -102,7 +102,7 @@ describe("TopGenres component", () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container
+			container,
 		);
 		const bars = container.querySelectorAll<HTMLElement>(".top-genres-bar");
 		expect(bars[1]?.style.width).toBe("50%");
@@ -112,7 +112,7 @@ describe("TopGenres component", () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container
+			container,
 		);
 		const names = container.querySelectorAll(".top-genres-name");
 		const pcts = container.querySelectorAll(".top-genres-pct");
@@ -126,10 +126,12 @@ describe("TopGenres component", () => {
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, {
 				topGenres: mockGenres,
-				onGenreClick: (g: string) => { clicked = g; },
+				onGenreClick: (g: string) => {
+					clicked = g;
+				},
 				activeGenre: null,
 			}),
-			container
+			container,
 		);
 		const nameBtn = container.querySelector(".top-genres-name") as HTMLButtonElement;
 		nameBtn?.click();
@@ -144,7 +146,7 @@ describe("TopGenres component", () => {
 				onGenreClick: () => {},
 				activeGenre: "pop",
 			}),
-			container
+			container,
 		);
 		const names = container.querySelectorAll(".top-genres-name");
 		expect(names[0]?.classList.contains("top-genres-name--active")).toBe(true);

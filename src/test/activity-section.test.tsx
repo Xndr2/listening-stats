@@ -1,5 +1,5 @@
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, cleanup, fireEvent } from "@testing-library/react";
 import { ActivitySection } from "../app/components/ActivitySection";
 import { ActivityChartSkeleton } from "../app/components/LoadingSkeleton";
 import { LS_KEYS } from "../shared/constants/storage-keys";
@@ -155,10 +155,12 @@ function renderActivityForTest(args: {
 		dailyPlayCounts?: Array<{ date: string; count: number }>;
 		streak?: number;
 	} | null;
-	activityCaps: {
-		hasActivityData: boolean;
-		hasStreakData: boolean;
-	} | undefined;
+	activityCaps:
+		| {
+				hasActivityData: boolean;
+				hasStreakData: boolean;
+		  }
+		| undefined;
 }): JSX.Element | null {
 	const { loading, stats, activityCaps } = args;
 	if (!activityCaps) return null;

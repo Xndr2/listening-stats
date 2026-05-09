@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 
 // Import everything we need to verify
 import type {
-	ArtistRecord,
 	ApiError,
+	ArtistRecord,
 	Period,
 	PeriodBoundaries,
 	RecentPlay,
@@ -30,6 +30,11 @@ describe("stats.ts type exports", () => {
 				totalPlays: 0,
 				totalDuration: 0,
 				recentPlays: [],
+				hourlyDistribution: Array(24).fill(0),
+				peakHour: 0,
+				skipRate: 0,
+				uniqueTrackCount: 0,
+				uniqueArtistCount: 0,
 			};
 			expect(result).toBeDefined();
 			expect(Array.isArray(result.topTracks)).toBe(true);

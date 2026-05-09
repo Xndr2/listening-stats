@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getPreferences, setPreference } from "../app/preferences";
 import {
 	getPlayThreshold,
 	isSkipRepeatsEnabled,
@@ -7,7 +8,6 @@ import {
 	setSkipRepeatsEnabled,
 	setTrackingPaused,
 } from "../extension/tracker/settings";
-import { getPreferences, setPreference } from "../app/preferences";
 import { StatsCache, statsCache } from "../shared/stats/stats-cache";
 
 describe("TrackingTab integration", () => {

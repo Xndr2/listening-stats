@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { providerRegistry } from "../shared/stats/provider";
 import { localProvider } from "../shared/stats/local-provider";
+import { providerRegistry } from "../shared/stats/provider";
 import { statsfmProvider } from "../shared/stats/statsfm-provider";
 import type { Period, StatsResult } from "../shared/types/stats";
 
@@ -13,11 +13,21 @@ const mockStats: StatsResult = {
 		artistUri: "spotify:artist:1",
 		albumName: "Album",
 		albumUri: "spotify:album:1",
-		albumArt: null,
+		albumArt: undefined,
 		count: 100 - i,
 		durationMs: 180000,
 	})),
-	topArtists: [{ rank: 1, artistUri: "spotify:artist:1", artistName: "Artist", count: 100, durationMs: 1000000, genres: ["indie"], imageUrl: null }],
+	topArtists: [
+		{
+			rank: 1,
+			artistUri: "spotify:artist:1",
+			artistName: "Artist",
+			count: 100,
+			durationMs: 1000000,
+			genres: ["indie"],
+			imageUrl: null,
+		},
+	],
 	topAlbums: [],
 	topGenres: [{ rank: 1, genre: "indie", count: 100 }],
 	totalPlays: 1000,
@@ -47,7 +57,11 @@ async function renderShareModal() {
 	document.body.appendChild(container);
 	const onClose = vi.fn();
 	Spicetify.ReactDOM.render(
-		Spicetify.React.createElement(ShareModal, { stats: mockStats, activePeriod: mockPeriod, onClose }),
+		Spicetify.React.createElement(ShareModal, {
+			stats: mockStats,
+			activePeriod: mockPeriod,
+			onClose,
+		}),
 		container,
 	);
 	return { container, onClose };
@@ -85,7 +99,7 @@ describe("ShareModal", () => {
 			font: "",
 			lineWidth: 1,
 		} as unknown as CanvasRenderingContext2D);
-		vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (cb: BlobCallback) {
+		vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((cb: BlobCallback) => {
 			cb(new Blob(["fake"], { type: "image/png" }));
 		});
 	});
@@ -99,8 +113,12 @@ describe("ShareModal", () => {
 	it("renders modal chrome and action buttons", async () => {
 		const { container } = await renderShareModal();
 		expect(document.querySelector(".share-modal")).toBeTruthy();
-		expect(document.querySelector("[data-testid='share-copy-btn']")?.textContent).toContain("Copy image");
-		expect(document.querySelector("[data-testid='share-download-btn']")?.textContent).toContain("Save PNG");
+		expect(document.querySelector("[data-testid='share-copy-btn']")?.textContent).toContain(
+			"Copy image",
+		);
+		expect(document.querySelector("[data-testid='share-download-btn']")?.textContent).toContain(
+			"Save PNG",
+		);
 		Spicetify.ReactDOM.unmountComponentAtNode(container);
 		container.remove();
 	});
@@ -116,7 +134,9 @@ describe("ShareModal", () => {
 
 	it("shows follow theme toggle", async () => {
 		const { container } = await renderShareModal();
-		const toggle = document.querySelector<HTMLInputElement>(".share-toggle-row input[type='checkbox']");
+		const toggle = document.querySelector<HTMLInputElement>(
+			".share-toggle-row input[type='checkbox']",
+		);
 		expect(toggle).toBeTruthy();
 		expect(toggle?.checked).toBe(false);
 		toggle?.click();
@@ -128,7 +148,9 @@ describe("ShareModal", () => {
 	it("hides streak variant for statsfm provider", async () => {
 		providerRegistry.setActive("statsfm");
 		const { container } = await renderShareModal();
-		const labels = Array.from(document.querySelectorAll(".share-variant-tab")).map((t) => t.textContent?.trim());
+		const labels = Array.from(document.querySelectorAll(".share-variant-tab")).map((t) =>
+			t.textContent?.trim(),
+		);
 		expect(labels).not.toContain("Streak");
 		Spicetify.ReactDOM.unmountComponentAtNode(container);
 		container.remove();

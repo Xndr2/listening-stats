@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mocks MUST come before any imports that reference these modules
 vi.mock("../shared/api/cosmos-async", () => ({
@@ -10,10 +10,10 @@ vi.mock("../shared/api/circuit-breaker", () => ({
 	},
 }));
 
-import { cosmosGet } from "../shared/api/cosmos-async";
 import { circuitBreaker } from "../shared/api/circuit-breaker";
-import { resolveImportedUris } from "../shared/storage/uri-resolver";
+import { cosmosGet } from "../shared/api/cosmos-async";
 import { db } from "../shared/storage/db";
+import { resolveImportedUris } from "../shared/storage/uri-resolver";
 import type { PlayEvent } from "../shared/types/play-event";
 
 const cosmosGetMock = vi.mocked(cosmosGet);
@@ -49,7 +49,7 @@ function makeSearchResponse(
 		albumId: string;
 		albumName: string;
 		imageUrl?: string;
-	}>
+	}>,
 ) {
 	return {
 		tracks: {
@@ -95,7 +95,7 @@ describe("resolveImportedUris", () => {
 				trackUri: "listening-stats:track:abc123",
 				trackName: "Test Track",
 				artistName: "Test Artist",
-			}) as PlayEvent
+			}) as PlayEvent,
 		);
 
 		cosmosGetMock.mockResolvedValueOnce({
@@ -130,7 +130,7 @@ describe("resolveImportedUris", () => {
 				trackUri: "listening-stats:track:abc123",
 				trackName: "Test Track",
 				artistName: "Test Artist",
-			}) as PlayEvent
+			}) as PlayEvent,
 		);
 
 		// Search returns tracks that do NOT match
@@ -201,7 +201,9 @@ describe("resolveImportedUris", () => {
 		const event2 = events.find((e) => e.trackUri === "listening-stats:track:uri2");
 		expect(event2).toBeDefined();
 		// Second event was never resolved (circuit stopped it)
-		expect(event2?.resolvedAt === null || event2?.resolvedAt === undefined || event2?.resolvedAt === 0).toBe(true);
+		expect(
+			event2?.resolvedAt === null || event2?.resolvedAt === undefined || event2?.resolvedAt === 0,
+		).toBe(true);
 	});
 
 	it("Test 5 (batch update - same synthetic URI): 3 events same URI results in 1 search, all updated", async () => {
@@ -250,7 +252,7 @@ describe("resolveImportedUris", () => {
 				trackName: "Already Resolved",
 				resolvedAt: now,
 				startedAt: 1700000000001,
-			}) as PlayEvent
+			}) as PlayEvent,
 		);
 		// One unresolved event
 		await db.playEvents.add(
@@ -259,7 +261,7 @@ describe("resolveImportedUris", () => {
 				trackName: "Not Yet Resolved",
 				resolvedAt: null,
 				startedAt: 1700000000002,
-			}) as PlayEvent
+			}) as PlayEvent,
 		);
 
 		cosmosGetMock.mockResolvedValueOnce({
@@ -287,7 +289,7 @@ describe("resolveImportedUris", () => {
 			makePlayEvent({
 				trackUri: "listening-stats:track:unresolvable",
 				resolvedAt: 0,
-			}) as PlayEvent
+			}) as PlayEvent,
 		);
 
 		await resolveImportedUris({ delayMs: 0 });
@@ -301,7 +303,7 @@ describe("resolveImportedUris", () => {
 				trackUri: "listening-stats:track:casetest",
 				trackName: "test track",
 				artistName: "test artist",
-			}) as PlayEvent
+			}) as PlayEvent,
 		);
 
 		// Search result has UPPERCASE casing
@@ -333,7 +335,7 @@ describe("resolveImportedUris", () => {
 				trackUri: "listening-stats:track:noart",
 				trackName: "Test Track",
 				artistName: "Test Artist",
-			}) as PlayEvent
+			}) as PlayEvent,
 		);
 
 		cosmosGetMock.mockResolvedValueOnce({
@@ -364,7 +366,7 @@ describe("resolveImportedUris", () => {
 				trackUri: "listening-stats:track:specialchars",
 				trackName: "Don't Stop Me Now",
 				artistName: "Queen",
-			}) as PlayEvent
+			}) as PlayEvent,
 		);
 
 		cosmosGetMock.mockResolvedValueOnce({
@@ -385,7 +387,7 @@ describe("resolveImportedUris", () => {
 
 		// Verify cosmosGet was called with encoded URL
 		expect(cosmosGetMock).toHaveBeenCalledWith(
-			expect.stringContaining(encodeURIComponent("Don't Stop Me Now"))
+			expect.stringContaining(encodeURIComponent("Don't Stop Me Now")),
 		);
 	});
 });

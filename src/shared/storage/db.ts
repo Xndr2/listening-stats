@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { ArtistRecord } from "../types/stats";
 import type { PlayEvent } from "../types/play-event";
+import type { ArtistRecord } from "../types/stats";
 
 let versionChangeCallback: (() => void) | undefined;
 

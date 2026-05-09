@@ -24,7 +24,7 @@ export default function EmptyState({ onOpenSettings }: EmptyStateProps) {
 			>
 				Play some tracks and check back. Make sure tracking is enabled in Settings.
 			</p>
-			<button className="btn-primary" onClick={onOpenSettings}>
+			<button type="button" className="btn-primary" onClick={onOpenSettings}>
 				Open Settings
 			</button>
 		</div>

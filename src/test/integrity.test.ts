@@ -1,9 +1,9 @@
 import Dexie from "dexie";
 import { afterEach, describe, expect, it } from "vitest";
+import { LS_KEYS } from "../shared/constants/storage-keys";
 import { backupToIdb } from "../shared/storage/backup";
 import { db } from "../shared/storage/db";
 import { runStartupChecks } from "../shared/storage/integrity";
-import { LS_KEYS } from "../shared/constants/storage-keys";
 import type { PlayEvent } from "../shared/types/play-event";
 
 function makeEvent(startedAt: number, trackUri = "spotify:track:abc123"): Omit<PlayEvent, "id"> {
@@ -96,13 +96,14 @@ describe("runStartupChecks", () => {
 		// Spy on db.playEvents.count to throw
 		const original = db.playEvents.count.bind(db.playEvents);
 		let threw = false;
-		db.playEvents.count = async () => {
+		const failingCount = async () => {
 			if (!threw) {
 				threw = true;
 				throw new Error("DB unavailable");
 			}
 			return original();
 		};
+		db.playEvents.count = failingCount as typeof db.playEvents.count;
 
 		const result = await runStartupChecks();
 		expect(result.ok).toBe(false);

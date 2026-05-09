@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { db } from "../shared/storage/db";
-import type { PlayEvent } from "../shared/types/play-event";
 import { LS_KEYS } from "../shared/constants/storage-keys";
-import { initDatabase, backupIfUpgradeNeeded } from "../shared/storage/migration-manager";
 import * as backup from "../shared/storage/backup";
+import { db } from "../shared/storage/db";
+import { backupIfUpgradeNeeded, initDatabase } from "../shared/storage/migration-manager";
+import type { PlayEvent } from "../shared/types/play-event";
 
 // Mock enrichArtists to avoid real API calls (same pattern as local-provider.test.ts)
 vi.mock("../shared/stats/artist-enrichment", () => ({
@@ -81,11 +81,7 @@ describe("v1 compatibility  -  COMPAT-01: opens v1 IDB without data loss", () =>
 	});
 
 	it("record count is preserved after db opens at version 5", async () => {
-		const v1Events = [
-			makeV1Event(1000),
-			makeV1Event(2000),
-			makeV1Event(3000),
-		];
+		const v1Events = [makeV1Event(1000), makeV1Event(2000), makeV1Event(3000)];
 		await db.playEvents.bulkAdd(v1Events as PlayEvent[]);
 
 		// initDatabase should not drop records or alter the count
@@ -110,9 +106,7 @@ describe("v1 compatibility  -  COMPAT-02: events preserved and accessible", () =
 
 	it("db.playEvents.toArray() returns all v1 events after initDatabase()", async () => {
 		const COUNT = 5;
-		const events = Array.from({ length: COUNT }, (_, i) =>
-			makeV1Event(1000 * (i + 1)),
-		);
+		const events = Array.from({ length: COUNT }, (_, i) => makeV1Event(1000 * (i + 1)));
 		await db.playEvents.bulkAdd(events as PlayEvent[]);
 
 		await initDatabase();
@@ -171,9 +165,7 @@ describe("v1 compatibility  -  COMPAT-03: missing type treated as play", () => {
 
 	it("LocalProvider.getStats() with v1 fixture data returns totalPlays equal to event count", async () => {
 		const COUNT = 4;
-		const v1Events = Array.from({ length: COUNT }, (_, i) =>
-			makeV1Event(1000 * (i + 1)),
-		);
+		const v1Events = Array.from({ length: COUNT }, (_, i) => makeV1Event(1000 * (i + 1)));
 		await db.playEvents.bulkAdd(v1Events as PlayEvent[]);
 
 		const provider = new LocalProvider();
@@ -184,11 +176,7 @@ describe("v1 compatibility  -  COMPAT-03: missing type treated as play", () => {
 	});
 
 	it("skipRate is 0 when all events lack the type field (v1 data only)", async () => {
-		const v1Events = [
-			makeV1Event(1000),
-			makeV1Event(2000),
-			makeV1Event(3000),
-		];
+		const v1Events = [makeV1Event(1000), makeV1Event(2000), makeV1Event(3000)];
 		await db.playEvents.bulkAdd(v1Events as PlayEvent[]);
 
 		const provider = new LocalProvider();
@@ -199,10 +187,7 @@ describe("v1 compatibility  -  COMPAT-03: missing type treated as play", () => {
 	});
 
 	it("filter e.type === 'skip' returns empty for v1-only data", async () => {
-		const v1Events = [
-			makeV1Event(1000),
-			makeV1Event(2000),
-		];
+		const v1Events = [makeV1Event(1000), makeV1Event(2000)];
 		await db.playEvents.bulkAdd(v1Events as PlayEvent[]);
 
 		const all = await db.playEvents.toArray();
@@ -237,9 +222,9 @@ describe("v1 compatibility migration retry flag", () => {
 		// Close db so initDatabase has work to do
 		db.close();
 
-		const openSpy = vi.spyOn(db, "open").mockRejectedValueOnce(
-			new Error("simulated upgrade failure"),
-		);
+		const openSpy = vi
+			.spyOn(db, "open")
+			.mockRejectedValueOnce(new Error("simulated upgrade failure"));
 
 		try {
 			await initDatabase();
@@ -265,13 +250,12 @@ describe("v1 compatibility migration retry flag", () => {
 		db.close();
 		let flagWasSetDuringOpen = false;
 
-		const openSpy = vi.spyOn(db, "open").mockImplementationOnce(async () => {
-			flagWasSetDuringOpen =
-				localStorage.getItem(LS_KEYS.MIGRATION_PENDING) === "1";
+		const openSpy = vi.spyOn(db, "open").mockImplementationOnce((async () => {
+			flagWasSetDuringOpen = localStorage.getItem(LS_KEYS.MIGRATION_PENDING) === "1";
 			// Call through to the real open (get the original)
 			openSpy.mockRestore();
 			return db.open();
-		});
+		}) as typeof db.open);
 
 		await initDatabase();
 
