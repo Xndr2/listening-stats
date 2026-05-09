@@ -1,182 +1,193 @@
-#!/bin/bash
-# Listening Stats - Spicetify CustomApp Installer for Linux/macOS
-# Usage: curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.sh | bash
+#!/usr/bin/env bash
+# Listening Stats  -  install or update for Spicetify (macOS / Linux).
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.sh | bash
+# Prerelease zip (newest GitHub release that includes listening-stats.zip):
+#   LISTENING_STATS_PRERELEASE=1 curl -fsSL … | bash
+#
+# Downloads listening-stats.zip from GitHub Releases (default: latest stable). With
+# LISTENING_STATS_PRERELEASE=1, uses the newest release that ships listening-stats.zip (may be a prerelease).
+# Requires jq or python3 for the prerelease path.
+#
+# Replaces CustomApps/listening-stats, runs spicetify apply, removes temp files.
 
-set -e
+set -euo pipefail
 
-# Config
-REPO_URL="https://github.com/Xndr2/listening-stats"
-APP_NAME="listening-stats"
+REPO_SLUG="Xndr2/listening-stats"
+MIN_ZIP_BYTES=2000
 
-# Colors
-RED='\e[0;31m'
-GREEN='\e[0;32m'
-YELLOW='\e[1;33m'
-CYAN='\e[0;36m'
-BOLD='\e[1m'
-NC='\e[0m'
-
-print_color() {
-    printf "%b%s%b\n" "$1" "$2" "$NC"
+resolve_zip_url() {
+	local slug="$1"
+	if [[ "${LISTENING_STATS_PRERELEASE:-}" == "1" ]]; then
+		local api_url="https://api.github.com/repos/${slug}/releases?per_page=20"
+		local json tag
+		json="$(curl -sSf -H "Accept: application/vnd.github+json" "${api_url}")" || {
+			echo "! Could not reach GitHub API (prerelease lookup)." >&2
+			exit 1
+		}
+		if command -v jq >/dev/null 2>&1; then
+			tag="$(printf '%s' "${json}" | jq -r '.[] | select((.assets // []) | map(.name) | index("listening-stats.zip")) | .tag_name' | head -n1)"
+		elif command -v python3 >/dev/null 2>&1; then
+			tag="$(printf '%s' "${json}" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+for r in data:
+    names = [a.get("name") for a in r.get("assets") or []]
+    if "listening-stats.zip" in names:
+        print(r["tag_name"])
+        break
+')"
+		else
+			echo "! LISTENING_STATS_PRERELEASE=1 requires jq or python3." >&2
+			exit 1
+		fi
+		[[ -n "${tag}" ]] || {
+			echo "! No GitHub release includes listening-stats.zip." >&2
+			exit 1
+		}
+		printf '%s\n' "https://github.com/${slug}/releases/download/${tag}/listening-stats.zip"
+	else
+		printf '%s\n' "https://github.com/${slug}/releases/latest/download/listening-stats.zip"
+	fi
 }
 
-print_status() {
-    printf "%s" "$1"
+if [[ -t 1 ]]; then
+	BOLD=$'\033[1m'
+	DIM=$'\033[2m'
+	GRN=$'\033[32m'
+	CYN=$'\033[36m'
+	YEL=$'\033[33m'
+	RST=$'\033[0m'
+else
+	BOLD="" DIM="" GRN="" CYN="" YEL="" RST=""
+fi
+
+rule() {
+	printf '%s\n' "${DIM}────────────────────────────────────────────────────────────────${RST}"
 }
 
-print_ok() {
-    printf " %b%s%b\n" "$GREEN" "OK" "$NC"
+banner() {
+	echo ""
+	rule
+	echo "${CYN}${BOLD}  Listening Stats${RST}  ${DIM}·${RST}  install / update"
+	echo "${DIM}  Spicetify custom app${RST}"
+	rule
+	echo ""
 }
 
-print_fail() {
-    printf " %b%s%b\n" "$RED" "FAILED" "$NC"
+step() {
+	echo "${GRN}${BOLD}▸${RST} ${BOLD}$1${RST}"
 }
+
+die() {
+	echo "${YEL}${BOLD}!${RST} $1" >&2
+	exit 1
+}
+
+ZIP_URL="$(resolve_zip_url "${REPO_SLUG}")"
+
+banner
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "${TMP_DIR}"' EXIT
+
+ZIP_PATH="${TMP_DIR}/listening-stats.zip"
+
+step "Downloading ${DIM}${ZIP_URL}${RST}"
+if command -v curl >/dev/null 2>&1; then
+	curl -fSL --progress-bar "${ZIP_URL}" -o "${ZIP_PATH}"
+else
+	die "curl not found. Install curl or download the zip manually from GitHub."
+fi
+
+SIZE="$(wc -c <"${ZIP_PATH}" | tr -d ' ')"
+if (( SIZE < MIN_ZIP_BYTES )); then
+	die "Download is too small (${SIZE} bytes)  -  expected a real release zip. Is ${ZIP_URL} valid?"
+fi
+
+step "Locating Spicetify CustomApps directory"
+CUSTOM_APPS=""
+if command -v spicetify >/dev/null 2>&1; then
+	# Prefer CLI custom-app root (matches where apply looks)
+	CUSTOM_APPS="$(spicetify -q -a path root 2>/dev/null || spicetify -a path root 2>/dev/null || true)"
+	CUSTOM_APPS="$(printf '%s' "${CUSTOM_APPS}" | head -1 | tr -d '\r')"
+	if [[ -z "${CUSTOM_APPS}" || ! -d "${CUSTOM_APPS}" ]]; then
+		USERDATA="$(spicetify -q path userdata 2>/dev/null || spicetify path userdata 2>/dev/null)"
+		USERDATA="$(printf '%s' "${USERDATA}" | tr -d '\r')"
+		if [[ -n "${USERDATA}" && -d "${USERDATA}" ]]; then
+			CUSTOM_APPS="${USERDATA}/CustomApps"
+		fi
+	fi
+fi
+if [[ -z "${CUSTOM_APPS}" ]]; then
+	if [[ "$(uname -s)" == "Darwin" ]]; then
+		for cand in "${HOME}/spicetify_data/CustomApps" "${HOME}/.config/spicetify/CustomApps"; do
+			if [[ -d "${cand}" ]]; then
+				CUSTOM_APPS="${cand}"
+				break
+			fi
+		done
+		[[ -n "${CUSTOM_APPS}" ]] || CUSTOM_APPS="${HOME}/spicetify_data/CustomApps"
+	else
+		CUSTOM_APPS="${HOME}/.config/spicetify/CustomApps"
+	fi
+fi
+
+TARGET="${CUSTOM_APPS}/listening-stats"
+echo "   ${DIM}→ ${TARGET}${RST}"
+
+EXTRACT="${TMP_DIR}/extract"
+rm -rf "${EXTRACT}"
+mkdir -p "${EXTRACT}"
+
+step "Extracting bundle"
+if ! unzip -q "${ZIP_PATH}" -d "${EXTRACT}"; then
+	die "unzip failed. Is unzip installed?"
+fi
+
+# Always install into CustomApps/listening-stats  -  never unpack loose files into CustomApps.
+mkdir -p "${CUSTOM_APPS}"
+rm -rf "${TARGET}"
+if [[ -d "${EXTRACT}/listening-stats" ]]; then
+	mv "${EXTRACT}/listening-stats" "${TARGET}"
+elif [[ -f "${EXTRACT}/manifest.json" || -f "${EXTRACT}/index.js" ]]; then
+	mkdir -p "${TARGET}"
+	shopt -s dotglob nullglob
+	for item in "${EXTRACT}"/*; do
+		[[ -e "${item}" ]] || continue
+		mv "${item}" "${TARGET}/"
+	done
+	shopt -u dotglob nullglob
+else
+	dir_count=0
+	sole_dir=""
+	for maybe in "${EXTRACT}"/*; do
+		[[ -d "${maybe}" ]] || continue
+		dir_count=$((dir_count + 1))
+		sole_dir="${maybe}"
+	done
+	if [[ "${dir_count}" -eq 1 && ( -f "${sole_dir}/manifest.json" || -f "${sole_dir}/index.js" ) ]]; then
+		mv "${sole_dir}" "${TARGET}"
+	else
+		die "Zip layout not recognized. Expected listening-stats/ in the zip, app files at zip root, or one top-level app folder."
+	fi
+fi
+
+if [[ ! -f "${TARGET}/manifest.json" ]]; then
+	die "Installed folder is missing manifest.json  -  zip may be wrong or corrupt."
+fi
+
+if ! command -v spicetify >/dev/null 2>&1; then
+	die "spicetify not found in PATH. Install Spicetify CLI, then run:
+   ${BOLD}spicetify config custom_apps listening-stats && spicetify apply${RST}"
+fi
+
+step "Applying Spicetify (${DIM}config + apply${RST})"
+spicetify config custom_apps listening-stats
+spicetify apply
 
 echo ""
-printf "%b" "$GREEN"
-echo "▗▖   ▗▄▄▄▖ ▗▄▄▖▗▄▄▄▖▗▄▄▄▖▗▖  ▗▖▗▄▄▄▖▗▖  ▗▖ ▗▄▄▖     ▗▄▄▖▗▄▄▄▖▗▄▖▗▄▄▄▖▗▄▄▖"
-echo "▐▌     █  ▐▌     █  ▐▌   ▐▛▚▖▐▌  █  ▐▛▚▖▐▌▐▌       ▐▌     █ ▐▌ ▐▌ █ ▐▌   "
-echo "▐▌     █   ▝▀▚▖  █  ▐▛▀▀▘▐▌ ▝▜▌  █  ▐▌ ▝▜▌▐▌▝▜▌     ▝▀▚▖  █ ▐▛▀▜▌ █  ▝▀▚▖"
-echo "▐▙▄▄▖▗▄█▄▖▗▄▄▞▘  █  ▐▙▄▄▖▐▌  ▐▌▗▄█▄▖▐▌  ▐▌▝▚▄▞▘    ▗▄▄▞▘  █ ▐▌ ▐▌ █ ▗▄▄▞▘"
-echo "                                                                         "
-printf "%b\n" "$NC"
-print_color "$CYAN" "Listening Stats Installer for Linux/macOS"
-echo ""
-
-# Check if Spicetify is installed
-print_status "Checking for Spicetify..."
-if ! command -v spicetify &> /dev/null; then
-    print_fail
-    echo ""
-    print_color "$YELLOW" "Spicetify is not installed. Please install it first:"
-    print_color "$CYAN" "curl -fsSL https://raw.githubusercontent.com/spicetify/cli/main/install.sh | sh"
-    echo ""
-    exit 1
-fi
-
-SPICETIFY_VERSION=$(spicetify -v 2>/dev/null || echo "unknown")
-printf " %bv%s%b\n" "$GREEN" "$SPICETIFY_VERSION" "$NC"
-
-# Get Spicetify config directory
-print_status "Getting Spicetify config directory..."
-SPICETIFY_CONFIG=""
-
-# Try to get from spicetify command
-if command -v spicetify &> /dev/null; then
-    SPICETIFY_CONFIG=$(spicetify path userdata 2>/dev/null || echo "")
-fi
-
-# Fallback to common locations
-if [ -z "$SPICETIFY_CONFIG" ] || [ ! -d "$SPICETIFY_CONFIG" ]; then
-    if [ -d "$HOME/.config/spicetify" ]; then
-        SPICETIFY_CONFIG="$HOME/.config/spicetify"
-    elif [ -d "$HOME/.spicetify" ]; then
-        SPICETIFY_CONFIG="$HOME/.spicetify"
-    elif [ -n "$XDG_CONFIG_HOME" ] && [ -d "$XDG_CONFIG_HOME/spicetify" ]; then
-        SPICETIFY_CONFIG="$XDG_CONFIG_HOME/spicetify"
-    else
-        SPICETIFY_CONFIG="$HOME/.config/spicetify"
-    fi
-fi
-
-print_ok
-printf "  → %s\n" "$SPICETIFY_CONFIG"
-
-CUSTOM_APPS_PATH="$SPICETIFY_CONFIG/CustomApps"
-APP_PATH="$CUSTOM_APPS_PATH/$APP_NAME"
-
-# Create CustomApps directory if needed
-if [ ! -d "$CUSTOM_APPS_PATH" ]; then
-    print_status "Creating CustomApps directory..."
-    mkdir -p "$CUSTOM_APPS_PATH"
-    print_ok
-fi
-
-# Remove old installation
-if [ -d "$APP_PATH" ]; then
-    print_status "Removing old installation..."
-    rm -rf "$APP_PATH"
-    print_ok
-fi
-
-# Download latest release
-print_color "$CYAN" "Downloading latest release..."
-TEMP_ZIP="/tmp/$APP_NAME.zip"
-DOWNLOAD_URL="$REPO_URL/releases/latest/download/listening-stats.zip"
-
-if command -v curl &> /dev/null; then
-    DOWNLOAD_CMD="curl -fsSL"
-elif command -v wget &> /dev/null; then
-    DOWNLOAD_CMD="wget -qO-"
-else
-    print_color "$RED" "Error: curl or wget is required"
-    exit 1
-fi
-
-# Try releases first
-if ! $DOWNLOAD_CMD "$DOWNLOAD_URL" > "$TEMP_ZIP" 2>/dev/null; then
-    print_color "$YELLOW" "Release not found, trying dist branch..."
-    ALT_URL="$REPO_URL/archive/refs/heads/dist.zip"
-    if ! $DOWNLOAD_CMD "$ALT_URL" > "$TEMP_ZIP" 2>/dev/null; then
-        print_color "$RED" "Download failed"
-        exit 1
-    fi
-fi
-
-print_color "$GREEN" "Download complete!"
-
-# Extract and install
-print_status "Installing..."
-TEMP_EXTRACT="/tmp/$APP_NAME-extract"
-rm -rf "$TEMP_EXTRACT"
-mkdir -p "$TEMP_EXTRACT"
-
-if command -v unzip &> /dev/null; then
-    unzip -q "$TEMP_ZIP" -d "$TEMP_EXTRACT"
-else
-    print_color "$RED" "Error: unzip is required"
-    exit 1
-fi
-
-# Find the actual content (might be nested in a directory)
-SOURCE_DIR="$TEMP_EXTRACT"
-if [ -f "$TEMP_EXTRACT/manifest.json" ]; then
-    SOURCE_DIR="$TEMP_EXTRACT"
-else
-    # Check for nested directory
-    NESTED=$(find "$TEMP_EXTRACT" -maxdepth 1 -type d ! -path "$TEMP_EXTRACT" | head -1)
-    if [ -n "$NESTED" ] && [ -f "$NESTED/manifest.json" ]; then
-        SOURCE_DIR="$NESTED"
-    fi
-fi
-
-# Create app directory and copy files
-mkdir -p "$APP_PATH"
-cp -r "$SOURCE_DIR"/* "$APP_PATH/"
-
-# Cleanup
-rm -f "$TEMP_ZIP"
-rm -rf "$TEMP_EXTRACT"
-
-print_ok
-
-# Configure Spicetify
-print_status "Configuring Spicetify..."
-spicetify config custom_apps "$APP_NAME" 2>/dev/null || true
-print_ok
-
-# Apply changes
-print_color "$CYAN" "Applying changes..."
-if spicetify apply; then
-    echo ""
-    print_color "$GREEN" "✓ Listening Stats installed successfully!"
-    echo ""
-    print_color "$BOLD" "Restart Spotify if it was running."
-    print_color "$CYAN" "You will find Listening Stats in the sidebar."
-else
-    echo ""
-    print_color "$YELLOW" "Could not apply automatically. Try running:"
-    print_color "$CYAN" "  spicetify apply"
-fi
-
+rule
+echo "${GRN}${BOLD}Done.${RST}  Restart Spotify if the app does not pick up changes."
+rule
 echo ""
