@@ -30,9 +30,7 @@ jobs:
       - name: Create release zip
         run: |
           mkdir -p release/listening-stats
-          cp dist/extension.js release/listening-stats/
-          cp dist/index.js release/listening-stats/
-          cp manifest.json release/listening-stats/
+          cp dist/extension.js dist/index.js dist/manifest.json release/listening-stats/
           node -e "const fs=require('fs'); const pre=String(process.env.RELEASE_PRE).toLowerCase()==='true'; fs.writeFileSync('release/latest-release.json', JSON.stringify({ tag: process.env.RELEASE_TAG, prerelease: pre }))"
           cd release && zip -r ../listening-stats.zip listening-stats/
         env:
@@ -50,9 +48,13 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout --orphan dist-temp
           git rm -rf .
-          cp release/listening-stats/* .
+          # Loose build artifacts at branch root (no unzip needed for raw.githubusercontent.com)
+          cp dist/extension.js dist/index.js dist/manifest.json .
+          # Same paths as inside listening-stats.zip (CustomApps/listening-stats/)
+          mkdir -p listening-stats
+          cp dist/extension.js dist/index.js dist/manifest.json listening-stats/
           cp release/latest-release.json .
           cp listening-stats.zip .
-          git add extension.js index.js manifest.json latest-release.json listening-stats.zip
+          git add extension.js index.js manifest.json listening-stats latest-release.json listening-stats.zip
           git commit -m "Release ${{ github.event.release.tag_name }}"
           git push origin dist-temp:dist --force
