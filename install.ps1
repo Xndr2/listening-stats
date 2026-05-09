@@ -2,6 +2,9 @@
 # Usage:
 #   irm https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1 | iex
 #
+# If Spicetify CLI is missing, installs it under LocalAppData\spicetify (non-interactive; no Marketplace).
+# Set $env:LISTENING_STATS_SKIP_SPICETIFY_INSTALL = "1" to only install LS (fail if spicetify missing).
+#
 # Downloads listening-stats.zip from GitHub Releases (default: latest stable). With
 # $env:LISTENING_STATS_PRERELEASE = "1", uses the newest release that ships listening-stats.zip.
 #
@@ -49,7 +52,74 @@ function Step($Message) {
     Write-Host $Message -ForegroundColor White
 }
 
+function Ensure-SpicetifyCli {
+    if ($env:LISTENING_STATS_SKIP_SPICETIFY_INSTALL -eq "1") {
+        if (-not (Get-Command spicetify -ErrorAction SilentlyContinue)) {
+            throw "spicetify not found and LISTENING_STATS_SKIP_SPICETIFY_INSTALL=1."
+        }
+        return
+    }
+
+    if (Get-Command spicetify -ErrorAction SilentlyContinue) {
+        return
+    }
+
+    $spicetifyDir = Join-Path $env:LOCALAPPDATA "spicetify"
+    $spicetifyExe = Join-Path $spicetifyDir "spicetify.exe"
+    if (Test-Path $spicetifyExe) {
+        $env:PATH = "$spicetifyDir;$env:PATH"
+        if (Get-Command spicetify -ErrorAction SilentlyContinue) { return }
+    }
+
+    if ($PSVersionTable.PSVersion -lt [version]'5.1') {
+        throw "PowerShell 5.1+ is required to install Spicetify automatically. See https://spicetify.app/docs/getting-started"
+    }
+
+    $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw "Run this installer from a non-elevated PowerShell window (Spicetify installs per-user)."
+    }
+
+    Step "Installing Spicetify CLI (first-time, non-interactive)"
+
+    if ($env:PROCESSOR_ARCHITECTURE -eq 'AMD64') { $arch = 'x64' }
+    elseif ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { $arch = 'arm64' }
+    else { $arch = 'x32' }
+
+    $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/spicetify/cli/releases/latest' -Headers @{ Accept = 'application/vnd.github+json' }
+    $ver = ($rel.tag_name -replace '^v', '')
+    $spZipUrl = "https://github.com/spicetify/cli/releases/download/v$ver/spicetify-$ver-windows-$arch.zip"
+    $spTmpZip = Join-Path $env:TEMP "spicetify-cli-$([guid]::NewGuid().ToString('N')).zip"
+
+    try {
+        Invoke-WebRequest -Uri $spZipUrl -OutFile $spTmpZip -UseBasicParsing
+        New-Item -ItemType Directory -Force -Path $spicetifyDir | Out-Null
+        Expand-Archive -Path $spTmpZip -DestinationPath $spicetifyDir -Force
+    }
+    finally {
+        Remove-Item -Force $spTmpZip -ErrorAction SilentlyContinue
+    }
+
+    $userScope = [EnvironmentVariableTarget]::User
+    $pathVal = [Environment]::GetEnvironmentVariable('PATH', $userScope)
+    if ([string]::IsNullOrEmpty($pathVal)) {
+        [Environment]::SetEnvironmentVariable('PATH', $spicetifyDir, $userScope)
+    }
+    elseif ($pathVal -notlike "*$spicetifyDir*") {
+        [Environment]::SetEnvironmentVariable('PATH', "$pathVal;$spicetifyDir", $userScope)
+    }
+    $env:PATH = "$spicetifyDir;$env:PATH"
+
+    if (-not (Get-Command spicetify -ErrorAction SilentlyContinue)) {
+        throw "Spicetify installed but spicetify was not found on PATH. Close this window, open a new PowerShell, and run the installer again."
+    }
+
+    Write-Host "   Spicetify v$ver  -  $spicetifyExe" -ForegroundColor DarkGray
+}
+
 Write-Banner
+
+Ensure-SpicetifyCli
 
 $ZipUrl = Resolve-ZipUrl -Slug $RepoSlug
 
@@ -139,14 +209,6 @@ try {
 finally {
     Remove-Item -Force $TmpZip -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $ExtractRoot -ErrorAction SilentlyContinue
-}
-
-$spicetify = Get-Command spicetify -ErrorAction SilentlyContinue
-if (-not $spicetify) {
-    Write-Host ""
-    Write-Host "! spicetify not found in PATH. Install Spicetify CLI, then run:" -ForegroundColor Yellow
-    Write-Host "  spicetify config custom_apps listening-stats; spicetify apply"
-    exit 1
 }
 
 Step "Applying Spicetify (config + apply)"

@@ -5,6 +5,9 @@
 # Prerelease zip (newest GitHub release that includes listening-stats.zip):
 #   LISTENING_STATS_PRERELEASE=1 curl -fsSL … | bash
 #
+# If Spicetify CLI is missing, installs it to ~/.spicetify (non-interactive; no Marketplace).
+# Set LISTENING_STATS_SKIP_SPICETIFY_INSTALL=1 to only install LS (fail if spicetify missing).
+#
 # Downloads listening-stats.zip from GitHub Releases (default: latest stable). With
 # LISTENING_STATS_PRERELEASE=1, uses the newest release that ships listening-stats.zip (may be a prerelease).
 # Requires jq or python3 for the prerelease path.
@@ -84,9 +87,108 @@ die() {
 	exit 1
 }
 
+# Install Spicetify CLI to ~/.spicetify when missing (same release tarball as spicetify/cli; no Marketplace prompt;
+# no install.log in CWD). Current shell gets PATH; optional bash/zsh rc append.
+ensure_spicetify_cli() {
+	if [[ "${LISTENING_STATS_SKIP_SPICETIFY_INSTALL:-}" == "1" ]]; then
+		command -v spicetify >/dev/null 2>&1 || die "spicetify not found and LISTENING_STATS_SKIP_SPICETIFY_INSTALL=1."
+		return 0
+	fi
+
+	if command -v spicetify >/dev/null 2>&1; then
+		return 0
+	fi
+
+	local install_dir="${HOME}/.spicetify"
+	local exe="${install_dir}/spicetify"
+	if [[ -x "${exe}" ]]; then
+		export PATH="${install_dir}:${PATH}"
+		command -v spicetify >/dev/null 2>&1 && return 0
+	fi
+
+	if [[ "$(id -u)" -eq 0 ]]; then
+		die "Do not run this script as root/sudo. Install as your normal user (Spicetify requirement), then re-run."
+	fi
+
+	local dep
+	for dep in curl tar grep; do
+		command -v "${dep}" >/dev/null 2>&1 || die "${dep} is required to install Spicetify CLI automatically."
+	done
+
+	local target=""
+	case "$(uname -sm)" in
+		"Darwin x86_64") target="darwin-amd64" ;;
+		"Darwin arm64") target="darwin-arm64" ;;
+		"Linux x86_64") target="linux-amd64" ;;
+		"Linux aarch64") target="linux-arm64" ;;
+		*) die "Automatic Spicetify install supports macOS/Linux x86_64 and arm64 only. Install Spicetify manually: https://spicetify.app/docs/advanced/installation" ;;
+	esac
+
+	step "Installing Spicetify CLI (first-time, non-interactive)"
+	local releases_uri="https://github.com/spicetify/cli/releases"
+	local json tag ver download_uri tgz
+	json="$(curl -LsH "Accept: application/json" "${releases_uri}/latest")" || die "Could not reach GitHub for Spicetify releases."
+	tag="${json%%\",\"update_url*}"
+	tag="${tag##*tag_name\":\"}"
+	tag="${tag%\"}"
+	ver="${tag#v}"
+	download_uri="${releases_uri}/download/v${ver}/spicetify-${ver}-${target}.tar.gz"
+
+	mkdir -p "${install_dir}"
+	tgz="$(mktemp)"
+	if ! curl -fsSL --progress-bar "${download_uri}" -o "${tgz}"; then
+		rm -f "${tgz}"
+		die "Failed to download Spicetify CLI."
+	fi
+	if ! tar xzf "${tgz}" -C "${install_dir}"; then
+		rm -f "${tgz}"
+		die "Failed to extract Spicetify CLI."
+	fi
+	rm -f "${tgz}"
+	chmod +x "${exe}"
+	export PATH="${install_dir}:${PATH}"
+
+	command -v spicetify >/dev/null 2>&1 || die "Spicetify extracted but not executable. Check ${install_dir}."
+
+	# Persist PATH for bash/zsh (best-effort; current shell already has export)
+	case "${SHELL:-}" in
+		*zsh*)
+			local rc="${HOME}/.zshrc"
+			if [[ -n "${ZDOTDIR:-}" ]]; then
+				rc="${ZDOTDIR}/.zshrc"
+			fi
+			[[ -f "${rc}" ]] || touch "${rc}"
+			if ! grep -Fq "${install_dir}" "${rc}" 2>/dev/null; then
+				{
+					echo ""
+					echo "# Spicetify CLI (added by Listening Stats installer)"
+					echo "export PATH=\"${install_dir}:\$PATH\""
+				} >>"${rc}"
+			fi
+			;;
+		*bash*)
+			local rc
+			for rc in "${HOME}/.bashrc" "${HOME}/.bash_profile"; do
+				[[ -f "${rc}" ]] || continue
+				if ! grep -Fq "${install_dir}" "${rc}" 2>/dev/null; then
+					{
+						echo ""
+						echo "# Spicetify CLI (added by Listening Stats installer)"
+						echo "export PATH=\"${install_dir}:\$PATH\""
+					} >>"${rc}"
+				fi
+			done
+			;;
+	esac
+
+	echo "   ${DIM}Spicetify v${ver}  -  ${exe}${RST}"
+}
+
 ZIP_URL="$(resolve_zip_url "${REPO_SLUG}")"
 
 banner
+
+ensure_spicetify_cli
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
@@ -175,11 +277,6 @@ fi
 
 if [[ ! -f "${TARGET}/manifest.json" ]]; then
 	die "Installed folder is missing manifest.json  -  zip may be wrong or corrupt."
-fi
-
-if ! command -v spicetify >/dev/null 2>&1; then
-	die "spicetify not found in PATH. Install Spicetify CLI, then run:
-   ${BOLD}spicetify config custom_apps listening-stats && spicetify apply${RST}"
 fi
 
 step "Applying Spicetify (${DIM}config + apply${RST})"
