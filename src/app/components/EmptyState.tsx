@@ -1,43 +1,32 @@
-import { formatDurationLong, getPeriodDisplayName } from "../../services/stats";
-import { ListeningStats } from "../../types";
-import { PeriodTabs } from "./PeriodTabs";
-
 interface EmptyStateProps {
-  stats: ListeningStats | null;
-  period: string;
-  periods: string[];
-  periodLabels: Record<string, string>;
-  onPeriodChange: (period: string) => void;
+	onOpenSettings: () => void;
 }
 
-export function EmptyState({
-  stats,
-  period,
-  periods,
-  periodLabels,
-  onPeriodChange,
-}: EmptyStateProps) {
-  return (
-    <>
-      <div className="overview-row">
-        <div className="overview-card hero">
-          <div className="overview-value">
-            {formatDurationLong(stats?.totalTimeMs ?? 0)}
-          </div>
-          <div className="overview-label">
-            No data for {getPeriodDisplayName(period)}
-          </div>
-          <PeriodTabs
-            period={period}
-            periods={periods}
-            periodLabels={periodLabels}
-            onPeriodChange={onPeriodChange}
-          />
-          <div className="overview-secondary">
-            Play some music to see your statistics here!
-          </div>
-        </div>
-      </div>
-    </>
-  );
+export default function EmptyState({ onOpenSettings }: EmptyStateProps) {
+	return (
+		<div className="empty-state" role="status">
+			<h2
+				style={{
+					fontSize: "var(--font-size-md, 14px)",
+					fontWeight: 700,
+					color: "var(--spice-text)",
+					marginBottom: "var(--space-sm, 8px)",
+				}}
+			>
+				No listening data yet
+			</h2>
+			<p
+				style={{
+					fontSize: "var(--font-size-md, 14px)",
+					color: "var(--spice-subtext)",
+					marginBottom: "var(--space-md, 16px)",
+				}}
+			>
+				Play some tracks and check back. Make sure tracking is enabled in Settings.
+			</p>
+			<button className="btn-primary" onClick={onOpenSettings}>
+				Open Settings
+			</button>
+		</div>
+	);
 }

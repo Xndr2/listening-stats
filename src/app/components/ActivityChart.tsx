@@ -1,63 +1,56 @@
 import { formatHour } from "../format";
-import { formatMinutes } from "../utils";
+import { getPreferences } from "../preferences";
+
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 interface ActivityChartProps {
-  hourlyDistribution: number[];
-  peakHour: number;
-  hourlyUnit?: "ms" | "plays";
+	hourlyDistribution: number[];
+	peakHour: number;
 }
 
-export function ActivityChart({
-  hourlyDistribution,
-  peakHour,
-  hourlyUnit = "ms",
-}: ActivityChartProps) {
-  const { TooltipWrapper } = Spicetify.ReactComponent;
-  if (!hourlyDistribution.some((h) => h > 0)) {
-    return null;
-  }
+export function ActivityChart({ hourlyDistribution, peakHour }: ActivityChartProps) {
+	const prefs = getPreferences();
+	const max = Math.max(...hourlyDistribution, 1);
 
-  const max = Math.max(...hourlyDistribution, 1);
-
-  const formatValue = (val: number) => {
-    if (hourlyUnit === "plays") {
-      return `${val} ${val === 1 ? "play" : "plays"}`;
-    }
-    return formatMinutes(val);
-  };
-
-  return (
-    <div className="activity-section">
-      <div className="activity-header">
-        <h3 className="activity-title">Activity by Hour</h3>
-        <div className="activity-peak">
-          Peak: <strong>{formatHour(peakHour)}</strong>
-        </div>
-      </div>
-      <div className="activity-chart">
-        {hourlyDistribution.map((val, hr) => {
-          const h = val > 0 ? Math.max((val / max) * 100, 5) : 0;
-          return (
-            <TooltipWrapper
-              key={hr}
-              label={`${formatHour(hr)}: ${formatValue(val)}`}
-              placement="top"
-            >
-              <div
-                className={`activity-bar ${hr === peakHour && val > 0 ? "peak" : ""}`}
-                style={{ height: `${h}%`, animationDelay: `${hr * 0.02}s` }}
-              />
-            </TooltipWrapper>
-          );
-        })}
-      </div>
-      <div className="chart-labels">
-        <span>{formatHour(0)}</span>
-        <span>{formatHour(6)}</span>
-        <span>{formatHour(12)}</span>
-        <span>{formatHour(18)}</span>
-        <span>{formatHour(0)}</span>
-      </div>
-    </div>
-  );
+	return (
+		<div className="section-card">
+			<div className="activity-chart-header">
+				<header className="section-heading" style={{ marginBottom: 0 }}>
+					<span className="section-kicker">Patterns</span>
+					<h2 className="section-title">Activity</h2>
+				</header>
+				{hourlyDistribution[peakHour] > 0 && (
+					<div className="activity-chart-peak">
+						Peak: <span>{formatHour(peakHour, prefs.use24HourTime)}</span>
+					</div>
+				)}
+			</div>
+			<div className="activity-chart">
+				{HOURS.map((hr) => {
+					const val = hourlyDistribution[hr];
+					const heightPct = val > 0 ? Math.max((val / max) * 100, 5) : 0;
+					const isPeak = hr === peakHour && val > 0;
+					return (
+						<Spicetify.ReactComponent.TooltipWrapper
+							key={hr}
+							label={`${formatHour(hr, prefs.use24HourTime)}: ${val} plays`}
+							placement="top"
+						>
+							<div
+								className={`activity-bar${isPeak ? " peak" : ""}`}
+								style={{ height: `${heightPct}%` }}
+							/>
+						</Spicetify.ReactComponent.TooltipWrapper>
+					);
+				})}
+			</div>
+			<div className="activity-chart-labels">
+				<span>{formatHour(0, prefs.use24HourTime)}</span>
+				<span>{formatHour(6, prefs.use24HourTime)}</span>
+				<span>{formatHour(12, prefs.use24HourTime)}</span>
+				<span>{formatHour(18, prefs.use24HourTime)}</span>
+				<span>{formatHour(0, prefs.use24HourTime)}</span>
+			</div>
+		</div>
+	);
 }

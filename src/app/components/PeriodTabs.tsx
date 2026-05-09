@@ -1,27 +1,25 @@
+import type { Period } from "../../shared/types/stats";
+
 interface PeriodTabsProps {
-  period: string;
-  periods: string[];
-  periodLabels: Record<string, string>;
-  onPeriodChange: (period: string) => void;
+	periods: Period[];
+	activePeriod: Period;
+	onPeriodChange: (period: Period) => void;
 }
 
-export function PeriodTabs({
-  period,
-  periods,
-  periodLabels,
-  onPeriodChange,
-}: PeriodTabsProps) {
-  return (
-    <div className="period-tabs">
-      {periods.map((p) => (
-        <button
-          key={p}
-          className={`period-tab ${period === p ? "active" : ""}`}
-          onClick={() => onPeriodChange(p)}
-        >
-          {periodLabels[p] || p}
-        </button>
-      ))}
-    </div>
-  );
+export default function PeriodTabs({ periods, activePeriod, onPeriodChange }: PeriodTabsProps) {
+	return (
+		<div className="period-tabs" role="tablist">
+			{periods.map((p) => (
+				<button
+					key={p.id}
+					className={`period-tab ${p.id === activePeriod.id ? "active" : ""}`}
+					role="tab"
+					aria-selected={p.id === activePeriod.id}
+					onClick={() => onPeriodChange(p)}
+				>
+					{p.label}
+				</button>
+			))}
+		</div>
+	);
 }

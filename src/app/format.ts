@@ -1,119 +1,45 @@
-import { getPreferences } from "../services/preferences";
+export function formatDuration(ms: number): string {
+	if (ms < 60_000) return "<1 min";
+	const totalMinutes = Math.floor(ms / 60_000);
+	if (totalMinutes < 60) return `${totalMinutes} min`;
+	const hours = Math.floor(totalMinutes / 60);
+	const minutes = totalMinutes % 60;
+	if (hours < 24) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+	const days = Math.floor(hours / 24);
+	const remainingHours = hours % 24;
+	return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+}
+
+export function formatRelativeTime(timestampMs: number): string {
+	const diffMs = Date.now() - timestampMs;
+	const diffSec = Math.floor(diffMs / 1000);
+	if (diffSec < 60) return "just now";
+	const diffMin = Math.floor(diffSec / 60);
+	if (diffMin < 60) return `${diffMin}m ago`;
+	const diffHr = Math.floor(diffMin / 60);
+	if (diffHr < 24) return `${diffHr}h ago`;
+	const diffDays = Math.floor(diffHr / 24);
+	return `${diffDays}d ago`;
+}
 
 export function formatNumber(n: number): string {
-  return Spicetify.Locale?.formatNumber?.(n) ?? n.toLocaleString();
+	try {
+		return Spicetify.Locale.formatNumber(n);
+	} catch {
+		return String(n);
+	}
 }
 
-export function formatHour(h: number): string {
-  const { use24HourTime } = getPreferences();
-  if (use24HourTime) {
-    return h.toString().padStart(2, "0") + ":00";
-  }
-  if (h === 0) return "12am";
-  if (h === 12) return "12pm";
-  return h < 12 ? `${h}am` : `${h - 12}pm`;
+export function formatHour(hour: number, use24h: boolean): string {
+	if (use24h) return `${hour}:00`;
+	if (hour === 0) return "12am";
+	if (hour < 12) return `${hour}am`;
+	if (hour === 12) return "12pm";
+	return `${hour - 12}pm`;
 }
 
-/**
- * Lightweight markdown-to-HTML renderer for GitHub release body format.
- * Handles: headings, bold, italic, inline code, links, unordered lists, line breaks.
- */
-export function renderMarkdown(text: string): string {
-  if (!text) return "";
-
-  // Normalize line endings and escape HTML entities
-  let html = text
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-
-  // Process inline code - protect from further processing
-  const codeBlocks: string[] = [];
-  html = html.replace(/`([^`]+)`/g, (_match, code) => {
-    const idx = codeBlocks.length;
-    codeBlocks.push(`<code>${code}</code>`);
-    return `\x00CODE${idx}\x00`;
-  });
-
-  // Split into lines for block-level processing
-  const lines = html.split("\n");
-  const processed: string[] = [];
-  let inList = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
-
-    // Headings
-    if (line.match(/^###\s+(.+)$/)) {
-      if (inList) {
-        processed.push("</ul>");
-        inList = false;
-      }
-      processed.push(`<h5>${line.replace(/^###\s+/, "")}</h5>`);
-      continue;
-    }
-    if (line.match(/^##\s+(.+)$/)) {
-      if (inList) {
-        processed.push("</ul>");
-        inList = false;
-      }
-      processed.push(`<h4>${line.replace(/^##\s+/, "")}</h4>`);
-      continue;
-    }
-
-    // List items (- or *, with optional leading whitespace)
-    if (line.match(/^\s*[\-\*]\s+(.+)$/)) {
-      if (!inList) {
-        processed.push("<ul>");
-        inList = true;
-      }
-      processed.push(`<li>${line.replace(/^\s*[\-\*]\s+/, "")}</li>`);
-      continue;
-    }
-
-    // Non-list line: close any open list
-    if (inList) {
-      processed.push("</ul>");
-      inList = false;
-    }
-
-    // Empty line -> paragraph break
-    if (line.trim() === "") {
-      processed.push("<br>");
-      continue;
-    }
-
-    processed.push(line);
-  }
-
-  // Close any remaining open list
-  if (inList) {
-    processed.push("</ul>");
-  }
-
-  html = processed.join("\n");
-
-  // Inline formatting: bold, italic, links
-  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "<em>$1</em>");
-  html = html.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
-  );
-
-  // Restore inline code blocks
-  html = html.replace(
-    /\x00CODE(\d+)\x00/g,
-    (_match, idx) => codeBlocks[parseInt(idx)],
-  );
-
-  // Convert remaining single newlines to <br> (but not inside tags)
-  // Only between non-tag lines (not after </ul>, </h4>, etc.)
-  html = html.replace(/(?<!\>)\n(?!\<)/g, "<br>");
-
-  return html;
+export function formatEstimatedPayout(totalPlays: number): string {
+	// Spotify average per-stream rate ~$0.004
+	const payout = totalPlays * 0.004;
+	return `$${payout.toFixed(2)}`;
 }

@@ -1,175 +1,301 @@
-import { getPreferences } from "../../services/preferences";
-import { formatDuration } from "../../services/stats";
-import { ListeningStats } from "../../types";
-import { formatNumber } from "../format";
-import { Icons } from "../icons";
-import { getRankClass, navigateToUri } from "../utils";
-import { ImageWithRetry } from "./ImageWithRetry";
+import type { StatsResult } from "../../shared/types/stats";
+import { formatDuration, formatNumber } from "../format";
+import { getPreferences } from "../preferences";
+import { navigateToUri } from "../utils";
+import { SkeletonBlock, SkeletonCircle } from "./SkeletonPrimitives";
+
+const { React } = Spicetify;
+
+export function getRankClass(rank: number): string {
+	if (rank === 1) return "rank-gold";
+	if (rank === 2) return "rank-silver";
+	if (rank === 3) return "rank-bronze";
+	return "";
+}
+
+function TopListColumnSkeleton() {
+	return (
+		<div>
+			{Array.from({ length: 5 }).map((_, i) => (
+				<div key={i} className="top-list-row" style={{ marginBottom: 6 }}>
+					<SkeletonCircle size={20} />
+					<SkeletonBlock width={44} height={44} />
+					<div style={{ flex: 1 }}>
+						<SkeletonBlock width="80%" height={11} style={{ marginBottom: 6 }} />
+						<SkeletonBlock width="55%" height={9} />
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
 
 interface TopListsProps {
-  stats: ListeningStats;
-  likedTracks: Map<string, boolean>;
-  onLikeToggle: (uri: string, e: React.MouseEvent) => void;
-  showLikeButtons?: boolean;
-  period?: string;
+	stats: StatsResult | null;
+	loading: boolean;
+	loadingByColumn?: { tracks: boolean; artists: boolean; albums: boolean };
+	hiddenSections: string[];
+	onGenreClick?: (genre: string) => void;
+	activeGenre?: string | null;
 }
 
 export function TopLists({
-  stats,
-  likedTracks,
-  onLikeToggle,
-  showLikeButtons = true,
-  period = "",
+	stats,
+	loading,
+	loadingByColumn,
+	hiddenSections,
+	onGenreClick,
+	activeGenre,
 }: TopListsProps) {
-  const { TooltipWrapper } = Spicetify.ReactComponent;
-  const itemCount = getPreferences().itemsPerSection;
+	const prefs = getPreferences();
 
-  return (
-    <div className="top-lists-section">
-      <div className="top-list">
-        <div className="top-list-header">
-          <h3 className="top-list-title">
-            <span dangerouslySetInnerHTML={{ __html: Icons.music }} />
-            Top Tracks
-          </h3>
-        </div>
-        <div className="item-list">
-          {stats.topTracks.slice(0, itemCount).map((t, i) => (
-            <div
-              key={t.trackUri || `track-${i}`}
-              className="item-row"
-              onClick={() => t.trackUri && navigateToUri(t.trackUri)}
-            >
-              <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
-              {t.albumArt ? (
-                <ImageWithRetry src={t.albumArt} className="item-art" />
-              ) : (
-                <div className="item-art placeholder" />
-              )}
-              <div className="item-info">
-                <div className="item-name">{t.trackName}</div>
-                <div className="item-meta">{t.artistName}</div>
-              </div>
-              <div className="item-stats">
-                {t.playCount ? (
-                  <span className="item-plays">
-                    {formatNumber(t.playCount)} plays
-                  </span>
-                ) : null}
-                {t.totalTimeMs > 0 && (
-                  <span className="item-time">
-                    {formatDuration(t.totalTimeMs)}
-                  </span>
-                )}
-              </div>
-              {showLikeButtons &&
-                (t.trackUri ? (
-                  <button
-                    className={`heart-btn ${likedTracks.get(t.trackUri) ? "liked" : ""}`}
-                    onClick={(e) => onLikeToggle(t.trackUri, e)}
-                    dangerouslySetInnerHTML={{
-                      __html: likedTracks.get(t.trackUri)
-                        ? Icons.heartFilled
-                        : Icons.heart,
-                    }}
-                  />
-                ) : (
-                  <TooltipWrapper
-                    label="No Spotify link, can't save to library"
-                    placement="top"
-                  >
-                    <span
-                      className="heart-btn disabled"
-                      dangerouslySetInnerHTML={{ __html: Icons.heart }}
-                    />
-                  </TooltipWrapper>
-                ))}
-            </div>
-          ))}
-        </div>
-      </div>
+	const visibleColumns = prefs.columnOrder.filter((id) => !hiddenSections.includes(id));
+	if (visibleColumns.length === 0) return null;
 
-      <div className="top-list">
-        <div className="top-list-header">
-          <h3 className="top-list-title">
-            <span dangerouslySetInnerHTML={{ __html: Icons.users }} />
-            Top Artists
-          </h3>
-        </div>
-        <div className="item-list">
-          {stats.topArtists.slice(0, itemCount).map((a, i) => {
-            return (
-              <div
-                key={a.artistUri || a.artistName}
-                className="item-row"
-                onClick={() => a.artistUri && navigateToUri(a.artistUri)}
-              >
-                <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
-                {a.artistImage ? (
-                  <ImageWithRetry
-                    src={a.artistImage}
-                    className="item-art round"
-                  />
-                ) : (
-                  <div className="item-art round placeholder artist-placeholder" />
-                )}
-                <div className="item-info">
-                  <div className="item-name">{a.artistName}</div>
-                  <div className="item-meta">
-                    {a.genres?.slice(0, 2).join(", ") || ""}
-                  </div>
-                </div>
-                {a.playCount ? (
-                  <div className="item-stats">
-                    <span className="item-plays">
-                      {formatNumber(a.playCount)} plays
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+	const columnRenderers: Record<string, () => React.ReactNode> = {
+		"top-tracks": () => (
+			<div className="section-card" data-column-id="top-tracks" key="top-tracks">
+				<header className="section-heading">
+					<span className="section-kicker">Most played</span>
+					<h2 className="section-title">Tracks</h2>
+				</header>
+				{(loading || loadingByColumn?.tracks) ? (
+					<TopListColumnSkeleton />
+				) : (
+					stats?.topTracks.slice(0, prefs.itemsPerSection).map((track) => (
+						// biome-ignore lint/a11y/useSemanticElements: flex row layout requires div
+						<div
+							key={track.trackUri || `unknown-track-${track.rank}`}
+							className="top-list-row"
+							role="button"
+							tabIndex={0}
+							onClick={() => navigateToUri(track.trackUri)}
+							onKeyDown={(e: { key: string }) => {
+								if (e.key === "Enter" || e.key === " ") navigateToUri(track.trackUri);
+							}}
+						>
+							<span className={`rank-number ${getRankClass(track.rank)}`}>{track.rank}</span>
+							{track.albumArt && <img src={track.albumArt} alt="" className="track-art" />}
+							<div
+								style={{
+									flex: 1,
+									minWidth: 0,
+									display: "flex",
+									flexDirection: "column",
+									gap: 2,
+								}}
+							>
+								<div
+									style={{
+										fontSize: 13,
+										fontWeight: 600,
+										color: "var(--spice-text)",
+										whiteSpace: "nowrap",
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+									}}
+								>
+									{track.trackName}
+								</div>
+								<div
+									style={{
+										fontSize: 11,
+										fontWeight: 400,
+										color: "rgba(var(--spice-rgb-text), 0.55)",
+										whiteSpace: "nowrap",
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+									}}
+								>
+									{track.artistName}
+								</div>
+							</div>
+							<div
+								style={{
+									display: "flex",
+									alignItems: "center",
+									color: "rgba(var(--spice-rgb-text), 0.55)",
+									flexShrink: 0,
+								}}
+							>
+								<span style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
+									{formatDuration(track.durationMs)}
+								</span>
+							</div>
+						</div>
+					))
+				)}
+			</div>
+		),
+		"top-artists": () => (
+			<div className="section-card" data-column-id="top-artists" key="top-artists">
+				<header className="section-heading">
+					<span className="section-kicker">Top</span>
+					<h2 className="section-title">Artists</h2>
+				</header>
+				{(loading || loadingByColumn?.artists) ? (
+					<TopListColumnSkeleton />
+				) : (
+					stats?.topArtists.slice(0, prefs.itemsPerSection).map((artist) => {
+						const primaryGenre = artist.genres?.[0];
+						return (
+							// biome-ignore lint/a11y/useSemanticElements: flex row layout requires div
+							<div
+								key={artist.artistUri || `unknown-artist-${artist.rank}`}
+								className="top-list-row"
+								role="button"
+								tabIndex={0}
+								onClick={() => navigateToUri(artist.artistUri)}
+								onKeyDown={(e: { key: string }) => {
+									if (e.key === "Enter" || e.key === " ") navigateToUri(artist.artistUri);
+								}}
+							>
+								<span className={`rank-number ${getRankClass(artist.rank)}`}>{artist.rank}</span>
+								{artist.imageUrl && (
+									<img src={artist.imageUrl} alt="" className="track-art track-art--round" />
+								)}
+								<div
+									style={{
+										flex: 1,
+										minWidth: 0,
+										display: "flex",
+										flexDirection: "column",
+										gap: 2,
+									}}
+								>
+									<div
+										style={{
+											fontSize: 13,
+											fontWeight: 600,
+											color: "var(--spice-text)",
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
+										{artist.artistName}
+									</div>
+									<div
+										style={{
+											display: "flex",
+											alignItems: "center",
+											gap: 6,
+											fontSize: 11,
+											fontWeight: 400,
+											color: "rgba(var(--spice-rgb-text), 0.55)",
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
+										<span style={{ fontVariantNumeric: "tabular-nums" }}>
+											{formatNumber(artist.count)} plays
+										</span>
+										{primaryGenre && (
+											<>
+												<span style={{ opacity: 0.4 }}>·</span>
+												{/* biome-ignore lint/a11y/useSemanticElements: genre tag is styled as inline clickable text, not a standalone action */}
+												<span
+													role="button"
+													tabIndex={0}
+													onClick={(e: { stopPropagation: () => void }) => {
+														e.stopPropagation();
+														onGenreClick?.(primaryGenre);
+													}}
+													onKeyDown={(e: { key: string; stopPropagation: () => void }) => {
+														if (e.key === "Enter" || e.key === " ") {
+															e.stopPropagation();
+															onGenreClick?.(primaryGenre);
+														}
+													}}
+													style={{
+														color:
+															activeGenre === primaryGenre
+																? "var(--spice-button)"
+																: "rgba(var(--spice-rgb-text), 0.7)",
+														cursor: "pointer",
+													}}
+												>
+													{primaryGenre}
+												</span>
+											</>
+										)}
+									</div>
+								</div>
+							</div>
+						);
+					})
+				)}
+			</div>
+		),
+		"top-albums": () => (
+			<div className="section-card" data-column-id="top-albums" key="top-albums">
+				<header className="section-heading">
+					<span className="section-kicker">Top</span>
+					<h2 className="section-title">Albums</h2>
+				</header>
+				{(loading || loadingByColumn?.albums) ? (
+					<TopListColumnSkeleton />
+				) : (
+					stats?.topAlbums.slice(0, prefs.itemsPerSection).map((album) => (
+						// biome-ignore lint/a11y/useSemanticElements: flex row layout requires div
+						<div
+							key={album.albumUri || `unknown-album-${album.rank}`}
+							className="top-list-row"
+							role="button"
+							tabIndex={0}
+							onClick={() => navigateToUri(album.albumUri)}
+							onKeyDown={(e: { key: string }) => {
+								if (e.key === "Enter" || e.key === " ") navigateToUri(album.albumUri);
+							}}
+						>
+							<span className={`rank-number ${getRankClass(album.rank)}`}>{album.rank}</span>
+							{album.albumArt && <img src={album.albumArt} alt="" className="track-art" />}
+							<div
+								style={{
+									flex: 1,
+									minWidth: 0,
+									display: "flex",
+									flexDirection: "column",
+									gap: 2,
+								}}
+							>
+								<div
+									style={{
+										fontSize: 13,
+										fontWeight: 600,
+										color: "var(--spice-text)",
+										whiteSpace: "nowrap",
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+									}}
+								>
+									{album.albumName}
+								</div>
+								<div
+									style={{
+										fontSize: 11,
+										fontWeight: 400,
+										color: "rgba(var(--spice-rgb-text), 0.55)",
+										whiteSpace: "nowrap",
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+										fontVariantNumeric: "tabular-nums",
+									}}
+								>
+									{album.artistName} · {formatNumber(album.count)} plays
+								</div>
+							</div>
+						</div>
+					))
+				)}
+			</div>
+		),
+	};
 
-      <div className="top-list">
-        <div className="top-list-header">
-          <h3 className="top-list-title">
-            <span dangerouslySetInnerHTML={{ __html: Icons.album }} />
-            Top Albums
-          </h3>
-        </div>
-        <div className="item-list">
-          {stats.topAlbums.slice(0, itemCount).map((a, i) => (
-            <div
-              key={a.albumUri || `album-${i}`}
-              className="item-row"
-              onClick={() => a.albumUri && navigateToUri(a.albumUri)}
-            >
-              <span className={`item-rank ${getRankClass(i)}`}>{i + 1}</span>
-              {a.albumArt ? (
-                <ImageWithRetry src={a.albumArt} className="item-art" />
-              ) : (
-                <div className="item-art placeholder" />
-              )}
-              <div className="item-info">
-                <div className="item-name">{a.albumName}</div>
-                <div className="item-meta">{a.artistName}</div>
-              </div>
-              <div className="item-stats">
-                {a.playCount ? (
-                  <span className="item-plays">
-                    {formatNumber(a.playCount)} plays
-                  </span>
-                ) : null}
-                <span className="item-time">
-                  {formatNumber(a.trackCount)} tracks
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+	return (
+		<div className="top-lists-grid">
+			{visibleColumns.map((id) => columnRenderers[id]?.() ?? null)}
+		</div>
+	);
 }

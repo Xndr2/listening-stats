@@ -1,0 +1,371 @@
+import { validateUsername, type StatsFmConfig } from "../../../shared/api/statsfm-client";
+import { statsfmProvider } from "../../../shared/stats/statsfm-provider";
+import { providerRegistry } from "../../../shared/stats/provider";
+import type { ProviderRegistry } from "../../../shared/stats/provider";
+import { statsCache } from "../../../shared/stats/stats-cache";
+import { LS_KEYS } from "../../../shared/constants/storage-keys";
+import { EVENTS } from "../../../shared/constants/events";
+import { validateLastfmKey } from "../../../shared/api/lastfm-client";
+import { lastfmCache } from "../../../shared/api/lastfm-cache";
+
+const { useState } = Spicetify.React;
+
+type ConnectPhase = "idle" | "connecting" | "connected" | "error";
+
+export const ERROR_MESSAGES: Record<string, string> = {
+	not_found: "Username not found. Check your stats.fm customId.",
+	private: "Profile is private. Visit stats.fm settings and set your profile to public.",
+	network: "Could not reach stats.fm. Check your connection and try again.",
+	circuit_open: "stats.fm is temporarily unavailable. Try again shortly.",
+};
+
+export function readStatsFmConfig(): StatsFmConfig | null {
+	const raw = localStorage.getItem(LS_KEYS.STATSFM_CONFIG);
+	if (!raw) return null;
+	return JSON.parse(raw) as StatsFmConfig;
+}
+
+export function deriveTierBadge(registry: ProviderRegistry): {
+	tier: "plus" | "free";
+	tierClass: string;
+	tierLabel: string;
+} {
+	const sfmInfo = registry.getAll().find((p) => p.id === "statsfm");
+	const tier = sfmInfo?.capabilities.tier === "plus" ? "plus" : "free";
+	const tierClass = tier === "plus" ? "tier-badge--plus" : "tier-badge--free";
+	const tierLabel = tier === "plus" ? "Plus" : "Free";
+	return { tier, tierClass, tierLabel };
+}
+
+type LastfmPhase = "idle" | "testing" | "connected" | "error";
+
+const LASTFM_ERROR_MESSAGES: Record<string, string> = {
+	invalid_key: "Invalid API key. Double-check the key and try again.",
+	network: "Could not reach Last.fm. Check your connection and try again.",
+};
+
+export function ProvidersTab() {
+	const [username, setUsername] = useState("");
+	const [phase, setPhase] = useState<ConnectPhase>(() =>
+		readStatsFmConfig() ? "connected" : "idle",
+	);
+	const [config, setConfig] = useState<StatsFmConfig | null>(() => readStatsFmConfig());
+	const [connectError, setConnectError] = useState<string | null>(null);
+	const [revalidating, setRevalidating] = useState(false);
+	const [revalidateError, setRevalidateError] = useState<string | null>(null);
+
+	const [lastfmKey, setLastfmKey] = useState("");
+	const [lastfmPhase, setLastfmPhase] = useState<LastfmPhase>(() =>
+		localStorage.getItem(LS_KEYS.LASTFM_API_KEY) ? "connected" : "idle",
+	);
+	const [lastfmError, setLastfmError] = useState<string | null>(null);
+
+	const handleConnect = async () => {
+		if (!username.trim()) return;
+		setPhase("connecting");
+		setConnectError(null);
+
+		const result = await validateUsername(username.trim());
+		if (!result.valid) {
+			setConnectError(
+				ERROR_MESSAGES[result.reason] ??
+					"Connection failed. Check the console for details.",
+			);
+			setPhase("error");
+			return;
+		}
+
+		const newConfig: StatsFmConfig = {
+			username: username.trim(),
+			isPlus: result.isPlus,
+			connectedAt: Date.now(),
+			lastValidated: Date.now(),
+		};
+		localStorage.setItem(LS_KEYS.STATSFM_CONFIG, JSON.stringify(newConfig));
+		await statsfmProvider.init();
+		statsCache.invalidate();
+		providerRegistry.setActive("statsfm");
+		window.dispatchEvent(new CustomEvent(EVENTS.STATSFM_CONNECTED));
+		window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));
+		setConfig(newConfig);
+		setPhase("connected");
+	};
+
+	const handleDisconnect = () => {
+		localStorage.removeItem(LS_KEYS.STATSFM_CONFIG);
+		statsCache.invalidate();
+		providerRegistry.setActive("local");
+		window.dispatchEvent(new CustomEvent(EVENTS.STATSFM_DISCONNECTED));
+		window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));
+		setPhase("idle");
+		setUsername("");
+		setConfig(null);
+		setConnectError(null);
+	};
+
+	const handleRevalidate = async () => {
+		if (!config) return;
+		const prevIsPlus = config.isPlus;
+		setRevalidating(true);
+		setRevalidateError(null);
+
+		const result = await validateUsername(config.username);
+		if (!result.valid) {
+			setRevalidateError(
+				ERROR_MESSAGES[result.reason] ??
+					"Validation failed. Check the console for details.",
+			);
+			setRevalidating(false);
+			return;
+		}
+
+		const newConfig: StatsFmConfig = {
+			...config,
+			isPlus: result.isPlus,
+			lastValidated: Date.now(),
+		};
+		localStorage.setItem(LS_KEYS.STATSFM_CONFIG, JSON.stringify(newConfig));
+		await statsfmProvider.init();
+		setConfig(newConfig);
+		setRevalidating(false);
+
+		// Tier changes need fresh stats + provider listeners
+		if (prevIsPlus !== result.isPlus) {
+			statsCache.invalidate();
+			window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));
+		}
+	};
+
+	const handleLastfmTest = async () => {
+		const trimmed = lastfmKey.trim();
+		if (!trimmed) return;
+		setLastfmPhase("testing");
+		setLastfmError(null);
+
+		const result = await validateLastfmKey(trimmed);
+		if (result.valid) {
+			localStorage.setItem(LS_KEYS.LASTFM_API_KEY, trimmed);
+			await lastfmCache.invalidate();
+			setLastfmPhase("connected");
+		} else {
+			setLastfmError(LASTFM_ERROR_MESSAGES[result.reason] ?? "Connection failed");
+			setLastfmPhase("error");
+		}
+	};
+
+	const handleLastfmDisconnect = async () => {
+		localStorage.removeItem(LS_KEYS.LASTFM_API_KEY);
+		await lastfmCache.invalidate();
+		setLastfmPhase("idle");
+		setLastfmKey("");
+		setLastfmError(null);
+	};
+
+	const handleProviderSwitch = (newId: string) => {
+		statsCache.invalidate();
+		providerRegistry.setActive(newId);
+		window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));
+	};
+
+	const providers = providerRegistry.getAll();
+	const activeProviderId = providerRegistry.getActiveId();
+	const hasStatsFmConfig = config !== null;
+	const { tierClass, tierLabel } = deriveTierBadge(providerRegistry);
+
+	return (
+		<div>
+			{/* Active Provider section */}
+			<h3 className="section-header">Active Provider</h3>
+			<div className="settings-sublabel" style={{ marginBottom: "12px" }}>
+				Select the data source for your listening statistics
+			</div>
+			<div role="radiogroup" aria-label="Active provider">
+				{providers.map((p) => (
+					<div
+						key={p.id}
+						className={`provider-radio-row ${activeProviderId === p.id ? "active" : ""}`}
+						role="radio"
+						aria-checked={activeProviderId === p.id}
+						aria-label={p.name}
+						onClick={() => {
+							if (p.id === "statsfm" && !hasStatsFmConfig) return;
+							if (activeProviderId !== p.id) handleProviderSwitch(p.id);
+						}}
+						style={
+							p.id === "statsfm" && !hasStatsFmConfig
+								? { opacity: 0.5, pointerEvents: "none" as const }
+								: undefined
+						}
+					>
+						<div>
+							<div className="settings-label">
+								{p.id === "local" ? "Local Tracking" : "stats.fm"}
+							</div>
+							<div className="settings-sublabel">
+								{p.id === "local"
+									? "Stats tracked directly on this device"
+									: "Import stats from your stats.fm account"}
+							</div>
+						</div>
+					</div>
+				))}
+			</div>
+
+			{/* stats.fm Account section */}
+			<h3 className="section-header" style={{ marginTop: "16px" }}>
+				stats.fm Account
+			</h3>
+
+			{(phase === "idle" || phase === "connecting" || phase === "error") && (
+				<div>
+					<div className="settings-sublabel" style={{ marginBottom: "8px" }}>
+						Use your stats.fm customId, not your display name
+					</div>
+					<div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+						<input
+							type="text"
+							value={username}
+							onChange={(e) => setUsername(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && phase !== "connecting") handleConnect();
+							}}
+							placeholder="Enter your stats.fm username"
+							disabled={phase === "connecting"}
+							aria-label="stats.fm username"
+							style={{
+								flex: 1,
+								padding: "8px 12px",
+								borderRadius: "4px",
+								border: "1px solid var(--spice-misc)",
+								background: "var(--spice-main)",
+								color: "var(--spice-text)",
+								fontSize: "var(--font-size-sm, 14px)",
+							}}
+						/>
+						<button
+							className="btn-primary"
+							onClick={handleConnect}
+							disabled={phase === "connecting"}
+							aria-busy={phase === "connecting"}
+							style={phase === "connecting" ? { opacity: 0.6 } : undefined}
+						>
+							{phase === "connecting" ? "Connecting..." : "Connect Account"}
+						</button>
+					</div>
+					{phase === "error" && connectError && (
+						<div className="provider-connect-error" role="alert">
+							{connectError}
+						</div>
+					)}
+				</div>
+			)}
+
+			{phase === "connected" && config && (
+				<div className="provider-status-card">
+					<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+						<span style={{ color: "var(--spice-text)", fontWeight: 700 }}>
+							{config.username}
+						</span>
+						<span className={`tier-badge ${tierClass}`}>
+							{tierLabel}
+						</span>
+					</div>
+					<div className="settings-sublabel">
+						Connected since {new Date(config.connectedAt).toLocaleDateString()}
+					</div>
+					<button
+						className="btn-secondary"
+						onClick={handleRevalidate}
+						disabled={revalidating}
+						aria-busy={revalidating}
+						aria-label="Re-validate stats.fm tier status"
+						style={{
+							marginTop: "8px",
+							alignSelf: "flex-start",
+							...(revalidating ? { opacity: 0.6 } : {}),
+						}}
+					>
+						{revalidating ? "Re-validating..." : "Re-validate"}
+					</button>
+					{revalidateError && (
+						<div className="provider-connect-error" role="alert">
+							{revalidateError}
+						</div>
+					)}
+					<button
+						className="btn-destructive"
+						onClick={handleDisconnect}
+						aria-label="Disconnect stats.fm account"
+						style={{ marginTop: "8px", alignSelf: "flex-start" }}
+					>
+						Disconnect
+					</button>
+				</div>
+			)}
+
+			{/* Last.fm Integration section */}
+			<h3 className="section-header" style={{ marginTop: "16px" }}>
+				Last.fm Integration
+			</h3>
+			<div className="settings-sublabel" style={{ marginBottom: "8px" }}>
+				Provide a Last.fm API key to power the World Charts page with real data.
+			</div>
+
+			{lastfmPhase === "connected" ? (
+				<div className="provider-status-card">
+					<div role="status" style={{ color: "var(--spice-text)", fontWeight: 700 }}>
+						Connected
+					</div>
+					<div className="settings-sublabel">
+						Last.fm API key is configured and active.
+					</div>
+					<button
+						className="btn-destructive"
+						onClick={handleLastfmDisconnect}
+						style={{ marginTop: "8px", alignSelf: "flex-start" }}
+					>
+						Disconnect
+					</button>
+				</div>
+			) : (
+				<div>
+					<div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+						<input
+							type="text"
+							value={lastfmKey}
+							onChange={(e) => setLastfmKey(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && lastfmPhase !== "testing") handleLastfmTest();
+							}}
+							placeholder="Enter your Last.fm API key"
+							disabled={lastfmPhase === "testing"}
+							aria-label="Last.fm API key"
+							style={{
+								flex: 1,
+								padding: "8px 12px",
+								borderRadius: "4px",
+								border: "1px solid var(--spice-misc)",
+								background: "var(--spice-main)",
+								color: "var(--spice-text)",
+								fontSize: "var(--font-size-sm, 14px)",
+							}}
+						/>
+						<button
+							className="btn-primary"
+							onClick={handleLastfmTest}
+							disabled={lastfmPhase === "testing" || !lastfmKey.trim()}
+							style={lastfmPhase === "testing" ? { opacity: 0.6 } : undefined}
+						>
+							{lastfmPhase === "testing" ? "Testing..." : "Test Connection"}
+						</button>
+					</div>
+					{lastfmPhase === "error" && lastfmError && (
+						<div className="provider-connect-error" role="alert">
+							{lastfmError}
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
+}
