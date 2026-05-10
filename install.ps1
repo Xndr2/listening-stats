@@ -117,12 +117,50 @@ function Invoke-Spicetify {
     }
 }
 
+function Test-PathSafe {
+    # Test-Path throws "Illegal characters in path" on Windows when given a string with control
+    # bytes (e.g. ANSI escapes leaking from spicetify) or characters in <>:"|?*. We never want
+    # diagnostic-string handling to crash the installer, so swallow that into $false.
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    try { return [bool](Test-Path -LiteralPath $Path) }
+    catch { return $false }
+}
+
 function Get-SpicetifyPath {
     param([Parameter(Mandatory)][string[]]$ArgumentList)
     $res = Invoke-Spicetify -ArgumentList $ArgumentList
     if ($res.ExitCode -ne 0) { return "" }
     if ([string]::IsNullOrWhiteSpace($res.Output)) { return "" }
-    return ($res.Output -split "`n")[0].Trim()
+    # Strip ANSI CSI sequences (ESC [ … final-byte) — spicetify emits them on Windows hosts that
+    # advertise VT support, and the ESC byte (0x1B) is illegal in Windows paths -> Test-Path
+    # throws unless we sanitize first.
+    $clean = [regex]::Replace($res.Output, "`e\[[0-9;]*[A-Za-z]", "")
+    # Drop any remaining control bytes (CR is preserved across split below; we strip everything
+    # else 0x00-0x1F that survived).
+    $clean = [regex]::Replace($clean, "[\x00-\x08\x0B\x0C\x0E-\x1F]", "")
+    foreach ($raw in ($clean -split "`r?`n")) {
+        $line = $raw.Trim()
+        if (-not $line) { continue }
+        # Skip lines that are obviously banners/warnings/info, not paths. spicetify on first
+        # run (fresh install) prints version + initialization messages above the actual path.
+        if ($line -match '^(\s*)(spicetify\s+v|warning|info|error|note|please)\b') { continue }
+        return $line
+    }
+    return ""
+}
+
+function Get-SpicetifyExeDir {
+    # Pure PowerShell-native lookup so no spicetify output parsing is needed. (Get-Command
+    # spicetify).Source returns the resolved .exe path on Windows and the binary path on
+    # Unix; either way Split-Path gives us the install directory whose CustomApps subfolder
+    # is the CLI's bundled fallback location.
+    $cmd = Get-Command spicetify -ErrorAction SilentlyContinue
+    if (-not $cmd) { return $null }
+    $src = $cmd.Source
+    if (-not $src) { return $null }
+    if (-not (Test-PathSafe $src)) { return $null }
+    return Split-Path -Parent $src
 }
 
 function Resolve-UserConfigCustomAppsDir {
@@ -130,12 +168,12 @@ function Resolve-UserConfigCustomAppsDir {
     # 1. SPICETIFY_CONFIG env var if set
     # 2. parent of `spicetify path -c` (config-xpui.ini) — authoritative when CLI is on PATH
     # 3. %APPDATA%\spicetify (Windows default in src/utils/path-utils.go GetSpicetifyFolder)
-    if ($env:SPICETIFY_CONFIG -and (Test-Path $env:SPICETIFY_CONFIG)) {
+    if ($env:SPICETIFY_CONFIG -and (Test-PathSafe $env:SPICETIFY_CONFIG)) {
         return Join-Path $env:SPICETIFY_CONFIG "CustomApps"
     }
     if (Get-Command spicetify -ErrorAction SilentlyContinue) {
         $cfgIni = Get-SpicetifyPath -ArgumentList @('path', '-c')
-        if ($cfgIni -and (Test-Path $cfgIni)) {
+        if ($cfgIni -and (Test-PathSafe $cfgIni)) {
             return Join-Path (Split-Path -Parent $cfgIni) "CustomApps"
         }
     }
@@ -145,16 +183,9 @@ function Resolve-UserConfigCustomAppsDir {
 function Resolve-ExeDirCustomAppsDir {
     # The CLI's bundled CustomApps root (used as a *fallback* by GetCustomAppPath when the
     # user-config dir does not contain the app). We only want to *clean* this location.
-    if (Get-Command spicetify -ErrorAction SilentlyContinue) {
-        $exePath = Get-SpicetifyPath -ArgumentList @('path')
-        if ($exePath -and (Test-Path $exePath)) {
-            $exeDir = Split-Path -Parent $exePath
-            return Join-Path $exeDir "CustomApps"
-        }
-        $alt = Get-SpicetifyPath -ArgumentList @('path', '-a', 'root')
-        if ($alt -and (Test-Path $alt)) {
-            return $alt
-        }
+    $exeDir = Get-SpicetifyExeDir
+    if ($exeDir) {
+        return Join-Path $exeDir "CustomApps"
     }
     return $null
 }
@@ -165,14 +196,14 @@ function Resolve-SpicetifyResolvedAppDir {
     param([string]$Name)
     if (-not (Get-Command spicetify -ErrorAction SilentlyContinue)) { return $null }
     $p = Get-SpicetifyPath -ArgumentList @('path', '-a', $Name)
-    if ($p -and (Test-Path $p)) { return $p }
+    if ($p -and (Test-PathSafe $p)) { return $p }
     return $null
 }
 
 function Remove-AppDirSafe {
     param([string]$Path, [string]$Label)
     if (-not $Path) { return }
-    if (-not (Test-Path -LiteralPath $Path)) { return }
+    if (-not (Test-PathSafe $Path)) { return }
     try {
         Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
         Detail "removed $Label : $Path"
