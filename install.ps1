@@ -11,11 +11,18 @@
 # serve …/releases/latest/listening-stats.zip — that path 404s). With
 # $env:LISTENING_STATS_PRERELEASE = "1", uses the newest release that ships listening-stats.zip.
 #
-# Replaces CustomApps/listening-stats, runs spicetify apply, removes temp files.
+# Installs into the **user-config** CustomApps directory (where `spicetify apply` reads from
+# first), then wipes any stale `listening-stats` copies in the CLI exe-dir CustomApps and any
+# Spicetify-resolved path so the loader cannot pick up an old version. Auto-recovers from a
+# stale backup ("Preprocessed Spotify data is outdated") by chaining `spicetify backup apply`.
 
 $ErrorActionPreference = "Stop"
+# Promote non-zero exits from native commands (spicetify) to terminating errors when the host
+# supports it (PowerShell 7.3+); pre-7.3 hosts ignore this and we capture $LASTEXITCODE manually.
+try { $PSNativeCommandUseErrorActionPreference = $true } catch { }
 
 $RepoSlug = "Xndr2/listening-stats"
+$AppName = "listening-stats"
 $MinZipBytes = 2000
 
 function Resolve-ZipUrl {
@@ -65,6 +72,90 @@ function Write-Banner {
 function Step($Message) {
     Write-Host "▸ " -NoNewline -ForegroundColor Green
     Write-Host $Message -ForegroundColor White
+}
+
+function Detail($Message) {
+    Write-Host "   $Message" -ForegroundColor DarkGray
+}
+
+function Warn($Message) {
+    Write-Host "   $Message" -ForegroundColor Yellow
+}
+
+function Invoke-Spicetify {
+    param([string[]]$ArgumentList)
+    $out = & spicetify @ArgumentList 2>&1 | Out-String
+    return [pscustomobject]@{
+        ExitCode = $LASTEXITCODE
+        Output   = $out.Trim()
+    }
+}
+
+function Get-SpicetifyPath {
+    param([Parameter(Mandatory)][string[]]$ArgumentList)
+    $res = Invoke-Spicetify -ArgumentList $ArgumentList
+    if ($res.ExitCode -ne 0) { return "" }
+    if ([string]::IsNullOrWhiteSpace($res.Output)) { return "" }
+    return ($res.Output -split "`n")[0].Trim()
+}
+
+function Resolve-UserConfigCustomAppsDir {
+    # Where `spicetify apply` looks for custom apps FIRST (see src/utils/path-utils.go GetCustomAppPath).
+    # 1. SPICETIFY_CONFIG env var if set
+    # 2. parent of `spicetify path -c` (config-xpui.ini) — authoritative when CLI is on PATH
+    # 3. %APPDATA%\spicetify (Windows default in src/utils/path-utils.go GetSpicetifyFolder)
+    if ($env:SPICETIFY_CONFIG -and (Test-Path $env:SPICETIFY_CONFIG)) {
+        return Join-Path $env:SPICETIFY_CONFIG "CustomApps"
+    }
+    if (Get-Command spicetify -ErrorAction SilentlyContinue) {
+        $cfgIni = Get-SpicetifyPath -ArgumentList @('path', '-c')
+        if ($cfgIni -and (Test-Path $cfgIni)) {
+            return Join-Path (Split-Path -Parent $cfgIni) "CustomApps"
+        }
+    }
+    return Join-Path $env:APPDATA "spicetify\CustomApps"
+}
+
+function Resolve-ExeDirCustomAppsDir {
+    # The CLI's bundled CustomApps root (used as a *fallback* by GetCustomAppPath when the
+    # user-config dir does not contain the app). We only want to *clean* this location.
+    if (Get-Command spicetify -ErrorAction SilentlyContinue) {
+        $exePath = Get-SpicetifyPath -ArgumentList @('path')
+        if ($exePath -and (Test-Path $exePath)) {
+            $exeDir = Split-Path -Parent $exePath
+            return Join-Path $exeDir "CustomApps"
+        }
+        $alt = Get-SpicetifyPath -ArgumentList @('path', '-a', 'root')
+        if ($alt -and (Test-Path $alt)) {
+            return $alt
+        }
+    }
+    return $null
+}
+
+function Resolve-SpicetifyResolvedAppDir {
+    # Whatever path `spicetify path -a <name>` returns — accounts for env-var overrides and any
+    # quirky resolution. Empty if not currently installed.
+    param([string]$Name)
+    if (-not (Get-Command spicetify -ErrorAction SilentlyContinue)) { return $null }
+    $p = Get-SpicetifyPath -ArgumentList @('path', '-a', $Name)
+    if ($p -and (Test-Path $p)) { return $p }
+    return $null
+}
+
+function Remove-AppDirSafe {
+    param([string]$Path, [string]$Label)
+    if (-not $Path) { return }
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    try {
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+        Detail "removed $Label : $Path"
+    }
+    catch {
+        Warn "could not remove $Label at $Path  -  $($_.Exception.Message)"
+        Warn "If Spotify is running, close it (and any Spotify tray icon) and re-run the installer."
+        throw
+    }
 }
 
 function Ensure-SpicetifyCli {
@@ -129,7 +220,58 @@ function Ensure-SpicetifyCli {
         throw "Spicetify installed but spicetify was not found on PATH. Close this window, open a new PowerShell, and run the installer again."
     }
 
-    Write-Host "   Spicetify v$ver  -  $spicetifyExe" -ForegroundColor DarkGray
+    Detail "Spicetify v$ver  -  $spicetifyExe"
+}
+
+function Confirm-NoNestedAppLayout {
+    # Defensive: spicetify's GetCustomAppSubfolderPath recursively walks the install dir and
+    # returns the FIRST subfolder containing index.js, which would hijack the loader. After a
+    # fresh install, manifest.json + index.js live at the top level only, but a botched user
+    # state might leave a nested copy. Detect and surface so the user knows what was wiped.
+    param([string]$AppDir)
+    $hits = @(Get-ChildItem -LiteralPath $AppDir -Directory -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "index.js") })
+    if ($hits.Count -gt 0) {
+        foreach ($h in $hits) {
+            Warn "stale nested index.js detected at $($h.FullName)  -  removing"
+            Remove-Item -LiteralPath $h.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Invoke-SpicetifyApplyWithRecovery {
+    Step "Applying Spicetify (config + apply)"
+    $cfg = Invoke-Spicetify -ArgumentList @('config', 'custom_apps', $AppName)
+    if ($cfg.ExitCode -ne 0) {
+        Warn $cfg.Output
+        throw "spicetify config failed (exit $($cfg.ExitCode))."
+    }
+
+    $apply = Invoke-Spicetify -ArgumentList @('apply')
+    $needsRebackup = ($apply.ExitCode -ne 0) -or
+                     ($apply.Output -match '(?i)outdated|mismatch|backup apply|restore backup apply')
+
+    if (-not $needsRebackup) {
+        return
+    }
+
+    Warn "spicetify apply reported a stale-backup or version-mismatch state:"
+    if ($apply.Output) { Warn ($apply.Output -replace '^', '   ') }
+    Step "Auto-recovery: spicetify backup apply"
+    $rec = Invoke-Spicetify -ArgumentList @('backup', 'apply')
+    if ($rec.ExitCode -eq 0) {
+        return
+    }
+
+    Warn "backup apply failed; trying restore + backup + apply"
+    if ($rec.Output) { Warn ($rec.Output -replace '^', '   ') }
+    $rec2 = Invoke-Spicetify -ArgumentList @('restore', 'backup', 'apply')
+    if ($rec2.ExitCode -eq 0) {
+        return
+    }
+
+    if ($rec2.Output) { Warn ($rec2.Output -replace '^', '   ') }
+    throw "Could not auto-recover spicetify state. Close Spotify completely (incl. tray icon) and run: spicetify restore backup apply"
 }
 
 Write-Banner
@@ -141,36 +283,33 @@ $ZipUrl = Resolve-ZipUrl -Slug $RepoSlug
 $TmpZip = Join-Path $env:TEMP "listening-stats-$([guid]::NewGuid().ToString('N')).zip"
 $ExtractRoot = Join-Path $env:TEMP "listening-stats-extract-$([guid]::NewGuid().ToString('N'))"
 
-$CustomApps = $null
-$spicetifyEarly = Get-Command spicetify -ErrorAction SilentlyContinue
-if ($spicetifyEarly) {
-    try {
-        $capps = (& spicetify -q -a path root 2>$null)
-        if (-not $capps) { $capps = (& spicetify -a path root 2>$null) }
-        $capps = if ($capps) { (($capps | Out-String).Trim() -split "`n")[0].Trim() } else { "" }
-        if ($capps -and (Test-Path $capps)) {
-            $CustomApps = $capps
-        }
-        else {
-            $ud = (& spicetify -q path userdata 2>$null)
-            if (-not $ud) { $ud = (& spicetify path userdata 2>$null) }
-            $ud = if ($ud) { ($ud | Out-String).Trim() } else { "" }
-            if ($ud -and (Test-Path $ud)) {
-                $CustomApps = Join-Path $ud "CustomApps"
-            }
-        }
-    }
-    catch { }
-}
-if (-not $CustomApps) {
-    $CustomApps = Join-Path $env:APPDATA "spicetify\CustomApps"
+Step "Locating Spicetify CustomApps"
+$UserCustomApps = Resolve-UserConfigCustomAppsDir
+$ExeCustomApps = Resolve-ExeDirCustomAppsDir
+Detail "user-config (install target) : $UserCustomApps"
+if ($ExeCustomApps -and ($ExeCustomApps -ne $UserCustomApps)) {
+    Detail "exe-dir (cleanup only)        : $ExeCustomApps"
 }
 
-$Dest = Join-Path $CustomApps "listening-stats"
+$Dest = Join-Path $UserCustomApps $AppName
+
+# Cleanup pass: remove every place a stale listening-stats could live so the loader can't pick
+# an old copy. Spicetify resolves at apply time via GetCustomAppPath: user-config first, then
+# exe-dir. We wipe both, plus whatever the CLI currently *thinks* the path is.
+Step "Removing any prior listening-stats copies"
+$resolved = Resolve-SpicetifyResolvedAppDir -Name $AppName
+$cleanupTargets = @($Dest)
+if ($ExeCustomApps) { $cleanupTargets += (Join-Path $ExeCustomApps $AppName) }
+if ($resolved)      { $cleanupTargets += $resolved }
+$cleanupTargets = $cleanupTargets | Sort-Object -Unique
+
+foreach ($t in $cleanupTargets) {
+    Remove-AppDirSafe -Path $t -Label "$AppName"
+}
 
 try {
     Step "Downloading"
-    Write-Host "   $ZipUrl" -ForegroundColor DarkGray
+    Detail $ZipUrl
     Invoke-WebRequest -Uri $ZipUrl -OutFile $TmpZip -UseBasicParsing -Headers @{
         "Cache-Control" = "no-cache"
         "Pragma"        = "no-cache"
@@ -185,18 +324,15 @@ try {
     New-Item -ItemType Directory -Force -Path $ExtractRoot | Out-Null
     Expand-Archive -Path $TmpZip -DestinationPath $ExtractRoot -Force
 
-    $Inner = Join-Path $ExtractRoot "listening-stats"
+    $Inner = Join-Path $ExtractRoot $AppName
     $manifestAtRoot = Test-Path (Join-Path $ExtractRoot "manifest.json")
     $indexAtRoot = Test-Path (Join-Path $ExtractRoot "index.js")
 
     Step "Installing"
-    Write-Host "   → $Dest" -ForegroundColor DarkGray
-    New-Item -ItemType Directory -Force -Path $CustomApps | Out-Null
-    if (Test-Path $Dest) {
-        Remove-Item -Recurse -Force $Dest
-    }
+    Detail "→ $Dest"
+    New-Item -ItemType Directory -Force -Path $UserCustomApps | Out-Null
 
-    # Always end up at CustomApps/listening-stats  -  never leave loose files in CustomApps.
+    # Always end up at <UserCustomApps>/listening-stats  -  never leave loose files in CustomApps.
     if (Test-Path $Inner) {
         Move-Item -Path $Inner -Destination $Dest
     }
@@ -223,15 +359,15 @@ try {
     if (-not (Test-Path (Join-Path $Dest "manifest.json"))) {
         throw "Installed folder is missing manifest.json  -  zip may be wrong or corrupt."
     }
+
+    Confirm-NoNestedAppLayout -AppDir $Dest
 }
 finally {
     Remove-Item -Force $TmpZip -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $ExtractRoot -ErrorAction SilentlyContinue
 }
 
-Step "Applying Spicetify (config + apply)"
-spicetify config custom_apps listening-stats
-spicetify apply
+Invoke-SpicetifyApplyWithRecovery
 
 Write-Host ""
 Write-Rule

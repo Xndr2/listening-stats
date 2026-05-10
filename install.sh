@@ -12,11 +12,15 @@
 # LISTENING_STATS_PRERELEASE=1, uses the newest release that ships listening-stats.zip (may be a prerelease).
 # Requires jq or python3 for the prerelease path.
 #
-# Replaces CustomApps/listening-stats, runs spicetify apply, removes temp files.
+# Installs into the **user-config** CustomApps directory (where `spicetify apply` reads from
+# first), then wipes any stale `listening-stats` copies in the CLI exe-dir CustomApps and any
+# Spicetify-resolved path so the loader cannot pick up an old version. Auto-recovers from a
+# stale backup ("Preprocessed Spotify data is outdated") by chaining `spicetify backup apply`.
 
 set -euo pipefail
 
 REPO_SLUG="Xndr2/listening-stats"
+APP_NAME="listening-stats"
 MIN_ZIP_BYTES=2000
 
 resolve_zip_url() {
@@ -82,9 +86,141 @@ step() {
 	echo "${GRN}${BOLD}▸${RST} ${BOLD}$1${RST}"
 }
 
+detail() {
+	echo "   ${DIM}$1${RST}"
+}
+
+warn() {
+	echo "   ${YEL}$1${RST}" >&2
+}
+
 die() {
 	echo "${YEL}${BOLD}!${RST} $1" >&2
 	exit 1
+}
+
+# Run spicetify, capture stdout+stderr and exit code without aborting under set -e.
+# Sets globals SPC_OUT and SPC_RC.
+spicetify_run() {
+	SPC_OUT=""
+	SPC_RC=0
+	if ! command -v spicetify >/dev/null 2>&1; then
+		SPC_RC=127
+		return 0
+	fi
+	# shellcheck disable=SC2034
+	if SPC_OUT="$(spicetify "$@" 2>&1)"; then
+		SPC_RC=0
+	else
+		SPC_RC=$?
+	fi
+	return 0
+}
+
+# First non-empty trimmed line of `spicetify <args...>` output, or empty string on failure.
+spicetify_path_line() {
+	spicetify_run "$@"
+	if [[ "${SPC_RC}" -ne 0 ]]; then
+		printf '%s' ""
+		return 0
+	fi
+	printf '%s' "${SPC_OUT}" | head -1 | tr -d '\r'
+}
+
+# Where `spicetify apply` looks for custom apps FIRST (see spicetify/cli src/utils/path-utils.go
+# GetCustomAppPath -> userAppsFolder).
+#  1. SPICETIFY_CONFIG env var if set.
+#  2. parent of `spicetify path -c` (config-xpui.ini) — authoritative when CLI is on PATH.
+#  3. XDG_CONFIG_HOME or ~/.config (Linux/macOS) — matches GetSpicetifyFolder() defaults.
+resolve_user_config_custom_apps() {
+	if [[ -n "${SPICETIFY_CONFIG:-}" && -d "${SPICETIFY_CONFIG}" ]]; then
+		printf '%s' "${SPICETIFY_CONFIG}/CustomApps"
+		return 0
+	fi
+	if command -v spicetify >/dev/null 2>&1; then
+		local cfg_ini
+		cfg_ini="$(spicetify_path_line path -c)"
+		if [[ -n "${cfg_ini}" && -f "${cfg_ini}" ]]; then
+			printf '%s' "$(dirname "${cfg_ini}")/CustomApps"
+			return 0
+		fi
+	fi
+	local parent
+	if [[ -n "${XDG_CONFIG_HOME:-}" ]]; then
+		parent="${XDG_CONFIG_HOME}"
+	else
+		parent="${HOME}/.config"
+	fi
+	printf '%s' "${parent}/spicetify/CustomApps"
+}
+
+# The CLI's bundled CustomApps root (used as a *fallback* by GetCustomAppPath when the
+# user-config dir does not contain the app). We only want to *clean* this location.
+resolve_exe_dir_custom_apps() {
+	if ! command -v spicetify >/dev/null 2>&1; then
+		printf '%s' ""
+		return 0
+	fi
+	local exe_path
+	exe_path="$(spicetify_path_line path)"
+	if [[ -n "${exe_path}" && -f "${exe_path}" ]]; then
+		printf '%s' "$(dirname "${exe_path}")/CustomApps"
+		return 0
+	fi
+	local alt
+	alt="$(spicetify_path_line path -a root)"
+	if [[ -n "${alt}" && -d "${alt}" ]]; then
+		printf '%s' "${alt}"
+		return 0
+	fi
+	printf '%s' ""
+}
+
+# Whatever path `spicetify path -a <name>` returns — accounts for env-var overrides and any
+# quirky resolution. Empty if not currently installed/configured.
+resolve_spicetify_resolved_app() {
+	local name="$1"
+	if ! command -v spicetify >/dev/null 2>&1; then
+		printf '%s' ""
+		return 0
+	fi
+	local p
+	p="$(spicetify_path_line path -a "${name}")"
+	if [[ -n "${p}" && -d "${p}" ]]; then
+		printf '%s' "${p}"
+		return 0
+	fi
+	printf '%s' ""
+}
+
+remove_app_dir_safe() {
+	local target="$1" label="$2"
+	[[ -n "${target}" ]] || return 0
+	[[ -e "${target}" ]] || return 0
+	if rm -rf -- "${target}"; then
+		detail "removed ${label}: ${target}"
+	else
+		warn "could not remove ${label} at ${target}"
+		warn "If Spotify is running, close it and re-run the installer."
+		exit 1
+	fi
+}
+
+# Defensive: spicetify's GetCustomAppSubfolderPath recursively walks the install dir and
+# returns the FIRST subfolder containing index.js, which would hijack the loader. After a
+# fresh install, manifest.json + index.js live at the top level only, but a botched user
+# state might leave a nested copy. Detect and remove them.
+clean_nested_app_layout() {
+	local app_dir="$1"
+	[[ -d "${app_dir}" ]] || return 0
+	local subdir
+	while IFS= read -r -d '' subdir; do
+		# Skip the top-level dir itself; only nested.
+		if [[ "${subdir}" != "${app_dir}" && -f "${subdir}/index.js" ]]; then
+			warn "stale nested index.js detected at ${subdir} - removing"
+			rm -rf -- "${subdir}"
+		fi
+	done < <(find "${app_dir}" -mindepth 1 -type d -print0 2>/dev/null)
 }
 
 # Install Spicetify CLI to ~/.spicetify when missing (same release tarball as spicetify/cli; no Marketplace prompt;
@@ -181,19 +317,89 @@ ensure_spicetify_cli() {
 			;;
 	esac
 
-	echo "   ${DIM}Spicetify v${ver}  -  ${exe}${RST}"
+	detail "Spicetify v${ver}  -  ${exe}"
 }
 
-ZIP_URL="$(resolve_zip_url "${REPO_SLUG}")"
+apply_with_recovery() {
+	step "Applying Spicetify (${DIM}config + apply${RST})"
+	spicetify_run config custom_apps "${APP_NAME}"
+	if [[ "${SPC_RC}" -ne 0 ]]; then
+		[[ -n "${SPC_OUT}" ]] && warn "${SPC_OUT}"
+		die "spicetify config failed (exit ${SPC_RC})."
+	fi
+
+	spicetify_run apply
+	local needs_rebackup=0
+	if [[ "${SPC_RC}" -ne 0 ]]; then needs_rebackup=1; fi
+	if printf '%s' "${SPC_OUT}" | grep -Eiq 'outdated|mismatch|backup apply|restore backup apply'; then
+		needs_rebackup=1
+	fi
+
+	if [[ "${needs_rebackup}" -eq 0 ]]; then
+		return 0
+	fi
+
+	warn "spicetify apply reported a stale-backup or version-mismatch state:"
+	[[ -n "${SPC_OUT}" ]] && printf '%s\n' "${SPC_OUT}" | sed 's/^/   /' >&2
+
+	step "Auto-recovery: spicetify backup apply"
+	spicetify_run backup apply
+	if [[ "${SPC_RC}" -eq 0 ]]; then
+		return 0
+	fi
+	[[ -n "${SPC_OUT}" ]] && printf '%s\n' "${SPC_OUT}" | sed 's/^/   /' >&2
+
+	warn "backup apply failed; trying restore + backup + apply"
+	spicetify_run restore backup apply
+	if [[ "${SPC_RC}" -eq 0 ]]; then
+		return 0
+	fi
+	[[ -n "${SPC_OUT}" ]] && printf '%s\n' "${SPC_OUT}" | sed 's/^/   /' >&2
+	die "Could not auto-recover spicetify state. Close Spotify completely and run: spicetify restore backup apply"
+}
 
 banner
 
 ensure_spicetify_cli
 
+ZIP_URL="$(resolve_zip_url "${REPO_SLUG}")"
+
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
+ZIP_PATH="${TMP_DIR}/${APP_NAME}.zip"
+EXTRACT="${TMP_DIR}/extract"
 
-ZIP_PATH="${TMP_DIR}/listening-stats.zip"
+step "Locating Spicetify CustomApps"
+USER_CUSTOM_APPS="$(resolve_user_config_custom_apps)"
+EXE_CUSTOM_APPS="$(resolve_exe_dir_custom_apps)"
+detail "user-config (install target) : ${USER_CUSTOM_APPS}"
+if [[ -n "${EXE_CUSTOM_APPS}" && "${EXE_CUSTOM_APPS}" != "${USER_CUSTOM_APPS}" ]]; then
+	detail "exe-dir (cleanup only)        : ${EXE_CUSTOM_APPS}"
+fi
+
+DEST="${USER_CUSTOM_APPS}/${APP_NAME}"
+
+# Cleanup pass: remove every place a stale listening-stats could live so the loader can't pick
+# up an old copy. spicetify resolves at apply time via GetCustomAppPath: user-config first,
+# then exe-dir. We wipe both, plus whatever the CLI currently *thinks* the path is.
+step "Removing any prior ${APP_NAME} copies"
+RESOLVED="$(resolve_spicetify_resolved_app "${APP_NAME}")"
+declare -a CLEANUP_TARGETS=()
+CLEANUP_TARGETS+=("${DEST}")
+[[ -n "${EXE_CUSTOM_APPS}" ]] && CLEANUP_TARGETS+=("${EXE_CUSTOM_APPS}/${APP_NAME}")
+[[ -n "${RESOLVED}" ]] && CLEANUP_TARGETS+=("${RESOLVED}")
+
+# Dedupe (preserve order).
+declare -a SEEN=()
+for t in "${CLEANUP_TARGETS[@]}"; do
+	dup=0
+	for s in "${SEEN[@]:-}"; do
+		[[ "${s}" == "${t}" ]] && dup=1 && break
+	done
+	[[ "${dup}" -eq 0 ]] || continue
+	SEEN+=("${t}")
+	remove_app_dir_safe "${t}" "${APP_NAME}"
+done
 
 step "Downloading ${DIM}${ZIP_URL}${RST}"
 if command -v curl >/dev/null 2>&1; then
@@ -207,39 +413,6 @@ if (( SIZE < MIN_ZIP_BYTES )); then
 	die "Download is too small (${SIZE} bytes)  -  expected a real release zip. Is ${ZIP_URL} valid?"
 fi
 
-step "Locating Spicetify CustomApps directory"
-CUSTOM_APPS=""
-if command -v spicetify >/dev/null 2>&1; then
-	# Prefer CLI custom-app root (matches where apply looks)
-	CUSTOM_APPS="$(spicetify -q -a path root 2>/dev/null || spicetify -a path root 2>/dev/null || true)"
-	CUSTOM_APPS="$(printf '%s' "${CUSTOM_APPS}" | head -1 | tr -d '\r')"
-	if [[ -z "${CUSTOM_APPS}" || ! -d "${CUSTOM_APPS}" ]]; then
-		USERDATA="$(spicetify -q path userdata 2>/dev/null || spicetify path userdata 2>/dev/null)"
-		USERDATA="$(printf '%s' "${USERDATA}" | tr -d '\r')"
-		if [[ -n "${USERDATA}" && -d "${USERDATA}" ]]; then
-			CUSTOM_APPS="${USERDATA}/CustomApps"
-		fi
-	fi
-fi
-if [[ -z "${CUSTOM_APPS}" ]]; then
-	if [[ "$(uname -s)" == "Darwin" ]]; then
-		for cand in "${HOME}/spicetify_data/CustomApps" "${HOME}/.config/spicetify/CustomApps"; do
-			if [[ -d "${cand}" ]]; then
-				CUSTOM_APPS="${cand}"
-				break
-			fi
-		done
-		[[ -n "${CUSTOM_APPS}" ]] || CUSTOM_APPS="${HOME}/spicetify_data/CustomApps"
-	else
-		CUSTOM_APPS="${HOME}/.config/spicetify/CustomApps"
-	fi
-fi
-
-TARGET="${CUSTOM_APPS}/listening-stats"
-echo "   ${DIM}→ ${TARGET}${RST}"
-
-EXTRACT="${TMP_DIR}/extract"
-rm -rf "${EXTRACT}"
 mkdir -p "${EXTRACT}"
 
 step "Extracting bundle"
@@ -247,17 +420,19 @@ if ! unzip -q "${ZIP_PATH}" -d "${EXTRACT}"; then
 	die "unzip failed. Is unzip installed?"
 fi
 
-# Always install into CustomApps/listening-stats  -  never unpack loose files into CustomApps.
-mkdir -p "${CUSTOM_APPS}"
-rm -rf "${TARGET}"
-if [[ -d "${EXTRACT}/listening-stats" ]]; then
-	mv "${EXTRACT}/listening-stats" "${TARGET}"
+step "Installing"
+detail "→ ${DEST}"
+mkdir -p "${USER_CUSTOM_APPS}"
+
+# Always install into <user-config>/CustomApps/listening-stats  -  never unpack loose files.
+if [[ -d "${EXTRACT}/${APP_NAME}" ]]; then
+	mv "${EXTRACT}/${APP_NAME}" "${DEST}"
 elif [[ -f "${EXTRACT}/manifest.json" || -f "${EXTRACT}/index.js" ]]; then
-	mkdir -p "${TARGET}"
+	mkdir -p "${DEST}"
 	shopt -s dotglob nullglob
 	for item in "${EXTRACT}"/*; do
 		[[ -e "${item}" ]] || continue
-		mv "${item}" "${TARGET}/"
+		mv "${item}" "${DEST}/"
 	done
 	shopt -u dotglob nullglob
 else
@@ -269,19 +444,19 @@ else
 		sole_dir="${maybe}"
 	done
 	if [[ "${dir_count}" -eq 1 && ( -f "${sole_dir}/manifest.json" || -f "${sole_dir}/index.js" ) ]]; then
-		mv "${sole_dir}" "${TARGET}"
+		mv "${sole_dir}" "${DEST}"
 	else
-		die "Zip layout not recognized. Expected listening-stats/ in the zip, app files at zip root, or one top-level app folder."
+		die "Zip layout not recognized. Expected ${APP_NAME}/ in the zip, app files at zip root, or one top-level app folder."
 	fi
 fi
 
-if [[ ! -f "${TARGET}/manifest.json" ]]; then
+if [[ ! -f "${DEST}/manifest.json" ]]; then
 	die "Installed folder is missing manifest.json  -  zip may be wrong or corrupt."
 fi
 
-step "Applying Spicetify (${DIM}config + apply${RST})"
-spicetify config custom_apps listening-stats
-spicetify apply
+clean_nested_app_layout "${DEST}"
+
+apply_with_recovery
 
 echo ""
 rule
