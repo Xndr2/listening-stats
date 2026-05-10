@@ -32,13 +32,13 @@ jobs:
           mkdir -p release/listening-stats
           cp dist/extension.js dist/index.js dist/manifest.json release/listening-stats/
           node -e "const fs=require('fs'); const pre=String(process.env.RELEASE_PRE).toLowerCase()==='true'; fs.writeFileSync('release/latest-release.json', JSON.stringify({ tag: process.env.RELEASE_TAG, prerelease: pre }))"
-          cd release && zip -r ../listening-stats.zip listening-stats/
+          (cd release && zip -r listening-stats.zip listening-stats/)
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           RELEASE_PRE: ${{ github.event.release.prerelease }}
 
       - name: Upload release asset
-        run: gh release upload "${{ github.event.release.tag_name }}" listening-stats.zip --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" release/listening-stats.zip --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -54,7 +54,7 @@ jobs:
           mkdir -p listening-stats
           cp dist/extension.js dist/index.js dist/manifest.json listening-stats/
           cp release/latest-release.json .
-          # listening-stats.zip is already at repo root from the previous step
+          cp release/listening-stats.zip .
           git add extension.js index.js manifest.json listening-stats latest-release.json listening-stats.zip
           git commit -m "Release ${{ github.event.release.tag_name }}"
           git push origin dist-temp:dist --force
