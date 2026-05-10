@@ -5,7 +5,10 @@
 # If Spicetify CLI is missing, installs it under LocalAppData\spicetify (non-interactive; no Marketplace).
 # Set $env:LISTENING_STATS_SKIP_SPICETIFY_INSTALL = "1" to only install LS (fail if spicetify missing).
 #
-# Downloads listening-stats.zip from GitHub Releases (default: latest stable). With
+# Downloads listening-stats.zip from GitHub Releases (default: latest stable). Stable builds
+# resolve the real asset URL from the API (avoids stale proxies caching /releases/latest/download/…).
+# Fallback: https://github.com/<repo>/releases/latest/download/listening-stats.zip (GitHub does not
+# serve …/releases/latest/listening-stats.zip — that path 404s). With
 # $env:LISTENING_STATS_PRERELEASE = "1", uses the newest release that ships listening-stats.zip.
 #
 # Replaces CustomApps/listening-stats, runs spicetify apply, removes temp files.
@@ -29,7 +32,19 @@ function Resolve-ZipUrl {
         }
         throw "No GitHub release includes listening-stats.zip."
     }
-    return "https://github.com/$Slug/releases/latest/download/listening-stats.zip"
+    $apiLatest = "https://api.github.com/repos/$Slug/releases/latest"
+    try {
+        $rel = Invoke-RestMethod -Uri $apiLatest -Headers @{ Accept = "application/vnd.github+json" } -ErrorAction Stop
+    }
+    catch {
+        $nonce = [guid]::NewGuid().ToString("N")
+        return "https://github.com/$Slug/releases/latest/download/listening-stats.zip?t=$nonce"
+    }
+    $match = @($rel.assets | Where-Object { $_.name -eq "listening-stats.zip" })
+    if ($match.Count -lt 1) {
+        throw "Latest GitHub release has no listening-stats.zip asset."
+    }
+    return $match[0].browser_download_url
 }
 
 function Write-Rule {
@@ -156,7 +171,10 @@ $Dest = Join-Path $CustomApps "listening-stats"
 try {
     Step "Downloading"
     Write-Host "   $ZipUrl" -ForegroundColor DarkGray
-    Invoke-WebRequest -Uri $ZipUrl -OutFile $TmpZip -UseBasicParsing
+    Invoke-WebRequest -Uri $ZipUrl -OutFile $TmpZip -UseBasicParsing -Headers @{
+        "Cache-Control" = "no-cache"
+        "Pragma"        = "no-cache"
+    }
 
     $len = (Get-Item $TmpZip).Length
     if ($len -lt $MinZipBytes) {
