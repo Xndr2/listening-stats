@@ -17,9 +17,16 @@
 # stale backup ("Preprocessed Spotify data is outdated") by chaining `spicetify backup apply`.
 
 $ErrorActionPreference = "Stop"
-# Promote non-zero exits from native commands (spicetify) to terminating errors when the host
-# supports it (PowerShell 7.3+); pre-7.3 hosts ignore this and we capture $LASTEXITCODE manually.
-try { $PSNativeCommandUseErrorActionPreference = $true } catch { }
+# Force UTF-8 console output so box-drawing / Unicode glyphs from spicetify and this script do
+# not get re-encoded to "?" on Windows PowerShell 5.1 (default OEM codepage). Best-effort.
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch { }
+# We invoke spicetify via & and inspect $LASTEXITCODE manually, so we MUST keep
+# $PSNativeCommandUseErrorActionPreference disabled — otherwise PS 7.3+ throws on every
+# non-zero exit (including expected ones during recovery) and the script aborts.
+try { $PSNativeCommandUseErrorActionPreference = $false } catch { }
 
 $RepoSlug = "Xndr2/listening-stats"
 $AppName = "listening-stats"
@@ -55,14 +62,14 @@ function Resolve-ZipUrl {
 }
 
 function Write-Rule {
-    Write-Host ("─" * 64) -ForegroundColor DarkGray
+    Write-Host ("-" * 64) -ForegroundColor DarkGray
 }
 
 function Write-Banner {
     Write-Host ""
     Write-Rule
     Write-Host "  Listening Stats " -NoNewline -ForegroundColor Cyan
-    Write-Host "· " -NoNewline -ForegroundColor DarkGray
+    Write-Host "- " -NoNewline -ForegroundColor DarkGray
     Write-Host "install / update" -ForegroundColor White
     Write-Host "  Spicetify custom app" -ForegroundColor DarkGray
     Write-Rule
@@ -70,7 +77,7 @@ function Write-Banner {
 }
 
 function Step($Message) {
-    Write-Host "▸ " -NoNewline -ForegroundColor Green
+    Write-Host "> " -NoNewline -ForegroundColor Green
     Write-Host $Message -ForegroundColor White
 }
 
@@ -84,9 +91,28 @@ function Warn($Message) {
 
 function Invoke-Spicetify {
     param([string[]]$ArgumentList)
-    $out = & spicetify @ArgumentList 2>&1 | Out-String
+    # Defensively disable both knobs that turn native non-zero exits into terminating errors —
+    # we want to *inspect* $LASTEXITCODE, not crash on it.
+    $PSNativeCommandUseErrorActionPreference = $false
+    $eapPrev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $out = ''
+    $code = 0
+    try {
+        $out = (& spicetify @ArgumentList 2>&1 | Out-String)
+        $code = $LASTEXITCODE
+    }
+    catch {
+        # Should be unreachable now, but if a host still escalates the native call we keep the
+        # message and report a non-zero exit instead of bubbling the exception up.
+        $out = $_.Exception.Message
+        $code = if ($LASTEXITCODE) { $LASTEXITCODE } else { 1 }
+    }
+    finally {
+        $ErrorActionPreference = $eapPrev
+    }
     return [pscustomobject]@{
-        ExitCode = $LASTEXITCODE
+        ExitCode = $code
         Output   = $out.Trim()
     }
 }
@@ -329,7 +355,7 @@ try {
     $indexAtRoot = Test-Path (Join-Path $ExtractRoot "index.js")
 
     Step "Installing"
-    Detail "→ $Dest"
+    Detail "-> $Dest"
     New-Item -ItemType Directory -Force -Path $UserCustomApps | Out-Null
 
     # Always end up at <UserCustomApps>/listening-stats  -  never leave loose files in CustomApps.
