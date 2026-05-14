@@ -499,7 +499,9 @@ function ShareWrapped({
 
 			{tracks.length > 0 && (
 				<div style={{ marginTop: isStory ? 12 : 8 }}>
-					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>Top tracks</div>
+					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>
+						Top tracks
+					</div>
 					<ol
 						style={{
 							listStyle: "none",
@@ -561,7 +563,9 @@ function ShareWrapped({
 
 			{artists.length > 0 && (
 				<div style={{ marginTop: isStory ? 12 : 8 }}>
-					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>Top artists</div>
+					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>
+						Top artists
+					</div>
 					<ol
 						style={{
 							listStyle: "none",
@@ -590,7 +594,12 @@ function ShareWrapped({
 								>
 									{i + 1}
 								</span>
-								<Tile seed={a.artistUri} sz={isStory ? 26 : 22} rounded={6} imageUrl={a.imageUrl ?? undefined} />
+								<Tile
+									seed={a.artistUri}
+									sz={isStory ? 26 : 22}
+									rounded={6}
+									imageUrl={a.imageUrl ?? undefined}
+								/>
 								<div style={{ minWidth: 0, flex: 1 }}>
 									<div
 										style={{
@@ -615,7 +624,9 @@ function ShareWrapped({
 
 			{genres.length > 0 && (
 				<div style={{ marginTop: isStory ? 12 : 8 }}>
-					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>Top genres</div>
+					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>
+						Top genres
+					</div>
 					<div style={{ display: "flex", flexDirection: "column", gap: isStory ? 6 : 4 }}>
 						{genres.map((g, i) => {
 							const pct = genreTotal > 0 ? g.count / genreTotal : 0;
@@ -1395,114 +1406,6 @@ async function drawTop5Content(
 		ctx.textAlign = "left";
 		y += 48 + chunkH;
 	}
-	return y;
-}
-
-interface TopArtistRowsOptions {
-	wrappedSquareTight?: boolean;
-	wrappedStoryTight?: boolean;
-}
-
-async function drawTopArtistRowsTop5Style(
-	ctx: CanvasRenderingContext2D,
-	artists: TopArtist[],
-	size: ShareSize,
-	palette: SharePalette,
-	x: number,
-	y: number,
-	w: number,
-	rowOptions?: TopArtistRowsOptions,
-): Promise<number> {
-	if (artists.length === 0) return y;
-	y = cvKicker(ctx, "Top artists", x, y, palette);
-	const isStory = size === "story";
-	const storyTight = rowOptions?.wrappedStoryTight === true && isStory;
-	const tightSq = rowOptions?.wrappedSquareTight === true && !isStory;
-	y += isStory ? (storyTight ? 36 : 48) : tightSq ? 22 : 32;
-	const rankW = tightSq ? 44 : storyTight ? 48 : 56;
-	const tileSz = isStory ? (storyTight ? 102 : 124) : tightSq ? 68 : 96;
-	const gapArt = CV_GAP + 8;
-	const textX = x + rankW + gapArt + tileSz + gapArt;
-	const textAvail = Math.max(72, x + w - CV_GAP - textX);
-	const titleBase = (ryLocal: number) => ryLocal + Math.round(tileSz * 0.38);
-	const subBase = (ryLocal: number) => ryLocal + Math.round(tileSz * 0.78);
-	const rowGap = isStory ? (storyTight ? 22 : 36) : tightSq ? 12 : 24;
-	const rArt = isStory ? (storyTight ? 8 : 10) : tightSq ? 6 : 8;
-	const rankNumPx = isStory ? (storyTight ? 52 : 64) : tightSq ? 48 : 64;
-	const titlePx = isStory ? (storyTight ? 38 : 44) : tightSq ? 30 : 40;
-	const subPx = isStory ? (storyTight ? 26 : 30) : tightSq ? 22 : 28;
-
-	for (let i = 0; i < artists.length; i++) {
-		const a = artists[i];
-		const ry = y + i * (tileSz + rowGap);
-		ctx.fillStyle = cvRgb(palette.accent);
-		ctx.font = `800 ${rankNumPx}px ${CV_FONT}`;
-		ctx.textAlign = "right";
-		ctx.fillText(`${i + 1}`, x + rankW, ry + tileSz / 2 + 18);
-		ctx.textAlign = "left";
-		const artX = x + rankW + gapArt;
-		if (!(await cvDrawArt(ctx, a.imageUrl ?? undefined, artX, ry, tileSz, rArt)))
-			cvPlaceholder(ctx, artX, ry, tileSz, rArt);
-		ctx.fillStyle = palette.text;
-		ctx.font = `600 ${titlePx}px ${CV_FONT}`;
-		ctx.fillText(cvTruncate(ctx, a.artistName, textAvail), textX, titleBase(ry));
-		ctx.fillStyle = palette.dimText;
-		ctx.font = `${subPx}px ${CV_FONT}`;
-		const sub = a.count === 1 ? "1 play" : `${formatNumber(a.count)} plays`;
-		ctx.fillText(cvTruncate(ctx, sub, textAvail), textX, subBase(ry));
-	}
-	y += artists.length * (tileSz + rowGap);
-	return y;
-}
-
-async function drawWrappedGenreBars(
-	ctx: CanvasRenderingContext2D,
-	top: TopGenre[],
-	size: ShareSize,
-	palette: SharePalette,
-	x: number,
-	y: number,
-	w: number,
-	squareWrappedTight = false,
-	storyWrappedTight = false,
-): Promise<number> {
-	if (top.length === 0) return y;
-	const maxCount = top[0].count;
-	const totalCount = top.reduce((s, g) => s + g.count, 0);
-	y = cvKicker(ctx, "Top genres", x, y, palette, false, 26);
-	const isStory = size === "story";
-	const storyTight = storyWrappedTight && isStory;
-	const tightSq = squareWrappedTight && !isStory;
-	y += isStory ? (storyTight ? 32 : 40) : tightSq ? 22 : 32;
-	const barH = isStory ? (storyTight ? 30 : 36) : tightSq ? 26 : 32;
-	const rowGap = isStory ? (storyTight ? 26 : 36) : tightSq ? 18 : 28;
-	const labelWPref = isStory ? 320 : 300;
-	const pctReserve = isStory ? 120 : tightSq ? 88 : 100;
-	const minBarW = isStory ? 72 : tightSq ? 52 : 64;
-	const genreLblFontPx = isStory ? (storyTight ? 34 : 40) : tightSq ? 28 : 36;
-	const labelCap = Math.max(160, Math.min(labelWPref, w - pctReserve - minBarW - CV_GAP - 28));
-	const genrePctColor = palette.specGenrePctMuted ?? palette.dimText;
-
-	for (let i = 0; i < top.length; i++) {
-		const g = top[i];
-		const ry = y + i * (barH + rowGap);
-		const pct = totalCount > 0 ? g.count / totalCount : 0;
-		ctx.fillStyle = palette.text;
-		ctx.font = `600 ${genreLblFontPx}px ${CV_FONT}`;
-		ctx.fillText(cvTruncate(ctx, g.genre, labelCap), x, ry + barH - 4);
-		const barX = x + labelCap + CV_GAP;
-		const barW = Math.max(minBarW, w - pctReserve - (barX - x) - CV_GAP);
-		ctx.fillStyle = "rgba(255,255,255,0.1)";
-		cvFillRoundRect(ctx, barX, ry, barW, barH, barH / 2);
-		ctx.fillStyle = cvRgb(palette.accent, 1 - i * 0.13);
-		cvFillRoundRect(ctx, barX, ry, barW * (g.count / maxCount), barH, barH / 2);
-		ctx.fillStyle = genrePctColor;
-		ctx.font = `600 ${isStory ? (storyTight ? 30 : 34) : tightSq ? 26 : 32}px ${CV_FONT}`;
-		ctx.textAlign = "right";
-		ctx.fillText(`${Math.round(pct * 100)}%`, x + w, ry + barH - 4);
-		ctx.textAlign = "left";
-	}
-	y += top.length * (barH + rowGap);
 	return y;
 }
 

@@ -578,9 +578,7 @@ function App() {
 							providerName={providerName}
 							activeProviderId={activeProviderId}
 							onSettingsClick={() => openSettings()}
-							onShareClick={
-								stats && activePage !== "world" ? () => setShowShare(true) : undefined
-							}
+							onShareClick={stats && activePage !== "world" ? () => setShowShare(true) : undefined}
 							periods={periodTabsPeriods}
 							activePeriod={activePeriodForTabs}
 							onPeriodChange={handlePeriodChange}
