@@ -1,4 +1,5 @@
 import type { StatsResult } from "../../shared/types/stats";
+import { normalizeSpotifyImageUrl } from "../../shared/util/spotify-image-url";
 import { formatDuration, formatNumber } from "../format";
 import { getPreferences } from "../preferences";
 import { navigateToUri } from "../utils";
@@ -62,67 +63,70 @@ export function TopLists({
 				{loading || loadingByColumn?.tracks ? (
 					<TopListColumnSkeleton />
 				) : (
-					stats?.topTracks.slice(0, prefs.itemsPerSection).map((track) => (
-						<div
-							key={track.trackUri || `unknown-track-${track.rank}`}
-							className="top-list-row"
-							role="button"
-							tabIndex={0}
-							onClick={() => navigateToUri(track.trackUri)}
-							onKeyDown={(e: { key: string }) => {
-								if (e.key === "Enter" || e.key === " ") navigateToUri(track.trackUri);
-							}}
-						>
-							<span className={`rank-number ${getRankClass(track.rank)}`}>{track.rank}</span>
-							{track.albumArt && <img src={track.albumArt} alt="" className="track-art" />}
+					stats?.topTracks.slice(0, prefs.itemsPerSection).map((track) => {
+						const trackArt = normalizeSpotifyImageUrl(track.albumArt);
+						return (
 							<div
-								style={{
-									flex: 1,
-									minWidth: 0,
-									display: "flex",
-									flexDirection: "column",
-									gap: 2,
+								key={track.trackUri || `unknown-track-${track.rank}`}
+								className="top-list-row"
+								role="button"
+								tabIndex={0}
+								onClick={() => navigateToUri(track.trackUri)}
+								onKeyDown={(e: { key: string }) => {
+									if (e.key === "Enter" || e.key === " ") navigateToUri(track.trackUri);
 								}}
 							>
+								<span className={`rank-number ${getRankClass(track.rank)}`}>{track.rank}</span>
+								{trackArt ? <img src={trackArt} alt="" className="track-art" /> : null}
 								<div
 									style={{
-										fontSize: 13,
-										fontWeight: 600,
-										color: "var(--spice-text)",
-										whiteSpace: "nowrap",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
+										flex: 1,
+										minWidth: 0,
+										display: "flex",
+										flexDirection: "column",
+										gap: 2,
 									}}
 								>
-									{track.trackName}
+									<div
+										style={{
+											fontSize: 13,
+											fontWeight: 600,
+											color: "var(--spice-text)",
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
+										{track.trackName}
+									</div>
+									<div
+										style={{
+											fontSize: 11,
+											fontWeight: 400,
+											color: "rgba(var(--spice-rgb-text), 0.55)",
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
+										{track.artistName}
+									</div>
 								</div>
 								<div
 									style={{
-										fontSize: 11,
-										fontWeight: 400,
+										display: "flex",
+										alignItems: "center",
 										color: "rgba(var(--spice-rgb-text), 0.55)",
-										whiteSpace: "nowrap",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
+										flexShrink: 0,
 									}}
 								>
-									{track.artistName}
+									<span style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
+										{formatDuration(track.durationMs)}
+									</span>
 								</div>
 							</div>
-							<div
-								style={{
-									display: "flex",
-									alignItems: "center",
-									color: "rgba(var(--spice-rgb-text), 0.55)",
-									flexShrink: 0,
-								}}
-							>
-								<span style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
-									{formatDuration(track.durationMs)}
-								</span>
-							</div>
-						</div>
-					))
+						);
+					})
 				)}
 			</div>
 		),
@@ -137,6 +141,7 @@ export function TopLists({
 				) : (
 					stats?.topArtists.slice(0, prefs.itemsPerSection).map((artist) => {
 						const primaryGenre = artist.genres?.[0];
+						const artistAvatar = normalizeSpotifyImageUrl(artist.imageUrl ?? undefined);
 						return (
 							<div
 								key={artist.artistUri || `unknown-artist-${artist.rank}`}
@@ -149,9 +154,9 @@ export function TopLists({
 								}}
 							>
 								<span className={`rank-number ${getRankClass(artist.rank)}`}>{artist.rank}</span>
-								{artist.imageUrl && (
-									<img src={artist.imageUrl} alt="" className="track-art track-art--round" />
-								)}
+								{artistAvatar ? (
+									<img src={artistAvatar} alt="" className="track-art track-art--round" />
+								) : null}
 								<div
 									style={{
 										flex: 1,
@@ -234,56 +239,59 @@ export function TopLists({
 				{loading || loadingByColumn?.albums ? (
 					<TopListColumnSkeleton />
 				) : (
-					stats?.topAlbums.slice(0, prefs.itemsPerSection).map((album) => (
-						<div
-							key={album.albumUri || `unknown-album-${album.rank}`}
-							className="top-list-row"
-							role="button"
-							tabIndex={0}
-							onClick={() => navigateToUri(album.albumUri)}
-							onKeyDown={(e: { key: string }) => {
-								if (e.key === "Enter" || e.key === " ") navigateToUri(album.albumUri);
-							}}
-						>
-							<span className={`rank-number ${getRankClass(album.rank)}`}>{album.rank}</span>
-							{album.albumArt && <img src={album.albumArt} alt="" className="track-art" />}
+					stats?.topAlbums.slice(0, prefs.itemsPerSection).map((album) => {
+						const albumArt = normalizeSpotifyImageUrl(album.albumArt);
+						return (
 							<div
-								style={{
-									flex: 1,
-									minWidth: 0,
-									display: "flex",
-									flexDirection: "column",
-									gap: 2,
+								key={album.albumUri || `unknown-album-${album.rank}`}
+								className="top-list-row"
+								role="button"
+								tabIndex={0}
+								onClick={() => navigateToUri(album.albumUri)}
+								onKeyDown={(e: { key: string }) => {
+									if (e.key === "Enter" || e.key === " ") navigateToUri(album.albumUri);
 								}}
 							>
+								<span className={`rank-number ${getRankClass(album.rank)}`}>{album.rank}</span>
+								{albumArt ? <img src={albumArt} alt="" className="track-art" /> : null}
 								<div
 									style={{
-										fontSize: 13,
-										fontWeight: 600,
-										color: "var(--spice-text)",
-										whiteSpace: "nowrap",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
+										flex: 1,
+										minWidth: 0,
+										display: "flex",
+										flexDirection: "column",
+										gap: 2,
 									}}
 								>
-									{album.albumName}
-								</div>
-								<div
-									style={{
-										fontSize: 11,
-										fontWeight: 400,
-										color: "rgba(var(--spice-rgb-text), 0.55)",
-										whiteSpace: "nowrap",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
-										fontVariantNumeric: "tabular-nums",
-									}}
-								>
-									{album.artistName} · {formatNumber(album.count)} plays
+									<div
+										style={{
+											fontSize: 13,
+											fontWeight: 600,
+											color: "var(--spice-text)",
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
+										{album.albumName}
+									</div>
+									<div
+										style={{
+											fontSize: 11,
+											fontWeight: 400,
+											color: "rgba(var(--spice-rgb-text), 0.55)",
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+											fontVariantNumeric: "tabular-nums",
+										}}
+									>
+										{album.artistName} · {formatNumber(album.count)} plays
+									</div>
 								</div>
 							</div>
-						</div>
-					))
+						);
+					})
 				)}
 			</div>
 		),

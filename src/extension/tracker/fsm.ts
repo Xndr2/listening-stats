@@ -1,6 +1,20 @@
 import { EVENTS } from "../../shared/constants/events";
 import { LS_KEYS } from "../../shared/constants/storage-keys";
 import type { PlayEvent } from "../../shared/types/play-event";
+import { normalizeSpotifyImageUrl } from "../../shared/util/spotify-image-url";
+
+/** Count as a full play when listened past the user threshold or through ~90% of the track. */
+export function classifyPlayOrSkip(
+	totalPlayedMs: number,
+	capturedDurationMs: number,
+	thresholdMs: number,
+): "play" | "skip" {
+	if (capturedDurationMs <= 0) return "skip";
+	const ratio = totalPlayedMs / capturedDurationMs;
+	if (ratio >= 0.9) return "play";
+	if (totalPlayedMs >= thresholdMs) return "play";
+	return "skip";
+}
 
 // ─── Public Types ──────────────────────────────────────────────────────────────
 
@@ -131,7 +145,7 @@ export class TrackingFSM {
 				artistUri: meta?.artist_uri || "",
 				albumName: meta?.album_title || "Unknown Album",
 				albumUri: meta?.album_uri || "",
-				albumArt: meta?.image_url || meta?.image_xlarge_url,
+				albumArt: normalizeSpotifyImageUrl(meta?.image_url || meta?.image_xlarge_url),
 				durationMs: item.duration?.milliseconds || 0,
 				startedAt: Date.now(),
 			};
@@ -232,9 +246,7 @@ export class TrackingFSM {
 
 		const threshold = this._deps.getPlayThreshold();
 		const capturedDuration = this._state.capturedData.durationMs;
-		// Classification: skip only when played < threshold AND track is longer than threshold
-		const isSkip = totalPlayedMs < threshold && capturedDuration > threshold;
-		const eventType: "play" | "skip" = isSkip ? "skip" : "play";
+		const eventType = classifyPlayOrSkip(totalPlayedMs, capturedDuration, threshold);
 
 		// Skip-repeats suppression: only suppress consecutive plays (not skips)
 		if (

@@ -5,10 +5,16 @@ import { db } from "../shared/storage/db";
 import { backupIfUpgradeNeeded, initDatabase } from "../shared/storage/migration-manager";
 import type { PlayEvent } from "../shared/types/play-event";
 
-// Mock enrichArtists to avoid real API calls (same pattern as local-provider.test.ts)
-vi.mock("../shared/stats/artist-enrichment", () => ({
-	enrichArtists: vi.fn().mockResolvedValue(undefined),
-}));
+// Mock enrichArtists only; keep isSpotifyArtistUri real for LocalProvider
+vi.mock("../shared/stats/artist-enrichment", async () => {
+	const actual = await vi.importActual<typeof import("../shared/stats/artist-enrichment")>(
+		"../shared/stats/artist-enrichment",
+	);
+	return {
+		...actual,
+		enrichArtists: vi.fn().mockResolvedValue(undefined),
+	};
+});
 
 import { LocalProvider } from "../shared/stats/local-provider";
 import { LOCAL_PERIODS } from "../shared/stats/periods";
@@ -206,9 +212,9 @@ describe("v1 compatibility  -  COMPAT-03: missing type treated as play", () => {
 		const provider = new LocalProvider();
 		const result = await provider.calculateStats(allTimePeriod);
 
-		// 3 total events, 1 typed skip => skipRate = 1/3
+		// 3 total events, 1 typed skip => skipRate = 1/3; totalPlays counts qualifying plays only
 		// The 2 v1 events (no type) are NOT treated as skips
-		expect(result.totalPlays).toBe(3);
+		expect(result.totalPlays).toBe(2);
 		expect(result.skipRate).toBeCloseTo(1 / 3, 5);
 	});
 });

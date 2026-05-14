@@ -28,7 +28,7 @@ describe("GuidedTour integration", () => {
 			container,
 		);
 		expect(document.querySelector(".tour-popover")).not.toBeNull();
-		expect(document.body.textContent).toContain("Step 1 of 8");
+		expect(document.body.textContent).toContain(`Step 1 of ${TOUR_STEPS.length}`);
 	});
 
 	it("does not render when active=false", async () => {
@@ -56,7 +56,7 @@ describe("GuidedTour integration", () => {
 		);
 		const nextBtn = document.querySelector(".tour-btn-next") as HTMLButtonElement;
 		nextBtn.click();
-		expect(document.body.textContent).toContain("Step 2 of 8");
+		expect(document.body.textContent).toContain(`Step 2 of ${TOUR_STEPS.length}`);
 		expect(document.body.textContent).toContain(TOUR_STEPS[1].label);
 	});
 
@@ -114,7 +114,7 @@ describe("GuidedTour integration", () => {
 			container,
 		);
 		window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
-		expect(document.body.textContent).toContain("Step 2 of 8");
+		expect(document.body.textContent).toContain(`Step 2 of ${TOUR_STEPS.length}`);
 	});
 
 	it("goes back on ArrowLeft keydown (not below step 0)", async () => {
@@ -129,13 +129,13 @@ describe("GuidedTour integration", () => {
 		);
 		// First go forward
 		window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
-		expect(document.body.textContent).toContain("Step 2 of 8");
+		expect(document.body.textContent).toContain(`Step 2 of ${TOUR_STEPS.length}`);
 		// Then go back
 		window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
-		expect(document.body.textContent).toContain("Step 1 of 8");
+		expect(document.body.textContent).toContain(`Step 1 of ${TOUR_STEPS.length}`);
 		// Don't go below 0
 		window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
-		expect(document.body.textContent).toContain("Step 1 of 8");
+		expect(document.body.textContent).toContain(`Step 1 of ${TOUR_STEPS.length}`);
 	});
 
 	it("skips tour on Escape keydown", async () => {
@@ -347,10 +347,10 @@ describe("GuidedTour spotlight and positioning", () => {
 		);
 		const nextBtn = document.querySelector(".tour-btn-next") as HTMLButtonElement;
 		nextBtn.click();
-		expect(document.body.textContent).toContain("Step 2 of 8");
+		expect(document.body.textContent).toContain(`Step 2 of ${TOUR_STEPS.length}`);
 		const backBtn = document.querySelector(".tour-btn-back") as HTMLButtonElement;
 		backBtn.click();
-		expect(document.body.textContent).toContain("Step 1 of 8");
+		expect(document.body.textContent).toContain(`Step 1 of ${TOUR_STEPS.length}`);
 	});
 
 	it("updates step count to match expanded TOUR_STEPS length", async () => {

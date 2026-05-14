@@ -89,8 +89,6 @@ interface HeaderProps {
 	periods?: Period[];
 	activePeriod?: Period;
 	onPeriodChange?: (period: Period) => void;
-	activePage?: string;
-	onPageChange?: (page: string) => void;
 }
 
 export default function Header({
@@ -101,8 +99,6 @@ export default function Header({
 	periods,
 	activePeriod,
 	onPeriodChange,
-	activePage,
-	onPageChange,
 }: HeaderProps) {
 	const [health, setHealth] = useState<HealthPayload | null>(() => {
 		try {
@@ -159,18 +155,17 @@ export default function Header({
 	);
 
 	useEffect(() => {
-		setCapabilities(providerRegistry.getActive()?.getProviderInfo().capabilities ?? null);
-	}, [activeProviderId]);
-
-	useEffect(() => {
 		const handler = () => {
 			setCapabilities(providerRegistry.getActive()?.getProviderInfo().capabilities ?? null);
 		};
+		handler();
 		window.addEventListener(EVENTS.PROVIDER_CHANGED, handler);
+		window.addEventListener(EVENTS.STATSFM_PROFILE_REFRESHED, handler);
 		return () => {
 			window.removeEventListener(EVENTS.PROVIDER_CHANGED, handler);
+			window.removeEventListener(EVENTS.STATSFM_PROFILE_REFRESHED, handler);
 		};
-	}, []);
+	}, [activeProviderId]);
 
 	const healthColor = getHealthColor(activeProviderId, health, sfmHealth);
 	const tooltipText =
@@ -194,31 +189,9 @@ export default function Header({
 						</div>
 					</Spicetify.ReactComponent.TooltipWrapper>
 				</div>
-				{activePage && onPageChange && (
-					<div className="page-tabs" role="tablist" data-testid="page-tabs">
-						<button
-							type="button"
-							className={`page-tab${activePage === "dashboard" ? " active" : ""}`}
-							role="tab"
-							aria-selected={activePage === "dashboard"}
-							onClick={() => onPageChange("dashboard")}
-						>
-							Dashboard
-						</button>
-						<button
-							type="button"
-							className={`page-tab${activePage === "world" ? " active" : ""}`}
-							role="tab"
-							aria-selected={activePage === "world"}
-							onClick={() => onPageChange("world")}
-						>
-							World
-						</button>
-					</div>
-				)}
 			</div>
 			<div className="stats-header-right">
-				{activePage !== "world" && periods && activePeriod && onPeriodChange && (
+				{periods && activePeriod && onPeriodChange && (
 					<div data-tour-target="period">
 						<PeriodTabs
 							periods={periods}

@@ -209,7 +209,7 @@ describe("TrackingFSM", () => {
 			expect(capturedType).toBe("skip");
 		});
 
-		it("classifies short track as 'play' when durationMs <= threshold", async () => {
+		it("classifies short track as 'skip' when barely listened (<90% and below threshold)", async () => {
 			let capturedType: string | undefined;
 			const fsmShort = new TrackingFSM({
 				...makeDeps(),
@@ -219,9 +219,25 @@ describe("TrackingFSM", () => {
 				}),
 				getPlayThreshold: vi.fn(() => 30000),
 			});
-			// durationMs = 5000 (< threshold of 30000)  -  short track
 			await fsmShort.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 5000 }));
-			// totalPlayedMs will be near 0 (< threshold), but durationMs <= threshold => 'play'
+			await fsmShort.handleSongChange(makePlayerData({ uri: "spotify:track:B", durationMs: 5000 }));
+			expect(capturedType).toBe("skip");
+		});
+
+		it("classifies short track as 'play' when ~90% or more of the track was heard", async () => {
+			let capturedType: string | undefined;
+			const fsmShort = new TrackingFSM({
+				...makeDeps(),
+				addPlayEvent: vi.fn(async (event) => {
+					capturedType = event.type;
+					return true;
+				}),
+				getPlayThreshold: vi.fn(() => 30000),
+			});
+			await fsmShort.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 5000 }));
+			const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 4600);
+			fsmShort.handlePlayPause(true);
+			spy.mockRestore();
 			await fsmShort.handleSongChange(makePlayerData({ uri: "spotify:track:B", durationMs: 5000 }));
 			expect(capturedType).toBe("play");
 		});

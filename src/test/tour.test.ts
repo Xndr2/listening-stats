@@ -60,9 +60,9 @@ describe("Tour logic", () => {
 	});
 
 	describe("TOUR_STEPS", () => {
-		it("has exactly 8 steps", async () => {
+		it("has exactly 7 steps", async () => {
 			const { TOUR_STEPS } = await import("../app/tour");
-			expect(TOUR_STEPS).toHaveLength(8);
+			expect(TOUR_STEPS).toHaveLength(7);
 		});
 
 		it("each step has id, label, text, and selector", async () => {
@@ -84,7 +84,6 @@ describe("Tour logic", () => {
 			const ids = TOUR_STEPS.map((s) => s.id);
 			expect(ids).toEqual([
 				"health",
-				"page-tabs",
 				"period",
 				"overview",
 				"lists",

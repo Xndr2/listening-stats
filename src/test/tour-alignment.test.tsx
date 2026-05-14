@@ -92,9 +92,10 @@ describe("Tour alignment scroll vs measure separation", () => {
 
 	it("scrollIntoView is called again when advancing to next step", async () => {
 		const healthTarget = createTourTarget("health", { top: 100, left: 50, width: 200, height: 40 });
-		const tabsEl = document.createElement("div");
-		tabsEl.setAttribute("data-testid", "page-tabs");
-		tabsEl.getBoundingClientRect = () => ({
+		const periodEl = document.createElement("div");
+		periodEl.setAttribute("data-tour-target", "period");
+		periodEl.className = "period-tabs";
+		periodEl.getBoundingClientRect = () => ({
 			top: 60,
 			left: 20,
 			width: 300,
@@ -105,8 +106,8 @@ describe("Tour alignment scroll vs measure separation", () => {
 			y: 60,
 			toJSON: () => {},
 		});
-		tabsEl.scrollIntoView = vi.fn();
-		document.body.appendChild(tabsEl);
+		periodEl.scrollIntoView = vi.fn();
+		document.body.appendChild(periodEl);
 
 		const { GuidedTour } = await import("../app/components/GuidedTour");
 		Spicetify.ReactDOM.render(
@@ -122,9 +123,9 @@ describe("Tour alignment scroll vs measure separation", () => {
 
 		const nextBtn = document.querySelector(".tour-btn-next") as HTMLButtonElement;
 		nextBtn.click();
-		expect(tabsEl.scrollIntoView).toHaveBeenCalledTimes(1);
+		expect(periodEl.scrollIntoView).toHaveBeenCalledTimes(1);
 
-		tabsEl.remove();
+		periodEl.remove();
 	});
 });
 
@@ -267,13 +268,24 @@ describe("Tour alignment step selectors resolve targets", () => {
 
 	const targetSetup: Record<string, () => HTMLElement> = {
 		health: () => createTourTarget("health", { top: 0, left: 0, width: 100, height: 30 }),
-		"page-tabs": () => {
+		period: () => {
 			const el = document.createElement("div");
-			el.setAttribute("data-testid", "page-tabs");
+			el.setAttribute("data-tour-target", "period");
+			el.className = "period-tabs";
+			el.getBoundingClientRect = () => ({
+				top: 0,
+				left: 0,
+				width: 100,
+				height: 30,
+				right: 100,
+				bottom: 30,
+				x: 0,
+				y: 0,
+				toJSON: () => {},
+			});
 			document.body.appendChild(el);
 			return el;
 		},
-		period: () => createTourTarget("period", { top: 0, left: 0, width: 100, height: 30 }),
 		overview: () => {
 			const el = document.createElement("div");
 			el.setAttribute("data-section-id", "overview");

@@ -1,26 +1,20 @@
-import { classifyLastfmError } from "../../shared/api/lastfm-client";
 import { LS_KEYS } from "../../shared/constants/storage-keys";
 import type { AppError } from "../../shared/errors";
-import type { WorldScope, WorldTrack, WorldWindow } from "../world-charts-service";
+import { classifyStatsFmError } from "../../shared/errors";
+import type { WorldChartDataSource, WorldTrack, WorldWindow } from "../world-charts-service";
 import { getArtistChartsAsync, getChartsAsync } from "../world-charts-service";
 import { InlineErrorCard } from "./InlineErrorCard";
 import { WorldChartsSkeleton } from "./LoadingSkeleton";
 
 const { useState, useEffect, useCallback } = Spicetify.React;
 
-const SCOPES: { value: WorldScope; label: string }[] = [
-	{ value: "world", label: "World" },
-	{ value: "us", label: "US" },
-	{ value: "gb", label: "UK" },
-	{ value: "jp", label: "JP" },
-];
-
 const WINDOWS: { value: WorldWindow; label: string }[] = [
 	{ value: "today", label: "Today" },
-	{ value: "week", label: "Week" },
+	{ value: "week", label: "This week" },
+	{ value: "month", label: "This month" },
+	{ value: "lifetime", label: "All-time" },
 ];
 
-const VALID_SCOPES = new Set<string>(SCOPES.map((s) => s.value));
 const VALID_WINDOWS = new Set<string>(WINDOWS.map((w) => w.value));
 
 const TILE_COLORS: [string, string][] = [
@@ -38,12 +32,6 @@ function tileGradient(seed: string): string {
 	const i = seed.charCodeAt(seed.length - 1) % TILE_COLORS.length;
 	const [a, b] = TILE_COLORS[i];
 	return `linear-gradient(135deg, ${a}, ${b})`;
-}
-
-function restoreScope(): WorldScope {
-	const stored = localStorage.getItem(LS_KEYS.WORLD_CHARTS_SCOPE);
-	if (stored && VALID_SCOPES.has(stored)) return stored as WorldScope;
-	return "world";
 }
 
 function restoreWindow(): WorldWindow {
@@ -65,56 +53,76 @@ function getDeltaDisplay(delta: number): { direction: string; indicator: string 
 	return { direction: "neutral", indicator: "-" };
 }
 
+function buildSourceLine(
+	trackSource: WorldChartDataSource,
+	artistSource: WorldChartDataSource,
+): string {
+	if (trackSource === "statsfm" && artistSource === "statsfm") return "Global charts · stats.fm";
+	const bits: string[] = [];
+	bits.push(
+		trackSource === "statsfm"
+			? "Tracks · stats.fm"
+			: trackSource === "mytopspotify"
+				? "Tracks · mytopspotify.io (daily)"
+				: "Tracks · demo",
+	);
+	bits.push(
+		artistSource === "statsfm"
+			? "Artists · stats.fm"
+			: artistSource === "mytopspotify"
+				? "Artists · mytopspotify.io (daily)"
+				: "Artists · demo",
+	);
+	return bits.join(" · ");
+}
+
 function searchInSpotify(query: string): void {
 	Spicetify.Platform.History.push(`/search/${encodeURIComponent(query)}`);
 }
 
-interface WorldChartsPageProps {
-	hasLastfmKey: boolean;
-	onConnectLastfm?: () => void;
-}
-
-export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPageProps) {
-	const [scope, setScope] = useState<WorldScope>(restoreScope);
+export function WorldChartsPage() {
 	const [timeWindow, setTimeWindow] = useState<WorldWindow>(restoreWindow);
 	const [tracks, setTracks] = useState<WorldTrack[]>([]);
 	const [artists, setArtists] = useState<WorldTrack[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<AppError | null>(null);
+	const [sourceLine, setSourceLine] = useState("Global charts · stats.fm");
 
-	const fetchCharts = useCallback(async (s: WorldScope, w: WorldWindow) => {
+	const fetchCharts = useCallback(async (w: WorldWindow) => {
 		setLoading(true);
 		setError(null);
 
 		const [trackResult, artistResult] = await Promise.all([
-			getChartsAsync(s, w),
-			getArtistChartsAsync(s, w),
+			getChartsAsync("world", w),
+			getArtistChartsAsync("world", w),
 		]);
+
+		let trackSource: WorldChartDataSource = "mock";
+		let artistSource: WorldChartDataSource = "mock";
 
 		if (trackResult.ok) {
 			setTracks(trackResult.data);
+			trackSource = trackResult.source ?? "statsfm";
 		} else {
-			setError(classifyLastfmError(trackResult.status, trackResult.message));
+			setError(classifyStatsFmError(trackResult.status, trackResult.message));
 			setTracks([]);
 		}
 
 		if (artistResult.ok) {
 			setArtists(artistResult.data);
+			artistSource = artistResult.source ?? "statsfm";
 		} else {
 			setArtists([]);
 		}
+
+		setSourceLine(buildSourceLine(trackSource, artistSource));
 
 		setLoading(false);
 	}, []);
 
 	useEffect(() => {
-		fetchCharts(scope, timeWindow);
-	}, [scope, timeWindow, fetchCharts]);
-
-	const handleScopeChange = (value: WorldScope) => {
-		setScope(value);
-		localStorage.setItem(LS_KEYS.WORLD_CHARTS_SCOPE, value);
-	};
+		fetchCharts(timeWindow);
+	}, [timeWindow, fetchCharts]);
 
 	const handleWindowChange = (value: WorldWindow) => {
 		setTimeWindow(value);
@@ -122,32 +130,24 @@ export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPa
 	};
 
 	const handleRetry = () => {
-		fetchCharts(scope, timeWindow);
+		fetchCharts(timeWindow);
 	};
-
-	if (!hasLastfmKey) {
-		return (
-			<div className="world-charts-page">
-				<div className="world-charts-empty" role="status">
-					<h2 className="world-charts-empty-title">Connect Last.fm</h2>
-					<p className="world-charts-empty-body">
-						Add a Last.fm API key to see what the world is playing.
-					</p>
-					{onConnectLastfm && (
-						<button type="button" className="btn-primary" onClick={onConnectLastfm}>
-							Connect Last.fm
-						</button>
-					)}
-				</div>
-			</div>
-		);
-	}
 
 	const renderChartItem = (item: WorldTrack, index: number, isArtist: boolean) => {
 		const rank = index + 1;
 		const rankCls = getRankClass(rank);
-		const delta = getDeltaDisplay(item.delta);
+		const deltaNum = item.delta;
+		const delta =
+			deltaNum != null ? getDeltaDisplay(deltaNum) : { direction: "neutral", indicator: "" };
 		const query = isArtist ? item.title : `${item.title} ${item.artist}`;
+
+		const bgStyle = item.artUrl
+			? {
+					backgroundImage: `url(${item.artUrl})`,
+					backgroundSize: "cover",
+					backgroundPosition: "center",
+				}
+			: { background: tileGradient(item.id) };
 
 		return (
 			<div
@@ -163,19 +163,21 @@ export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPa
 				<span className={`rank-number ${rankCls}`}>{rank}</span>
 				<div
 					className={`world-chart-tile${isArtist ? " world-chart-tile--round" : ""}`}
-					style={{ background: tileGradient(item.id) }}
+					style={bgStyle}
 				/>
 				<div className="world-chart-info">
 					<div className="world-chart-title">{item.title}</div>
-					<div className="world-chart-artist">
-						{isArtist ? `${item.plays} listeners` : item.artist}
-					</div>
+					<div className="world-chart-artist">{isArtist ? item.plays : item.artist}</div>
 				</div>
 				<div className="world-chart-stats">
-					{!isArtist && <div className="world-chart-plays">{item.plays}</div>}
-					<div className="world-chart-delta" data-direction={delta.direction}>
-						{delta.indicator}
-					</div>
+					{!isArtist && item.plays?.trim() ? (
+						<div className="world-chart-plays">{item.plays}</div>
+					) : null}
+					{deltaNum != null && delta.indicator ? (
+						<div className="world-chart-delta" data-direction={delta.direction}>
+							{delta.indicator}
+						</div>
+					) : null}
 				</div>
 			</div>
 		);
@@ -183,86 +185,72 @@ export function WorldChartsPage({ hasLastfmKey, onConnectLastfm }: WorldChartsPa
 
 	return (
 		<div className="world-charts-page">
-			<div className="world-charts-header">
-				<div>
-					<div className="section-kicker">World Charts</div>
-					<h2 className="section-title">What the world is playing</h2>
-				</div>
-				<div className="world-charts-tabs">
-					<div
-						className="world-charts-tab-group"
-						data-tabs="scope"
-						role="tablist"
-						aria-label="Region"
-					>
-						{SCOPES.map((s) => (
-							<button
-								type="button"
-								key={s.value}
-								className={`world-charts-tab${scope === s.value ? " active" : ""}`}
-								role="tab"
-								aria-selected={scope === s.value}
-								onClick={() => handleScopeChange(s.value)}
-							>
-								{s.label}
-							</button>
-						))}
+			<div className="world-charts-hero">
+				<div className="world-charts-header">
+					<div>
+						<div className="section-kicker">World Charts</div>
+						<h2 className="section-title">What the world is playing</h2>
 					</div>
-					<div
-						className="world-charts-tab-group"
-						data-tabs="window"
-						role="tablist"
-						aria-label="Time window"
-					>
-						{WINDOWS.map((w) => (
-							<button
-								type="button"
-								key={w.value}
-								className={`world-charts-tab${timeWindow === w.value ? " active" : ""}`}
-								role="tab"
-								aria-selected={timeWindow === w.value}
-								onClick={() => handleWindowChange(w.value)}
-							>
-								{w.label}
-							</button>
-						))}
+					<div className="world-charts-tabs">
+						<div
+							className="world-charts-tab-group"
+							data-tabs="window"
+							role="tablist"
+							aria-label="Time range"
+						>
+							{WINDOWS.map((w) => (
+								<button
+									type="button"
+									key={w.value}
+									className={`world-charts-tab${timeWindow === w.value ? " active" : ""}`}
+									role="tab"
+									aria-selected={timeWindow === w.value}
+									onClick={() => handleWindowChange(w.value)}
+								>
+									{w.label}
+								</button>
+							))}
+						</div>
 					</div>
 				</div>
+			</div>
+
+			<div className="world-page-notice" role="status">
+				World charts are new and updated often; what you see here may change as sources and layout
+				improve.
 			</div>
 
 			{loading && <WorldChartsSkeleton />}
 
 			{!loading && error && (
-				<InlineErrorCard
-					error={error}
-					onRetry={handleRetry}
-					onOpenSettings={onConnectLastfm ?? (() => {})}
-				/>
+				<InlineErrorCard error={error} onRetry={handleRetry} onOpenSettings={() => {}} />
 			)}
 
 			{!loading && !error && (
 				<>
-					<div className="world-charts-section" data-section="tracks">
-						<header className="section-heading">
-							<span className="section-kicker">Trending</span>
-							<h3 className="section-title">Top Tracks</h3>
-						</header>
-						<div className="world-charts-grid">
-							{tracks.slice(0, 8).map((t, i) => renderChartItem(t, i, false))}
-						</div>
+					<div className="world-charts-layout">
+						<section className="section-card world-charts-section" data-section="tracks">
+							<header className="section-heading">
+								<span className="section-kicker">Trending</span>
+								<h3 className="section-title">Top Tracks</h3>
+							</header>
+							<div className="world-charts-grid">
+								{tracks.slice(0, 8).map((t, i) => renderChartItem(t, i, false))}
+							</div>
+						</section>
+
+						<section className="section-card world-charts-section" data-section="artists">
+							<header className="section-heading">
+								<span className="section-kicker">Popular</span>
+								<h3 className="section-title">Top Artists</h3>
+							</header>
+							<div className="world-charts-grid">
+								{artists.slice(0, 8).map((a, i) => renderChartItem(a, i, true))}
+							</div>
+						</section>
 					</div>
 
-					<div className="world-charts-section" data-section="artists">
-						<header className="section-heading">
-							<span className="section-kicker">Popular</span>
-							<h3 className="section-title">Top Artists</h3>
-						</header>
-						<div className="world-charts-grid">
-							{artists.slice(0, 8).map((a, i) => renderChartItem(a, i, true))}
-						</div>
-					</div>
-
-					<div className="world-charts-source">Source: Last.fm</div>
+					<div className="world-charts-source">{sourceLine}</div>
 				</>
 			)}
 		</div>

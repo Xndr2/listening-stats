@@ -224,15 +224,12 @@ export default function OverviewSection({
 					tooltip: "Consecutive calendar days with at least one play (local timezone)",
 					accent: stats.streak != null && stats.streak > 0 ? "var(--spice-button)" : undefined,
 				},
-		"new-artists":
-			stats.newArtistCount != null
-				? {
-						value: formatNumber(stats.newArtistCount),
-						tooltip:
-							"Artists you played in this period that you didn't play in the previous period",
-						sub: "discovered",
-					}
-				: undefined,
+		"new-artists": {
+			value: formatNumber(stats.newArtistCount ?? 0),
+			tooltip:
+				"Artists you played in this period that you didn't play in the previous period (or no plays in the prior window)",
+			sub: "discovered",
+		},
 		"peak-hour": {
 			value: formatHour(stats.peakHour, prefs.use24HourTime),
 			tooltip: "Your most active listening hour in this period",

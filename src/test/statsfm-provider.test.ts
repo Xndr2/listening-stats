@@ -769,7 +769,7 @@ describe("StatsFmProvider", () => {
 			);
 			expect(priorCalls.length).toBe(0);
 
-			expect(result.newArtistCount).toBeUndefined();
+			expect(result.newArtistCount).toBe(0);
 			expect(result.priorPeriodTotalDuration).toBeUndefined();
 		});
 	});

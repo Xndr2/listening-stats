@@ -4,12 +4,11 @@ export const EVENTS = {
 	HEALTH_CHANGED: "listening-stats:health-changed",
 	TRACKING_PAUSED: "listening-stats:tracking-paused",
 	TRACKING_RESUMED: "listening-stats:tracking-resumed",
-	// Provider events (v2.2)
 	PROVIDER_CHANGED: "listening-stats:provider-changed",
 	STATSFM_CONNECTED: "listening-stats:statsfm-connected",
 	STATSFM_DISCONNECTED: "listening-stats:statsfm-disconnected",
-	// Health events (v2.3)
 	STATSFM_HEALTH_CHANGED: "listening-stats:statsfm-health-changed",
-	// Preference events (v2.5)
+	STATSFM_PROFILE_REFRESHED: "listening-stats:statsfm-profile-refreshed",
 	PREFS_CHANGED: "listening-stats:prefs-changed",
+	DASHBOARD_PERIOD_CHANGED: "listening-stats:dashboard-period-changed",
 } as const;

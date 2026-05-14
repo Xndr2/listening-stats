@@ -189,12 +189,18 @@ describe("OverviewSection hero RAF counter", () => {
 		await act(async () => {
 			await renderOverview({ ...baseStats, totalDuration: 3_600_000 }, mockPeriods[0])(container);
 		});
+		await act(async () => {
+			vi.advanceTimersByTime(1000);
+		});
 		// Full animation for period[0] completes: hours = 1.
 		expect(container.querySelector('[data-testid="hero-hours"]')?.textContent).toBe("1");
 
 		// Switch period to two hours of listening
 		await act(async () => {
 			await renderOverview({ ...baseStats, totalDuration: 7_200_000 }, mockPeriods[1])(container);
+		});
+		await act(async () => {
+			vi.advanceTimersByTime(1000);
 		});
 		expect(container.querySelector('[data-testid="hero-hours"]')?.textContent).toBe("2");
 		expect(container.querySelector('[data-testid="hero-minutes"]')?.textContent).toBe("00");
@@ -262,16 +268,15 @@ describe("OverviewSection grid topology", () => {
 		expect(cards.length).toBe(3);
 	});
 
-	it("when newArtistCount is undefined, only 6 tiles render (4 in right block + 2 in bottom)", async () => {
-		// No newArtistCount → tile filter drops "new-artists" → 6 visible
+	it("when newArtistCount is undefined, all 7 tiles render (new artists shows 0)", async () => {
 		await renderOverview({ ...baseStats, streak: 3 })(container);
 		const allCards = container.querySelectorAll(".overview-card");
-		expect(allCards.length).toBe(6);
-		// No data-card-id="new-artists" present
-		expect(container.querySelector('[data-card-id="new-artists"]')).toBeNull();
-		// Right block has 4; bottom row has 2 (top4 = first 4 visible after filter)
+		expect(allCards.length).toBe(7);
+		const newArtists = container.querySelector('[data-card-id="new-artists"]');
+		expect(newArtists).not.toBeNull();
+		expect(newArtists?.querySelector(".overview-card-value")?.textContent).toBe("0");
 		expect(container.querySelectorAll(".overview-right-block .overview-card").length).toBe(4);
-		expect(container.querySelectorAll(".overview-bottom-row .overview-card").length).toBe(2);
+		expect(container.querySelectorAll(".overview-bottom-row .overview-card").length).toBe(3);
 	});
 
 	it("data-card-id attributes preserved on all tiles", async () => {
@@ -372,10 +377,12 @@ describe("OverviewSection tiles by provider", () => {
 		expect(value?.style.color === "" || !value?.style.color.includes("--spice-button")).toBe(true);
 	});
 
-	it("new-artists tile is HIDDEN when stats.newArtistCount is undefined", async () => {
+	it("new-artists tile shows 0 when stats.newArtistCount is undefined", async () => {
 		setActiveProvider("local");
 		await renderOverview({ ...baseStats, streak: 3 })(container); // newArtistCount omitted
-		expect(container.querySelector('[data-card-id="new-artists"]')).toBeNull();
+		const newArtists = container.querySelector('[data-card-id="new-artists"]');
+		expect(newArtists).not.toBeNull();
+		expect(newArtists?.querySelector(".overview-card-value")?.textContent).toBe("0");
 	});
 
 	it("new-artists tile renders the count when stats.newArtistCount is defined", async () => {

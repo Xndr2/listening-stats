@@ -22,15 +22,9 @@ const BASE_TOUR_STEPS: TourStep[] = [
 		selector: '[data-tour-target="health"], .header-provider-pill',
 	},
 	{
-		id: "page-tabs",
-		label: "Dashboard & World",
-		text: "Switch between your personal Dashboard and the global World charts. The World tab shows trending tracks and artists worldwide from Last.fm.",
-		selector: '[data-testid="page-tabs"]',
-	},
-	{
 		id: "period",
-		label: "Time Window",
-		text: "Pick a time range and every section on the dashboard updates to match. Available periods depend on your tracking provider.",
+		label: "Time Window & World",
+		text: "Pick a time range and every section on the dashboard updates to match. Use the World tab at the end for global charts from stats.fm. Available periods depend on your tracking provider.",
 		selector: '[data-tour-target="period"], .period-tabs',
 	},
 ];

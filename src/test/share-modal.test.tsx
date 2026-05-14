@@ -155,4 +155,15 @@ describe("ShareModal", () => {
 		Spicetify.ReactDOM.unmountComponentAtNode(container);
 		container.remove();
 	});
+
+	it("hides genre variant for local provider", async () => {
+		providerRegistry.setActive("local");
+		const { container } = await renderShareModal();
+		const labels = Array.from(document.querySelectorAll(".share-variant-tab")).map((t) =>
+			t.textContent?.trim(),
+		);
+		expect(labels).not.toContain("Genre");
+		Spicetify.ReactDOM.unmountComponentAtNode(container);
+		container.remove();
+	});
 });

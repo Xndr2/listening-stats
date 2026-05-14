@@ -121,14 +121,14 @@ describe("Issue 41: card reflow for missing/unavailable cards", () => {
 		localStorage.clear();
 	});
 
-	it("when newArtistCount missing, remaining bottom row cards reflow without gaps", async () => {
+	it("when newArtistCount missing, bottom row still shows three tiles (new artists defaults to 0)", async () => {
 		await renderOverview(container, { ...baseStats, streak: 3 });
 		const bottomRow = container.querySelector<HTMLElement>(".overview-bottom-row");
 		expect(bottomRow).not.toBeNull();
 		const cards = bottomRow!.querySelectorAll(".overview-card");
-		expect(cards.length).toBe(2);
+		expect(cards.length).toBe(3);
 		const cols = bottomRow?.style.gridTemplateColumns;
-		expect(cols).toContain("2");
+		expect(cols).toContain("3");
 	});
 
 	it("hiding a card via prefs does not leave an empty slot", async () => {

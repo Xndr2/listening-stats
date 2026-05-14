@@ -84,7 +84,7 @@ export function WorldChartsSkeleton() {
 						className="skeleton-shimmer"
 						style={{ width: "140px", height: "18px", marginBottom: "16px", borderRadius: "4px" }}
 					/>
-					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+					<div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "8px 0" }}>
 						{Array.from({ length: 8 }).map((_, row) => (
 							<div
 								key={row}

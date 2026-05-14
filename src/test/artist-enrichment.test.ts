@@ -248,4 +248,63 @@ describe("enrichArtists", () => {
 		const stored = await db.artists.get(uri);
 		expect(stored?.imageUrl).toBeNull();
 	});
+
+	it("ignores invalid artist URIs (no cosmos call)", async () => {
+		await enrichArtists(["", "spotify:track:bad", "listening-stats:x", "spotify:artist:"]);
+		expect(cosmosGetMock).not.toHaveBeenCalled();
+	});
+
+	it("stores tombstone when API returns null for a slot", async () => {
+		const uri = makeArtistUri("nullslot");
+
+		cosmosGetMock.mockResolvedValueOnce({
+			ok: true,
+			data: { artists: [null] },
+		});
+
+		await enrichArtists([uri]);
+
+		const stored = await db.artists.get(uri);
+		expect(stored?.imageUrl).toBeNull();
+		expect(stored?.name).toBe("Unknown");
+	});
+
+	it("re-fetches when portrait is null and row is older than no-image cooldown", async () => {
+		const uri = makeArtistUri("retryimg");
+		await db.artists.put({
+			uri,
+			name: "Retry",
+			genres: [],
+			imageUrl: null,
+			updatedAt: Date.now() - 7 * 60 * 60 * 1000,
+		});
+
+		cosmosGetMock.mockResolvedValueOnce({
+			ok: true,
+			data: {
+				artists: [makeSpotifyArtist("retryimg", "Retry", [], "https://img.example/retry.jpg")],
+			},
+		});
+
+		await enrichArtists([uri]);
+
+		expect(cosmosGetMock).toHaveBeenCalledTimes(1);
+		const stored = await db.artists.get(uri);
+		expect(stored?.imageUrl).toBe("https://img.example/retry.jpg");
+	});
+
+	it("skips refetch when portrait is null but within no-image cooldown", async () => {
+		const uri = makeArtistUri("coolimg");
+		await db.artists.put({
+			uri,
+			name: "Cool",
+			genres: [],
+			imageUrl: null,
+			updatedAt: Date.now() - 2 * 60 * 60 * 1000,
+		});
+
+		await enrichArtists([uri]);
+
+		expect(cosmosGetMock).not.toHaveBeenCalled();
+	});
 });

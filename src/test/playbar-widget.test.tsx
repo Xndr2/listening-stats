@@ -53,7 +53,34 @@ describe("PlaybarWidget", () => {
 		expect(container.querySelector(".play-count-minimal")).toBeNull();
 	});
 
-	it("renders nothing when track has playCount <= 1", async () => {
+	it("shows New play when track has zero qualifying plays and extra context is on (default)", async () => {
+		const uri = "spotify:track:zeroplays";
+		(Spicetify.Player as any).data = {
+			isPaused: false,
+			item: { uri, name: "Fresh", metadata: {} },
+		};
+		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
+		await new Promise((r) => setTimeout(r, 80));
+		const first = container.querySelector(".play-count-pill--first");
+		expect(first).not.toBeNull();
+		expect(first?.textContent).toContain("New play");
+	});
+
+	it("hides widget at zero plays when extra play context is turned off", async () => {
+		setPreference("playCountShowPeriodStreams", false);
+		const uri = "spotify:track:zeroplays2";
+		(Spicetify.Player as any).data = {
+			isPaused: false,
+			item: { uri, name: "Fresh", metadata: {} },
+		};
+		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
+		await new Promise((r) => setTimeout(r, 80));
+		expect(container.querySelector(".play-count-widget-anchor")).toBeNull();
+	});
+
+	it("renders pill with 1 play when track has a single qualifying play", async () => {
 		const uri = "spotify:track:abc123";
 		await db.playEvents.add(makePlayEvent(uri, Date.now() - 60000));
 		(Spicetify.Player as any).data = {
@@ -64,7 +91,9 @@ describe("PlaybarWidget", () => {
 		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		// Wait for async effect
 		await new Promise((r) => setTimeout(r, 50));
-		expect(container.querySelector(".play-count-pill")).toBeNull();
+		const pill = container.querySelector(".play-count-pill");
+		expect(pill).not.toBeNull();
+		expect(pill?.textContent).toContain("1 play");
 	});
 
 	it("renders pill when track has playCount > 1", async () => {
@@ -270,8 +299,10 @@ describe("PlaybarWidget", () => {
 		const { PlaybarWidget } = await import("../app/components/PlaybarWidget");
 		Spicetify.ReactDOM.render(Spicetify.React.createElement(PlaybarWidget), container);
 		await new Promise((r) => setTimeout(r, 50));
-		// count = 1, should be hidden
-		expect(container.querySelector(".play-count-pill")).toBeNull();
+		// count = 1, visible as "1 play"
+		const pill1 = container.querySelector(".play-count-pill");
+		expect(pill1).not.toBeNull();
+		expect(pill1?.textContent).toContain("1 play");
 
 		// Add another play and fire event
 		await db.playEvents.add(makePlayEvent(uri, Date.now()));

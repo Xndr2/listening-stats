@@ -9,7 +9,8 @@ import type {
 	TopGenre,
 	TopTrack,
 } from "../types/stats";
-import { enrichArtists } from "./artist-enrichment";
+import { normalizeSpotifyImageUrl } from "../util/spotify-image-url";
+import { enrichArtists, isSpotifyArtistUri } from "./artist-enrichment";
 import { getAdjacentPeriod, getPriorPeriodBoundaries, LOCAL_PERIODS } from "./periods";
 import type { WaveCallback } from "./progressive";
 import type { ProviderInfo, StatsProvider } from "./provider";
@@ -18,6 +19,22 @@ import { statsCache } from "./stats-cache";
 const CACHE_KEY_PREFIX = "local";
 const RECENT_PLAYS_LIMIT = 12;
 const STREAK_LOOKBACK_DAYS = 400;
+
+async function mergeArtistImagesFromDb(stats: StatsResult): Promise<void> {
+	const uris = [...new Set(stats.topArtists.map((a) => a.artistUri).filter(isSpotifyArtistUri))];
+	if (uris.length === 0) return;
+	const rows = await db.artists.where("uri").anyOf(uris).toArray();
+	const byUri = new Map(rows.map((r) => [r.uri, r]));
+	for (const ta of stats.topArtists) {
+		const row = byUri.get(ta.artistUri);
+		const img = normalizeSpotifyImageUrl(row?.imageUrl ?? undefined) ?? row?.imageUrl;
+		if (img?.trim() && !ta.imageUrl?.trim()) ta.imageUrl = img;
+	}
+}
+
+function isQualifyingPlay(e: PlayEvent): boolean {
+	return e.type !== "skip";
+}
 
 function cacheKey(periodId: string): string {
 	return `${CACHE_KEY_PREFIX}:${periodId}`;
@@ -90,7 +107,10 @@ export class LocalProvider implements StatsProvider {
 
 		// Check cache first (per STATS-01)
 		const cached = statsCache.get<StatsResult>(key);
-		if (cached) return cached;
+		if (cached) {
+			await mergeArtistImagesFromDb(cached);
+			return cached;
+		}
 
 		// Query bounded events using startedAt index
 		const { start, end } = period.getBoundaries();
@@ -99,32 +119,40 @@ export class LocalProvider implements StatsProvider {
 				? await db.playEvents.toArray()
 				: await db.playEvents.where("startedAt").between(start, end).toArray();
 
+		const playEvents = events.filter(isQualifyingPlay);
+
 		// Prior window vs current: new artists + prior total duration (not all-time; separate query from streak window).
 		const priorBoundaries = getPriorPeriodBoundaries(period);
 		let newArtistCount: number | undefined;
 		let priorPeriodTotalDuration: number | undefined;
 
 		if (priorBoundaries) {
-			const priorEvents = await db.playEvents
+			const priorEventsRaw = await db.playEvents
 				.where("startedAt")
 				.between(priorBoundaries.start, priorBoundaries.end)
 				.toArray();
+			const priorEvents = priorEventsRaw.filter(isQualifyingPlay);
 
+			const currentArtistIds = new Set(playEvents.map((e) => e.artistUri));
 			if (priorEvents.length > 0) {
 				const priorArtistIds = new Set(priorEvents.map((e) => e.artistUri));
-				const currentArtistIds = new Set(events.map((e) => e.artistUri));
 				let newCount = 0;
 				for (const id of currentArtistIds) {
 					if (!priorArtistIds.has(id)) newCount++;
 				}
 				newArtistCount = newCount;
 				priorPeriodTotalDuration = priorEvents.reduce((sum, e) => sum + e.playedMs, 0);
+			} else {
+				newArtistCount = currentArtistIds.size;
 			}
+		} else {
+			newArtistCount = 0;
 		}
 
 		// Streak uses a fixed recent lookback, not the selected period
 		const streakCutoff = Date.now() - STREAK_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
-		const streakEvents = await db.playEvents.where("startedAt").above(streakCutoff).toArray();
+		const streakEventsRaw = await db.playEvents.where("startedAt").above(streakCutoff).toArray();
+		const streakEvents = streakEventsRaw.filter(isQualifyingPlay);
 		const streak = computeLocalStreak(streakEvents);
 
 		// Aggregate tracks, artists, albums
@@ -158,7 +186,7 @@ export class LocalProvider implements StatsProvider {
 			}
 		>();
 
-		for (const event of events) {
+		for (const event of playEvents) {
 			// Track aggregation
 			const t = trackMap.get(event.trackUri);
 			if (t) {
@@ -172,7 +200,7 @@ export class LocalProvider implements StatsProvider {
 					artistUri: event.artistUri,
 					albumName: event.albumName,
 					albumUri: event.albumUri,
-					albumArt: event.albumArt,
+					albumArt: normalizeSpotifyImageUrl(event.albumArt),
 					count: 1,
 					durationMs: event.playedMs,
 				});
@@ -202,7 +230,7 @@ export class LocalProvider implements StatsProvider {
 					name: event.albumName,
 					uri: event.albumUri,
 					artistName: event.artistName,
-					albumArt: event.albumArt,
+					albumArt: normalizeSpotifyImageUrl(event.albumArt),
 					count: 1,
 					durationMs: event.playedMs,
 				});
@@ -239,37 +267,40 @@ export class LocalProvider implements StatsProvider {
 			}));
 
 		// Recent plays (last 12 by startedAt descending)
-		const sorted = [...events].sort((a, b) => b.startedAt - a.startedAt);
+		const sorted = [...playEvents].sort((a, b) => b.startedAt - a.startedAt);
 		const recentPlays: RecentPlay[] = sorted.slice(0, RECENT_PLAYS_LIMIT).map((e) => ({
 			trackUri: e.trackUri,
 			trackName: e.trackName,
 			artistName: e.artistName,
-			albumArt: e.albumArt,
+			albumArt: normalizeSpotifyImageUrl(e.albumArt),
 			playedAt: e.startedAt,
 		}));
 
-		const totalDuration = events.reduce((sum, e) => sum + e.playedMs, 0);
+		const totalDuration = playEvents.reduce((sum, e) => sum + e.playedMs, 0);
+
+		const listeningDays =
+			playEvents.length > 0 ? new Set(playEvents.map((e) => toLocalDateKey(e.startedAt))).size : 0;
 
 		// Hourly distribution (24-element array, index = local hour)
 		const hourlyDistribution = new Array(24).fill(0) as number[];
-		for (const event of events) {
+		for (const event of playEvents) {
 			const hour = new Date(event.startedAt).getHours();
 			hourlyDistribution[hour]++;
 		}
 
 		// Peak hour: index of max value, or 0 if no plays
 		const peakHour =
-			events.length > 0 ? hourlyDistribution.indexOf(Math.max(...hourlyDistribution)) : 0;
+			playEvents.length > 0 ? hourlyDistribution.indexOf(Math.max(...hourlyDistribution)) : 0;
 
 		// Weekday distribution (7-element, Mon=0 through Sun=6)
 		const weekdayDistribution = new Array(7).fill(0) as number[];
-		for (const event of events) {
+		for (const event of playEvents) {
 			const jsDay = new Date(event.startedAt).getDay(); // 0=Sun..6=Sat
 			const idx = jsDay === 0 ? 6 : jsDay - 1; // -> 0=Mon..6=Sun
 			weekdayDistribution[idx]++;
 		}
 		const peakWeekday =
-			events.length > 0 ? weekdayDistribution.indexOf(Math.max(...weekdayDistribution)) : 0;
+			playEvents.length > 0 ? weekdayDistribution.indexOf(Math.max(...weekdayDistribution)) : 0;
 
 		// Daily play counts for heatmap (53 weeks lookback)
 		const dailyCountMap = new Map<string, number>();
@@ -305,7 +336,10 @@ export class LocalProvider implements StatsProvider {
 			const enriched = enrichedMap.get(ta.artistUri);
 			if (enriched) {
 				ta.genres = enriched.genres;
-				ta.imageUrl = enriched.imageUrl;
+				ta.imageUrl =
+					normalizeSpotifyImageUrl(enriched.imageUrl ?? undefined) ??
+					enriched.imageUrl ??
+					undefined;
 			}
 		}
 
@@ -325,8 +359,9 @@ export class LocalProvider implements StatsProvider {
 			topArtists,
 			topAlbums,
 			topGenres,
-			totalPlays: events.length,
+			totalPlays: playEvents.length,
 			totalDuration,
+			listeningDays,
 			recentPlays,
 			hourlyDistribution,
 			peakHour,

@@ -65,7 +65,20 @@ export function DisplayTab({
 
 	const handlePlayCountVariant = (val: PlayCountVariant) => {
 		setPreference("playCountVariant", val);
-		setPrefs({ ...prefs, playCountVariant: val });
+		if (val === "off") {
+			setPreference("playCountShowPeriodStreams", false);
+		}
+		setPrefs({
+			...prefs,
+			playCountVariant: val,
+			...(val === "off" ? { playCountShowPeriodStreams: false } : {}),
+		});
+		dispatchPrefsChanged();
+	};
+
+	const handlePlayCountPeriodStreams = (val: boolean) => {
+		setPreference("playCountShowPeriodStreams", val);
+		setPrefs({ ...prefs, playCountShowPeriodStreams: val });
 		dispatchPrefsChanged();
 	};
 
@@ -363,7 +376,7 @@ export function DisplayTab({
 					<div className="settings-sublabel">Widget style for now-playing track count</div>
 				</div>
 				<div data-testid="play-count-variant" style={{ display: "flex", gap: "8px" }}>
-					{(["pill", "bubble", "minimal"] as const).map((v) => (
+					{(["pill", "bubble", "minimal", "off"] as const).map((v) => (
 						<button
 							key={v}
 							type="button"
@@ -371,11 +384,41 @@ export function DisplayTab({
 							onClick={() => handlePlayCountVariant(v)}
 							style={{ padding: "4px 12px", minWidth: "40px" }}
 						>
-							{v.charAt(0).toUpperCase() + v.slice(1)}
+							{v === "off" ? "Off" : v.charAt(0).toUpperCase() + v.slice(1)}
 						</button>
 					))}
 				</div>
 			</div>
+
+			{prefs.playCountVariant !== "off" && (
+				<div className="settings-row" data-testid="play-count-extra-context">
+					<div>
+						<div className="settings-label">Extra play context</div>
+						<div className="settings-sublabel">
+							{providerKey === "statsfm" ? (
+								<>Also show streams for your current dashboard period (stats.fm top tracks).</>
+							) : (
+								<>
+									When this track has <strong>no qualifying plays</strong> in your database yet,
+									show a <strong>New play</strong> hint on the playbar (skips excluded).
+								</>
+							)}
+						</div>
+					</div>
+					{Toggle ? (
+						<Toggle
+							value={prefs.playCountShowPeriodStreams}
+							onSelected={handlePlayCountPeriodStreams}
+						/>
+					) : (
+						<input
+							type="checkbox"
+							checked={prefs.playCountShowPeriodStreams}
+							onChange={(e) => handlePlayCountPeriodStreams(e.currentTarget.checked)}
+						/>
+					)}
+				</div>
+			)}
 
 			<div className="settings-row">
 				<div>

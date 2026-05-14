@@ -68,6 +68,9 @@ declare namespace Spicetify {
 			| null
 			| undefined;
 	}
+	/** Spotify account handle when exposed by the client (optional). */
+	const User: { username?: string } | undefined;
+
 	/** Display a toast notification */
 	function showNotification(message: string, isError?: boolean): void;
 	namespace CosmosAsync {

@@ -48,7 +48,7 @@ export type OverviewProviderKey = "local" | "statsfm";
 
 export type ActivityTabId = "hour" | "weekday" | "day";
 
-export type PlayCountVariant = "pill" | "bubble" | "minimal";
+export type PlayCountVariant = "pill" | "bubble" | "minimal" | "off";
 
 export interface Preferences {
 	use24HourTime: boolean;
@@ -60,6 +60,12 @@ export interface Preferences {
 	activityTab: ActivityTabId;
 	activeGenre: string | null;
 	playCountVariant: PlayCountVariant;
+	/**
+	 * Extra playbar context: for **stats.fm**, resolve streams for the current dashboard period
+	 * and show next to lifetime when available; for **local**, show a first-play hint when the
+	 * track has no qualifying plays yet (skips excluded).
+	 */
+	playCountShowPeriodStreams: boolean;
 	activePage: string;
 	/** Include GitHub prereleases when checking for updates */
 	receiveBetaUpdates: boolean;
@@ -76,6 +82,7 @@ export interface Preferences {
 }
 
 const VALID_ACTIVITY_TABS = new Set<ActivityTabId>(["hour", "weekday", "day"]);
+const VALID_PLAY_COUNT_VARIANTS = new Set<PlayCountVariant>(["pill", "bubble", "minimal", "off"]);
 
 const DEFAULTS: Preferences = {
 	use24HourTime: false,
@@ -90,6 +97,7 @@ const DEFAULTS: Preferences = {
 	activityTab: "hour",
 	activeGenre: null,
 	playCountVariant: "pill",
+	playCountShowPeriodStreams: true,
 	activePage: "dashboard",
 	receiveBetaUpdates: false,
 	showAnnouncementBanner: true,
@@ -173,6 +181,13 @@ export function getPreferences(): Preferences {
 				activityTab: VALID_ACTIVITY_TABS.has(parsed.activityTab as ActivityTabId)
 					? (parsed.activityTab as ActivityTabId)
 					: DEFAULTS.activityTab,
+				playCountVariant: VALID_PLAY_COUNT_VARIANTS.has(parsed.playCountVariant as PlayCountVariant)
+					? (parsed.playCountVariant as PlayCountVariant)
+					: DEFAULTS.playCountVariant,
+				playCountShowPeriodStreams:
+					typeof parsed.playCountShowPeriodStreams === "boolean"
+						? parsed.playCountShowPeriodStreams
+						: DEFAULTS.playCountShowPeriodStreams,
 				receiveBetaUpdates:
 					typeof parsed.receiveBetaUpdates === "boolean"
 						? parsed.receiveBetaUpdates

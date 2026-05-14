@@ -5,10 +5,16 @@ import { db } from "../shared/storage/db";
 import type { PlayEvent } from "../shared/types/play-event";
 import type { StatsResult } from "../shared/types/stats";
 
-// Mock enrichArtists to avoid real API calls
-vi.mock("../shared/stats/artist-enrichment", () => ({
-	enrichArtists: vi.fn().mockResolvedValue(undefined),
-}));
+// Mock enrichArtists only; keep isSpotifyArtistUri and other exports real
+vi.mock("../shared/stats/artist-enrichment", async () => {
+	const actual = await vi.importActual<typeof import("../shared/stats/artist-enrichment")>(
+		"../shared/stats/artist-enrichment",
+	);
+	return {
+		...actual,
+		enrichArtists: vi.fn().mockResolvedValue(undefined),
+	};
+});
 
 import { enrichArtists } from "../shared/stats/artist-enrichment";
 import { LocalProvider, localProvider } from "../shared/stats/local-provider";
@@ -88,6 +94,7 @@ describe("LocalProvider", () => {
 			expect(result.topGenres).toEqual([]);
 			expect(result.totalPlays).toBe(0);
 			expect(result.totalDuration).toBe(0);
+			expect(result.listeningDays).toBe(0);
 			expect(result.recentPlays).toEqual([]);
 		});
 
@@ -103,6 +110,7 @@ describe("LocalProvider", () => {
 			expect(result.topArtists).toHaveLength(1);
 			expect(result.topArtists[0].artistUri).toBe(artistUri);
 			expect(result.topArtists[0].count).toBe(3);
+			expect(result.listeningDays).toBe(1);
 		});
 
 		it("returns topTracks sorted by count descending, rank assigned 1,2,3...", async () => {
@@ -548,18 +556,18 @@ describe("LocalProvider", () => {
 		expect(result.priorPeriodTotalDuration).toBe(200_000 + 180_000 + 150_000); // 530_000
 	});
 
-	it("newArtistCount is undefined when prior window has zero events", async () => {
+	it("newArtistCount counts current artists when prior window has zero qualifying plays", async () => {
 		const { start: curStart } = thisWeekPeriod.getBoundaries();
 		// Only current-period events, no prior events
 		await db.playEvents.bulkAdd([
 			makePlayEvent({ artistUri: "spotify:artist:X", artistName: "X", startedAt: curStart + 1000 }),
 		]);
 		const result = await provider.calculateStats(thisWeekPeriod);
-		expect(result.newArtistCount).toBeUndefined();
+		expect(result.newArtistCount).toBe(1);
 		expect(result.priorPeriodTotalDuration).toBeUndefined();
 	});
 
-	it("skips prior-period query for all-time (no newArtistCount / prior duration)", async () => {
+	it("skips prior-period query for all-time (newArtistCount is 0, no prior duration)", async () => {
 		// Even with abundant events, all-time has no meaningful prior.
 		await db.playEvents.bulkAdd([
 			makePlayEvent({ artistUri: "spotify:artist:X", startedAt: 1000 }),
@@ -567,7 +575,7 @@ describe("LocalProvider", () => {
 			makePlayEvent({ artistUri: "spotify:artist:Z", startedAt: 3000 }),
 		]);
 		const result = await provider.calculateStats(allTimePeriod);
-		expect(result.newArtistCount).toBeUndefined();
+		expect(result.newArtistCount).toBe(0);
 		expect(result.priorPeriodTotalDuration).toBeUndefined();
 	});
 

@@ -113,3 +113,12 @@ export function getPriorPeriodBoundaries(period: Period): { start: number; end: 
 	if (priorStart < 0) return null;
 	return { start: priorStart, end: start };
 }
+
+/** Synthetic period tab: opens global charts (not persisted as a time range). */
+export const WORLD_TAB_PERIOD_ID = "world-charts";
+
+export const WORLD_TAB_PERIOD: Period = {
+	id: WORLD_TAB_PERIOD_ID,
+	label: "World",
+	getBoundaries: getAllTimeBoundaries,
+};

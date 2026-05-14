@@ -7,7 +7,7 @@ import { LS_KEYS } from "../shared/constants/storage-keys";
 import type { AppError } from "../shared/errors";
 import { classifyStatsFmError, StatsFmError } from "../shared/errors";
 import { initProviders } from "../shared/stats/init-providers";
-import { LOCAL_PERIODS } from "../shared/stats/periods";
+import { LOCAL_PERIODS, WORLD_TAB_PERIOD, WORLD_TAB_PERIOD_ID } from "../shared/stats/periods";
 import {
 	allLoading,
 	allResolved,
@@ -17,13 +17,36 @@ import {
 } from "../shared/stats/progressive";
 import type { ProviderRegistry } from "../shared/stats/provider";
 import { providerRegistry } from "../shared/stats/provider";
+import {
+	restorePeriodForProvider,
+	safeParseProviderPeriods,
+	savePeriodForProvider,
+} from "../shared/stats/provider-periods-storage";
 import { statsCache } from "../shared/stats/stats-cache";
 import type { Period, StatsResult } from "../shared/types/stats";
 import type { UpdateCheckResult } from "../shared/update/update-check";
 import { checkForAppUpdate, isUpdatePromptSnoozed } from "../shared/update/update-check";
 import { resolveAnnouncementBanner } from "./banners";
 import { getActivityMode, getSectionsForProvider } from "./capabilities";
+import { ActivitySection } from "./components/ActivitySection";
+import { AnnouncementBanner } from "./components/AnnouncementBanner";
 import { AppFooter } from "./components/AppFooter";
+import { ConsistencySection } from "./components/ConsistencySection";
+import EmptyState from "./components/EmptyState";
+import { clearActiveGenre, FilterPill, setActiveGenre } from "./components/FilterPill";
+import { GuidedTour } from "./components/GuidedTour";
+import Header from "./components/Header";
+import { InlineErrorCard } from "./components/InlineErrorCard";
+import OverviewSection from "./components/OverviewSection";
+import { RecentlyPlayed } from "./components/RecentlyPlayed";
+import { SetupWizard } from "./components/SetupWizard";
+import { ShareModal } from "./components/ShareModal";
+import type { SettingsTab } from "./components/settings/SettingsModal";
+import { SettingsModal } from "./components/settings/SettingsModal";
+import { TopGenres } from "./components/TopGenres";
+import { TopLists } from "./components/TopLists";
+import { UpdateModal } from "./components/UpdateModal";
+import { WorldChartsPage } from "./components/WorldChartsPage";
 import { getPreferences, setPreference } from "./preferences";
 import { getTourSteps, shouldAutoStartTour } from "./tour";
 
@@ -47,58 +70,12 @@ export function buildProviderChangedState(registry: Pick<ProviderRegistry, "getA
 	return { activeProviderId: id, isLocalProvider: id === "local" };
 }
 
-export function safeParseProviderPeriods(): Record<string, string> {
-	try {
-		const raw = localStorage.getItem(LS_KEYS.PROVIDER_PERIODS);
-		if (!raw) return {};
-		const parsed = JSON.parse(raw);
-		if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-			return parsed as Record<string, string>;
-		}
-		return {};
-	} catch {
-		return {};
-	}
-}
-
-export function restorePeriodForProvider(providerId: string, supported: Period[]): Period {
-	const savedId = safeParseProviderPeriods()[providerId];
-	if (savedId) {
-		const match = supported.find((p) => p.id === savedId);
-		if (match) return match;
-	}
-	return supported[0];
-}
-
-export function savePeriodForProvider(providerId: string, periodId: string): void {
-	const map = safeParseProviderPeriods();
-	map[providerId] = periodId;
-	localStorage.setItem(LS_KEYS.PROVIDER_PERIODS, JSON.stringify(map));
-}
+export { restorePeriodForProvider, safeParseProviderPeriods, savePeriodForProvider };
 
 function getProviderPeriods(): Period[] {
 	const provider = providerRegistry.getActive();
 	return provider?.getSupportedPeriods() ?? LOCAL_PERIODS;
 }
-
-import { ActivitySection } from "./components/ActivitySection";
-import { AnnouncementBanner } from "./components/AnnouncementBanner";
-import { ConsistencySection } from "./components/ConsistencySection";
-import EmptyState from "./components/EmptyState";
-import { clearActiveGenre, FilterPill, setActiveGenre } from "./components/FilterPill";
-import { GuidedTour } from "./components/GuidedTour";
-import Header from "./components/Header";
-import { InlineErrorCard } from "./components/InlineErrorCard";
-import OverviewSection from "./components/OverviewSection";
-import { RecentlyPlayed } from "./components/RecentlyPlayed";
-import { SetupWizard } from "./components/SetupWizard";
-import { ShareModal } from "./components/ShareModal";
-import type { SettingsTab } from "./components/settings/SettingsModal";
-import { SettingsModal } from "./components/settings/SettingsModal";
-import { TopGenres } from "./components/TopGenres";
-import { TopLists } from "./components/TopLists";
-import { UpdateModal } from "./components/UpdateModal";
-import { WorldChartsPage } from "./components/WorldChartsPage";
 
 const { useState, useEffect, useCallback, useRef, useMemo } = Spicetify.React;
 
@@ -222,6 +199,12 @@ function App() {
 		}
 	}, []);
 
+	const periodTabsPeriods = useMemo(() => [...periods, WORLD_TAB_PERIOD], [periods]);
+	const activePeriodForTabs = useMemo(
+		() => (activePage === "world" ? WORLD_TAB_PERIOD : activePeriod),
+		[activePage, activePeriod],
+	);
+
 	useEffect(() => {
 		initProviders().then(() => {
 			const providerPeriods = getProviderPeriods();
@@ -236,10 +219,9 @@ function App() {
 	}, []);
 
 	useEffect(() => {
-		if (initialized) {
-			loadStats(activePeriod);
-		}
-	}, [activePeriod, initialized, loadStats]);
+		if (!initialized || activePage === "world") return;
+		loadStats(activePeriod);
+	}, [activePeriod, initialized, loadStats, activePage]);
 
 	useEffect(() => {
 		const handler = () => {
@@ -258,12 +240,13 @@ function App() {
 
 	useEffect(() => {
 		const handler = () => {
+			if (activePage === "world") return;
 			statsCache.invalidate();
 			loadStats(activePeriod, true);
 		};
 		window.addEventListener(EVENTS.PLAY_RECORDED, handler);
 		return () => window.removeEventListener(EVENTS.PLAY_RECORDED, handler);
-	}, [activePeriod, loadStats]);
+	}, [activePeriod, loadStats, activePage]);
 
 	useEffect(() => {
 		const handler = () => setPrefsVersion((v) => v + 1);
@@ -337,12 +320,28 @@ function App() {
 	);
 
 	const handlePeriodChange = useCallback((period: Period) => {
+		if (period.id === WORLD_TAB_PERIOD_ID) {
+			setShowShare(false);
+			setActivePage("world");
+			setPreference("activePage", "world");
+			return;
+		}
+		setActivePage("dashboard");
+		setPreference("activePage", "dashboard");
 		setActivePeriod(period);
 		savePeriodForProvider(providerRegistry.getActiveId() ?? "local", period.id);
+		window.dispatchEvent(
+			new CustomEvent(EVENTS.DASHBOARD_PERIOD_CHANGED, { detail: { periodId: period.id } }),
+		);
 	}, []);
 
-	const handleRefresh = useCallback(() => {
-		loadStats(activePeriod);
+	const handleRefresh = useCallback(async () => {
+		if (providerRegistry.getActiveId() === "statsfm") {
+			const { statsfmProvider } = await import("../shared/stats/statsfm-provider");
+			await statsfmProvider.init();
+			window.dispatchEvent(new CustomEvent(EVENTS.STATSFM_PROFILE_REFRESHED));
+		}
+		await loadStats(activePeriod);
 	}, [activePeriod, loadStats]);
 
 	const handleWizardComplete = useCallback(() => {
@@ -355,17 +354,10 @@ function App() {
 		setShowSettings(true);
 	}, []);
 
-	const handlePageChange = useCallback((page: string) => {
-		setActivePage(page);
-		setPreference("activePage", page);
-	}, []);
-
 	const handleRestartTour = useCallback(() => {
 		setShowSettings(false);
 		setTourActive(true);
 	}, []);
-
-	const hasLastfmKey = !!localStorage.getItem(LS_KEYS.LASTFM_API_KEY);
 
 	const isSlotLoading = (slot: keyof SectionSlots) =>
 		sectionSlots[slot] === "loading" || sectionSlots[slot] === "pending";
@@ -567,32 +559,33 @@ function App() {
 
 	const renderContent = () => {
 		if (activePage === "world") {
-			return (
-				<WorldChartsPage
-					hasLastfmKey={hasLastfmKey}
-					onConnectLastfm={() => openSettings("providers")}
-				/>
-			);
+			return <WorldChartsPage />;
 		}
 		return renderDashboard();
 	};
 
 	return (
 		<div className="stats-page" data-version={__VERSION__}>
-			{!showWizard && (
-				<>
-					<FilterPill activeGenre={prefs.activeGenre} onClear={clearActiveGenre} />
-					<Header
-						providerName={providerName}
-						activeProviderId={activeProviderId}
-						onSettingsClick={() => openSettings()}
-						onShareClick={stats ? () => setShowShare(true) : undefined}
-						periods={periods}
-						activePeriod={activePeriod}
-						onPeriodChange={handlePeriodChange}
-						activePage={activePage}
-						onPageChange={handlePageChange}
-					/>
+			{showWizard ? (
+				<div className="stats-page-scroll">
+					<SetupWizard onComplete={handleWizardComplete} />
+				</div>
+			) : (
+				<div className="stats-page-scroll">
+					<div className="stats-page-sticky">
+						<FilterPill activeGenre={prefs.activeGenre} onClear={clearActiveGenre} />
+						<Header
+							providerName={providerName}
+							activeProviderId={activeProviderId}
+							onSettingsClick={() => openSettings()}
+							onShareClick={
+								stats && activePage !== "world" ? () => setShowShare(true) : undefined
+							}
+							periods={periodTabsPeriods}
+							activePeriod={activePeriodForTabs}
+							onPeriodChange={handlePeriodChange}
+						/>
+					</div>
 					{activeBanner && (
 						<AnnouncementBanner
 							title={activeBanner.title}
@@ -608,7 +601,7 @@ function App() {
 					)}
 					{renderContent()}
 					<AppFooter version={__VERSION__} onCheckForUpdates={() => void openUpdatesModal()} />
-				</>
+				</div>
 			)}
 			{showSettings && (
 				<SettingsModal
@@ -623,7 +616,6 @@ function App() {
 					announcementDismissKey={resolvedBanner?.dismissKey ?? null}
 				/>
 			)}
-			{showWizard && <SetupWizard onComplete={handleWizardComplete} />}
 			<GuidedTour
 				active={tourActive && !showWizard}
 				version={__VERSION__}

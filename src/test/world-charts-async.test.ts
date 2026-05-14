@@ -11,13 +11,14 @@ vi.mock("../app/world-charts-service", async (importOriginal) => {
 	};
 });
 
+import type { WorldChartResult } from "../app/world-charts-service";
 import {
 	getArtistChartsAsync,
 	getChartsAsync,
 	WORLD_ARTISTS,
 	WORLD_TRACKS,
 } from "../app/world-charts-service";
-import type { LastfmResult } from "../shared/api/lastfm-client";
+import type { WorldTrack } from "../shared/types/world-charts";
 
 const getChartsAsyncMock = vi.mocked(getChartsAsync);
 const getArtistChartsAsyncMock = vi.mocked(getArtistChartsAsync);
@@ -40,16 +41,16 @@ afterEach(() => {
 
 describe("WorldChartsPage  -  async loading", () => {
 	it("shows skeleton loading state while fetching", async () => {
-		let resolveCharts!: (value: LastfmResult) => void;
+		let resolveCharts!: (value: WorldChartResult<WorldTrack[]>) => void;
 		getChartsAsyncMock.mockReturnValue(
-			new Promise<LastfmResult>((resolve) => {
+			new Promise<WorldChartResult<WorldTrack[]>>((resolve) => {
 				resolveCharts = resolve;
 			}),
 		);
 		getArtistChartsAsyncMock.mockReturnValue(new Promise(() => {}));
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
-		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
+		const { container } = render(React.createElement(WorldChartsPage));
 
 		const skeleton = container.querySelector(".world-charts-skeleton");
 		expect(skeleton).not.toBeNull();
@@ -63,7 +64,7 @@ describe("WorldChartsPage  -  async loading", () => {
 		getArtistChartsAsyncMock.mockReturnValue(new Promise(() => {}));
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
-		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
+		const { container } = render(React.createElement(WorldChartsPage));
 
 		const skeleton = container.querySelector(".world-charts-skeleton");
 		expect(skeleton).not.toBeNull();
@@ -75,7 +76,7 @@ describe("WorldChartsPage  -  async loading", () => {
 		mockBothSuccess();
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
-		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
+		const { container } = render(React.createElement(WorldChartsPage));
 
 		await vi.waitFor(() => {
 			const items = container.querySelectorAll(".world-chart-item");
@@ -92,28 +93,11 @@ describe("WorldChartsPage  -  async loading", () => {
 		});
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
-		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
+		const { container } = render(React.createElement(WorldChartsPage));
 
 		await vi.waitFor(() => {
 			const errorCard = container.querySelector(".inline-error-card");
 			expect(errorCard).not.toBeNull();
-		});
-	});
-
-	it("error card shows InvalidApiKey variant for 403", async () => {
-		getChartsAsyncMock.mockResolvedValue({ ok: false, status: 403, message: "Invalid API key" });
-		getArtistChartsAsyncMock.mockResolvedValue({
-			ok: false,
-			status: 403,
-			message: "Invalid API key",
-		});
-
-		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
-		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
-
-		await vi.waitFor(() => {
-			const errorTitle = container.querySelector(".inline-error-title");
-			expect(errorTitle?.textContent).toContain("API key");
 		});
 	});
 
@@ -126,7 +110,7 @@ describe("WorldChartsPage  -  async loading", () => {
 			.mockResolvedValueOnce({ ok: true, data: [...WORLD_ARTISTS] });
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
-		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
+		const { container } = render(React.createElement(WorldChartsPage));
 
 		await vi.waitFor(() => {
 			const retryBtn = container.querySelector(".inline-error-cta");
@@ -142,34 +126,34 @@ describe("WorldChartsPage  -  async loading", () => {
 		});
 	});
 
-	it("re-fetches when scope changes", async () => {
+	it("re-fetches when time window changes", async () => {
 		mockBothSuccess();
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
-		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
+		const { container } = render(React.createElement(WorldChartsPage));
 
 		await vi.waitFor(() => {
 			expect(container.querySelectorAll(".world-chart-item").length).toBeGreaterThan(0);
 		});
 
-		const scopeTabs = container.querySelector("[data-tabs='scope']");
-		const usBtn = scopeTabs!.querySelectorAll("button")[1]!;
-		fireEvent.click(usBtn);
+		const windowTabs = container.querySelector("[data-tabs='window']");
+		const weekBtn = windowTabs!.querySelectorAll("button")[1]!;
+		fireEvent.click(weekBtn);
 
 		await vi.waitFor(() => {
 			expect(getChartsAsyncMock).toHaveBeenCalledTimes(2);
 		});
 	});
 
-	it("shows source as Last.fm when connected", async () => {
+	it("shows stats.fm attribution", async () => {
 		mockBothSuccess();
 
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
-		const { container } = render(React.createElement(WorldChartsPage, { hasLastfmKey: true }));
+		const { container } = render(React.createElement(WorldChartsPage));
 
 		await vi.waitFor(() => {
 			const source = container.querySelector(".world-charts-source");
-			expect(source?.textContent).toContain("Last.fm");
+			expect(source?.textContent).toContain("stats.fm");
 		});
 	});
 });

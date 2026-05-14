@@ -26,13 +26,39 @@ body:has(.stats-page) .main-topBar-container {
 	display: none;
 }
 
-/* Page container */
+/* Page shell: flex column fills custom-app height; scroll is on inner so sticky works. */
 .stats-page {
-	padding: var(--space-lg, 24px) var(--space-xl, 32px);
 	box-sizing: border-box;
 	width: 100%;
 	max-width: 100%;
-	overflow-x: hidden;
+	height: 100%;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.stats-page-scroll {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-x: clip;
+	overflow-y: auto;
+	/* No top padding: sticky header must sit flush with scrollport top */
+	padding: 0 var(--space-xl, 32px) var(--space-lg, 24px);
+	box-sizing: border-box;
+}
+
+.stats-page-sticky {
+	position: sticky;
+	top: 0;
+	z-index: 100;
+	margin: 0 calc(-1 * var(--space-xl, 32px)) var(--space-md, 16px);
+	padding: var(--space-lg, 24px) var(--space-xl, 32px) var(--space-md, 16px);
+	/* Solid bar: themes may set --spice-main with alpha; rgb triple is opaque */
+	background: var(--spice-main);
+	background-color: rgb(var(--spice-rgb-main));
+	border-bottom: 1px solid rgba(var(--spice-rgb-text, 255 255 255), 0.06);
+	box-sizing: border-box;
 }
 
 /* Filter Pill */
@@ -151,7 +177,7 @@ button.announcement-banner-link-btn:hover {
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-lg, 24px);
-	padding: var(--space-md, 16px) 0 var(--space-lg, 24px);
+	padding: 8px 0 12px;
 	flex-wrap: wrap;
 }
 
@@ -160,7 +186,9 @@ button.announcement-banner-link-btn:hover {
 	font-size: 32px;
 	font-weight: 800;
 	letter-spacing: -0.02em;
-	line-height: 1.1;
+	line-height: 1;
+	display: flex;
+	align-items: center;
 	color: var(--spice-text);
 }
 
@@ -171,6 +199,7 @@ button.announcement-banner-link-btn:hover {
 	min-width: 0;
 	flex-wrap: wrap;
 	flex: 1 1 420px;
+	row-gap: 6px;
 }
 
 .header-provider-pill {
@@ -199,6 +228,7 @@ button.announcement-banner-link-btn:hover {
 	flex: 1 1 340px;
 	justify-content: flex-end;
 	flex-wrap: wrap;
+	row-gap: 8px;
 }
 
 .stats-header-icon-btn {
@@ -500,8 +530,13 @@ button.announcement-banner-link-btn:hover {
 }
 
 @media (max-width: 600px) {
-	.stats-page {
-		padding: var(--space-lg, 24px) var(--space-md, 16px);
+	.stats-page-scroll {
+		padding: 0 var(--space-md, 16px) var(--space-lg, 24px);
+	}
+
+	.stats-page-sticky {
+		margin: 0 calc(-1 * var(--space-md, 16px)) var(--space-md, 16px);
+		padding: var(--space-lg, 24px) var(--space-md, 16px) var(--space-md, 16px);
 	}
 
 	.stats-header-title {
@@ -529,7 +564,7 @@ button.announcement-banner-link-btn:hover {
 
 	.settings-modal {
 		width: calc(100vw - 32px);
-		max-width: 520px;
+		max-width: 620px;
 	}
 
 	.recently-played-item {
@@ -1025,7 +1060,8 @@ button.announcement-banner-link-btn:hover {
 .settings-modal {
 	background: var(--spice-card);
 	border-radius: 8px;
-	width: 520px;
+	width: 620px;
+	max-width: calc(100vw - 32px);
 	max-height: 80vh;
 	overflow-y: auto;
 	padding: 24px;
@@ -1164,12 +1200,13 @@ button.announcement-banner-link-btn:hover {
 
 .settings-tab {
 	cursor: pointer;
-	padding: 8px 16px;
+	padding: 8px 12px;
 	color: var(--spice-subtext);
 	background: none;
 	border: none;
 	border-bottom: 2px solid transparent;
 	font-size: var(--font-size-md, 14px);
+	white-space: nowrap;
 }
 
 .settings-tab:hover {
@@ -1980,15 +2017,19 @@ button.announcement-banner-link-btn:hover {
 	cursor: pointer;
 }
 .play-count-bubble-icon {
-	width: 24px;
-	height: 24px;
+	width: 28px;
+	height: 28px;
 	border-radius: 50%;
-	background: rgba(255, 255, 255, 0.06);
+	background: rgba(var(--spice-rgb-button), 0.28);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	color: var(--spice-button);
-	font-size: 10px;
+	font-size: 12px;
+	box-shadow:
+		0 0 0 1px rgba(var(--spice-rgb-button), 0.45),
+		inset 0 1px 0 rgba(255, 255, 255, 0.12);
+	text-shadow: 0 0 6px rgba(0, 0, 0, 0.45);
 }
 .play-count-badge {
 	position: absolute;
@@ -2062,8 +2103,35 @@ button.announcement-banner-link-btn:hover {
 	background: rgba(var(--spice-rgb-misc), 0.1);
 }
 
+.play-count-badge--new {
+	font-size: 8px;
+	letter-spacing: 0.04em;
+	padding: 0 3px;
+	min-width: 22px;
+}
+
+.play-count-pill--first {
+	color: rgba(var(--spice-rgb-text), 0.92);
+	border-color: rgba(var(--spice-rgb-button), 0.35);
+}
+
 .world-charts-page {
-	padding: var(--space-md, 16px) 0;
+	padding: 0;
+}
+
+.world-charts-hero {
+	margin-bottom: var(--space-lg, 24px);
+}
+
+.world-page-notice {
+	margin-bottom: var(--space-md, 16px);
+	padding: var(--space-sm, 8px) var(--space-md, 16px);
+	border-radius: 8px;
+	font-size: var(--font-size-sm, 12px);
+	line-height: var(--line-height-body, 1.5);
+	color: rgba(var(--spice-rgb-text), 0.85);
+	background: rgba(var(--spice-rgb-button), 0.1);
+	border: 1px solid rgba(var(--spice-rgb-button), 0.28);
 }
 
 .world-charts-header {
@@ -2071,7 +2139,17 @@ button.announcement-banner-link-btn:hover {
 	justify-content: space-between;
 	align-items: flex-start;
 	gap: var(--space-md, 16px);
-	margin-bottom: var(--space-lg, 24px);
+}
+
+.world-charts-layout {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-md, 16px);
+	align-items: start;
+}
+
+.world-charts-section.section-card {
+	margin-bottom: 0;
 }
 
 .world-charts-tabs {
@@ -2113,20 +2191,24 @@ button.announcement-banner-link-btn:hover {
 }
 
 .world-charts-section {
-	margin-bottom: var(--space-lg, 24px);
+	margin-bottom: 0;
 }
 
 .world-charts-grid {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 2px var(--space-lg, 24px);
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	width: 100%;
+	max-width: none;
 }
 
 .world-chart-item {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	padding: 8px;
+	gap: var(--space-sm, 8px);
+	min-height: 44px;
+	box-sizing: border-box;
+	padding: var(--space-xs, 4px) var(--space-sm, 8px);
 	border-radius: 6px;
 	cursor: pointer;
 	transition: background 0.15s;
@@ -2142,9 +2224,9 @@ button.announcement-banner-link-btn:hover {
 }
 
 .world-chart-tile {
-	width: 36px;
-	height: 36px;
-	border-radius: 4px;
+	width: 40px;
+	height: 40px;
+	border-radius: 6px;
 	flex-shrink: 0;
 }
 
@@ -2158,15 +2240,17 @@ button.announcement-banner-link-btn:hover {
 }
 
 .world-chart-title {
-	font-size: 13px;
+	font-size: var(--font-size-md, 14px);
 	font-weight: 600;
+	line-height: var(--line-height-label, 1.4);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
 .world-chart-artist {
-	font-size: 11px;
+	font-size: var(--font-size-sm, 12px);
+	line-height: var(--line-height-label, 1.4);
 	color: rgba(var(--spice-rgb-text), 0.55);
 	white-space: nowrap;
 	overflow: hidden;
@@ -2174,12 +2258,20 @@ button.announcement-banner-link-btn:hover {
 }
 
 .world-chart-stats {
-	text-align: right;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	justify-content: center;
+	gap: 2px;
 	flex-shrink: 0;
+	min-width: 72px;
+	text-align: right;
 }
 
 .world-chart-plays {
 	font-size: var(--font-size-sm, 12px);
+	font-weight: 600;
+	color: rgba(var(--spice-rgb-text), 0.75);
 	font-variant-numeric: tabular-nums;
 }
 
@@ -2201,8 +2293,8 @@ button.announcement-banner-link-btn:hover {
 }
 
 .world-charts-source {
-	margin-top: var(--space-sm, 8px);
-	font-size: 11px;
+	margin-top: var(--space-md, 16px);
+	font-size: var(--font-size-sm, 12px);
 	color: rgba(var(--spice-rgb-text), 0.45);
 }
 
@@ -2229,13 +2321,15 @@ button.announcement-banner-link-btn:hover {
 	margin-inline: auto;
 }
 
+@media (max-width: 960px) {
+	.world-charts-layout {
+		grid-template-columns: 1fr;
+	}
+}
+
 @media (max-width: 780px) {
 	.world-charts-header {
 		flex-direction: column;
-	}
-
-	.world-charts-grid {
-		grid-template-columns: 1fr;
 	}
 }
 
@@ -2515,6 +2609,25 @@ button.announcement-banner-link-btn:hover {
 	border-top: 1px solid rgba(var(--spice-rgb-misc, 255, 255, 255), 0.12);
 	font-size: var(--font-size-sm, 12px);
 	color: rgba(var(--spice-rgb-text), 0.55);
+}
+
+.stats-app-footer-links {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-sm, 8px);
+}
+
+.stats-app-footer-link {
+	color: var(--spice-button);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.stats-app-footer-link:hover {
+	color: var(--spice-button-active, var(--spice-button));
+	text-decoration: underline;
+	text-underline-offset: 2px;
 }
 
 .stats-app-footer-credit {

@@ -13,33 +13,50 @@ describe("PlayCountPill", () => {
 		document.body.removeChild(container);
 	});
 
-	it("renders null when count <= 1", async () => {
-		const { PlayCountPill } = await import("../app/components/PlayCountPill");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(PlayCountPill, {
-				count: 1,
-				variant: "pill",
-				firstPlayedAt: null,
-			}),
-			container,
-		);
-		expect(container.innerHTML).toBe("");
-	});
-
-	it("renders null when count is 0", async () => {
+	it("renders null when count is 0 and showFirstListen is off", async () => {
 		const { PlayCountPill } = await import("../app/components/PlayCountPill");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(PlayCountPill, {
 				count: 0,
 				variant: "pill",
 				firstPlayedAt: null,
+				showFirstListen: false,
 			}),
 			container,
 		);
 		expect(container.innerHTML).toBe("");
 	});
 
+	it("renders first-listen pill when count is 0 and showFirstListen is on", async () => {
+		const { PlayCountPill } = await import("../app/components/PlayCountPill");
+		Spicetify.ReactDOM.render(
+			Spicetify.React.createElement(PlayCountPill, {
+				count: 0,
+				variant: "pill",
+				firstPlayedAt: null,
+				showFirstListen: true,
+			}),
+			container,
+		);
+		const pill = container.querySelector(".play-count-pill--first");
+		expect(pill?.textContent).toContain("New play");
+	});
+
 	describe("pill variant (default)", () => {
+		it("renders 1 play for count 1", async () => {
+			const { PlayCountPill } = await import("../app/components/PlayCountPill");
+			Spicetify.ReactDOM.render(
+				Spicetify.React.createElement(PlayCountPill, {
+					count: 1,
+					variant: "pill",
+					firstPlayedAt: null,
+				}),
+				container,
+			);
+			const pill = container.querySelector(".play-count-pill");
+			expect(pill?.textContent).toContain("1 play");
+		});
+
 		it("renders with play-count-pill class and correct text", async () => {
 			const { PlayCountPill } = await import("../app/components/PlayCountPill");
 			Spicetify.ReactDOM.render(

@@ -126,6 +126,7 @@ export function ProvidersTab() {
 		await statsfmProvider.init();
 		setConfig(newConfig);
 		setRevalidating(false);
+		window.dispatchEvent(new CustomEvent(EVENTS.STATSFM_PROFILE_REFRESHED));
 
 		// Tier changes need fresh stats + provider listeners
 		if (prevIsPlus !== result.isPlus) {
@@ -268,35 +269,40 @@ export function ProvidersTab() {
 					<div className="settings-sublabel">
 						Connected since {new Date(config.connectedAt).toLocaleDateString()}
 					</div>
-					<button
-						type="button"
-						className="btn-secondary"
-						onClick={handleRevalidate}
-						disabled={revalidating}
-						aria-busy={revalidating}
-						aria-label="Re-validate stats.fm tier status"
+					<div
 						style={{
-							marginTop: "8px",
-							alignSelf: "flex-start",
-							...(revalidating ? { opacity: 0.6 } : {}),
+							display: "flex",
+							flexWrap: "wrap",
+							gap: "8px",
+							marginTop: "12px",
+							alignItems: "center",
 						}}
 					>
-						{revalidating ? "Re-validating..." : "Re-validate"}
-					</button>
+						<button
+							type="button"
+							className="btn-secondary"
+							onClick={handleRevalidate}
+							disabled={revalidating}
+							aria-busy={revalidating}
+							aria-label="Re-validate stats.fm tier status"
+							style={revalidating ? { opacity: 0.6 } : undefined}
+						>
+							{revalidating ? "Re-validating..." : "Re-validate"}
+						</button>
+						<button
+							type="button"
+							className="btn-destructive"
+							onClick={handleDisconnect}
+							aria-label="Disconnect stats.fm account"
+						>
+							Disconnect
+						</button>
+					</div>
 					{revalidateError && (
 						<div className="provider-connect-error" role="alert">
 							{revalidateError}
 						</div>
 					)}
-					<button
-						type="button"
-						className="btn-destructive"
-						onClick={handleDisconnect}
-						aria-label="Disconnect stats.fm account"
-						style={{ marginTop: "8px", alignSelf: "flex-start" }}
-					>
-						Disconnect
-					</button>
 				</div>
 			)}
 

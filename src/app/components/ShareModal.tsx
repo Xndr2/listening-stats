@@ -1,6 +1,8 @@
 import { LS_KEYS } from "../../shared/constants/storage-keys";
+import { hydrateShareCardAssets } from "../../shared/share/hydrate-share-assets";
 import { providerRegistry } from "../../shared/stats/provider";
-import type { Period, StatsResult } from "../../shared/types/stats";
+import type { Period, StatsResult, TopArtist, TopGenre, TopTrack } from "../../shared/types/stats";
+import { normalizeSpotifyImageUrl } from "../../shared/util/spotify-image-url";
 import { formatHour, formatNumber } from "../format";
 import { CloseIcon } from "../icons";
 
@@ -18,7 +20,6 @@ interface ShareModalProps {
 interface ShareRenderOptions {
 	followTheme?: boolean;
 	activeProviderId?: string;
-	/** Calendar span of the selected period for story-card stats (daily average, etc.). */
 	periodDayCount?: number;
 }
 
@@ -41,16 +42,19 @@ const TARGET_DIMENSIONS: Record<ShareSize, { width: number; height: number }> = 
 	story: { width: 1080, height: 1920 },
 };
 
-function getUsername(): string {
+function getShareCaptionHandle(): string {
 	try {
 		const raw = localStorage.getItem(LS_KEYS.STATSFM_CONFIG);
 		if (raw) {
-			const config = JSON.parse(raw);
-			if (config?.username) return config.username;
+			const config = JSON.parse(raw) as { username?: string };
+			const u = config?.username;
+			if (u && String(u).trim()) return String(u).trim();
 		}
 	} catch {
 		/* ignore */
 	}
+	const u = Spicetify.User?.username;
+	if (u && String(u).trim()) return String(u).trim();
 	return "";
 }
 
@@ -63,7 +67,7 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
 
-	const username = getUsername();
+	const username = getShareCaptionHandle();
 	const periodLabel = activePeriod.label;
 	const periodBoundaries = activePeriod.getBoundaries();
 	const periodDayCount = Math.max(
@@ -75,11 +79,14 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 
 	const availableVariants = useMemo(() => {
 		return VARIANTS.filter((v) => {
-			if (v.id === "genre" && !caps?.hasGenreData) return false;
+			if (v.id === "genre") {
+				if (activeProviderId === "local") return false;
+				if (!caps?.hasGenreData) return false;
+			}
 			if (v.id === "streak" && !caps?.hasStreakData) return false;
 			return true;
 		});
-	}, [caps]);
+	}, [caps, activeProviderId]);
 
 	useEffect(() => {
 		if (!availableVariants.some((v) => v.id === variant)) {
@@ -281,11 +288,7 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 	);
 }
 
-function getPreviewWidth(variant: ShareVariant, size: ShareSize): number {
-	if (variant === "wrapped") {
-		if (size === "story") return 360;
-		return 380;
-	}
+function getPreviewWidth(_variant: ShareVariant, size: ShareSize): number {
 	if (size === "story") return 270;
 	return 320;
 }
@@ -306,7 +309,6 @@ interface ShareCardPreviewProps {
 function _ShareCardPreview({ variant, size, stats, periodLabel, username }: ShareCardPreviewProps) {
 	const w = getPreviewWidth(variant, size);
 	const aspect = getAspectRatio(size);
-	const isWrapped = variant === "wrapped";
 	const captionText = username ? `@${username} · ${periodLabel}` : periodLabel;
 
 	return (
@@ -362,51 +364,37 @@ function _ShareCardPreview({ variant, size, stats, periodLabel, username }: Shar
 					}}
 				/>
 				<span>Listening Stats · Spicetify</span>
-				{isWrapped && (
-					<span
-						data-testid="share-watermark-meta"
-						style={{
-							marginLeft: "auto",
-							fontSize: 9.5,
-							fontWeight: 500,
-							color: "rgba(255,255,255,.5)",
-							textTransform: "none",
-							letterSpacing: 0,
-						}}
-					>
-						{captionText}
-					</span>
-				)}
 			</div>
-			{!isWrapped && (
-				<div
-					data-testid="share-footer"
-					style={{
-						position: "absolute",
-						bottom: 14,
-						left: 18,
-						fontSize: 10,
-						color: "rgba(255,255,255,.5)",
-					}}
-				>
-					{captionText}
-				</div>
-			)}
+			<div
+				data-testid="share-footer"
+				style={{
+					position: "absolute",
+					bottom: 14,
+					left: 18,
+					fontSize: 10,
+					color: "rgba(255,255,255,.5)",
+				}}
+			>
+				{captionText}
+			</div>
 			<div
 				style={{
 					position: "absolute",
-					inset: isWrapped ? "46px 20px 18px" : "56px 22px 50px",
+					inset: "56px 22px 56px",
 					display: "flex",
 					flexDirection: "column",
-					justifyContent: isWrapped ? "flex-start" : "center",
+					justifyContent: "flex-start",
+					overflow: "hidden",
 				}}
 			>
 				{variant === "top5" && <ShareTop5 stats={stats} />}
-				{variant === "time" && <ShareTime stats={stats} />}
+				{variant === "time" && <ShareTime stats={stats} periodLabel={periodLabel} />}
 				{variant === "genre" && <ShareGenre stats={stats} />}
 				{variant === "streak" && <ShareStreak stats={stats} />}
 				{variant === "throwback" && <ShareThrowback stats={stats} />}
-				{variant === "wrapped" && <ShareWrapped stats={stats} size={size} />}
+				{variant === "wrapped" && (
+					<ShareWrapped stats={stats} size={size} periodLabel={periodLabel} />
+				)}
 			</div>
 		</div>
 	);
@@ -443,9 +431,8 @@ function Tile({
 	rounded?: number;
 	imageUrl?: string;
 }) {
-	const bg = imageUrl
-		? `url(${imageUrl}) center/cover no-repeat, ${tileGrad(seed)}`
-		: tileGrad(seed);
+	const art = normalizeSpotifyImageUrl(imageUrl);
+	const bg = art ? `url(${art}) center/cover no-repeat, ${tileGrad(seed)}` : tileGrad(seed);
 	return (
 		<div
 			data-testid="share-tile"
@@ -460,9 +447,240 @@ function Tile({
 	);
 }
 
-function Avatar({ seed, sz, imageUrl }: { seed: string; sz: number; imageUrl?: string }) {
-	return <Tile seed={seed} sz={sz} rounded={sz} imageUrl={imageUrl} />;
+function ShareWrapped({
+	stats,
+	size,
+	periodLabel,
+}: {
+	stats: StatsResult;
+	size: ShareSize;
+	periodLabel: string;
+}) {
+	const isStory = size === "story";
+	const totalHours = Math.floor(stats.totalDuration / 3_600_000);
+	const streak = stats.streak ?? 0;
+	const peakLabel = formatHour(stats.peakHour, false);
+	const tracks = stats.topTracks.slice(0, isStory ? 4 : 3);
+	const artists = stats.topArtists.slice(0, isStory ? 4 : 3);
+	const genres = stats.topGenres.slice(0, isStory ? 3 : 2);
+	const genreMaxCount = genres[0]?.count ?? 1;
+	const genreTotal = genres.reduce((s, x) => s + x.count, 0);
+	const head = periodLabel.trim().length > 0 ? `${periodLabel} · Wrapped` : "Wrapped";
+
+	return (
+		<div>
+			<div style={KICKER_STYLE}>{head}</div>
+			<div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+				<span
+					style={{
+						fontSize: isStory ? 48 : 36,
+						fontWeight: 900,
+						color: "var(--spice-button, #1ed760)",
+						letterSpacing: "-.04em",
+						lineHeight: 0.95,
+					}}
+				>
+					{totalHours}
+				</span>
+				<span style={{ fontSize: isStory ? 20 : 16, fontWeight: 700 }}>hours</span>
+			</div>
+			<div
+				style={{
+					marginTop: 8,
+					fontSize: isStory ? 11 : 9,
+					color: "rgba(255,255,255,.65)",
+					lineHeight: 1.35,
+				}}
+			>
+				{formatNumber(stats.totalPlays)} plays · {stats.uniqueArtistCount} artists · peak{" "}
+				{peakLabel}
+				{streak > 0 ? ` · ${streak}-day streak` : ""}
+			</div>
+
+			{tracks.length > 0 && (
+				<div style={{ marginTop: isStory ? 12 : 8 }}>
+					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>Top tracks</div>
+					<ol
+						style={{
+							listStyle: "none",
+							margin: 0,
+							padding: 0,
+							display: "flex",
+							flexDirection: "column",
+							gap: isStory ? 6 : 4,
+						}}
+					>
+						{tracks.map((t, i) => (
+							<li
+								key={t.trackUri}
+								data-testid="share-wrapped-track"
+								style={{ display: "flex", alignItems: "center", gap: isStory ? 8 : 6 }}
+							>
+								<span
+									style={{
+										fontSize: isStory ? 16 : 14,
+										fontWeight: 800,
+										color: "var(--spice-button, #1ed760)",
+										width: isStory ? 18 : 16,
+										textAlign: "right",
+										fontVariantNumeric: "tabular-nums",
+									}}
+								>
+									{i + 1}
+								</span>
+								<Tile seed={t.trackUri} sz={isStory ? 26 : 22} imageUrl={t.albumArt} />
+								<div style={{ minWidth: 0, flex: 1 }}>
+									<div
+										style={{
+											fontSize: isStory ? 11 : 10,
+											fontWeight: 600,
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
+										{t.trackName}
+									</div>
+									<div
+										style={{
+											fontSize: isStory ? 9 : 8,
+											color: "rgba(255,255,255,.55)",
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
+										{t.artistName}
+									</div>
+								</div>
+							</li>
+						))}
+					</ol>
+				</div>
+			)}
+
+			{artists.length > 0 && (
+				<div style={{ marginTop: isStory ? 12 : 8 }}>
+					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>Top artists</div>
+					<ol
+						style={{
+							listStyle: "none",
+							margin: 0,
+							padding: 0,
+							display: "flex",
+							flexDirection: "column",
+							gap: isStory ? 6 : 4,
+						}}
+					>
+						{artists.map((a, i) => (
+							<li
+								key={a.artistUri || `artist-${i}`}
+								data-testid="share-wrapped-artist"
+								style={{ display: "flex", alignItems: "center", gap: isStory ? 8 : 6 }}
+							>
+								<span
+									style={{
+										fontSize: isStory ? 16 : 14,
+										fontWeight: 800,
+										color: "var(--spice-button, #1ed760)",
+										width: isStory ? 18 : 16,
+										textAlign: "right",
+										fontVariantNumeric: "tabular-nums",
+									}}
+								>
+									{i + 1}
+								</span>
+								<Tile seed={a.artistUri} sz={isStory ? 26 : 22} rounded={6} imageUrl={a.imageUrl ?? undefined} />
+								<div style={{ minWidth: 0, flex: 1 }}>
+									<div
+										style={{
+											fontSize: isStory ? 11 : 10,
+											fontWeight: 600,
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+									>
+										{a.artistName}
+									</div>
+									<div style={{ fontSize: isStory ? 9 : 8, color: "rgba(255,255,255,.55)" }}>
+										{a.count === 1 ? "1 play" : `${a.count} plays`}
+									</div>
+								</div>
+							</li>
+						))}
+					</ol>
+				</div>
+			)}
+
+			{genres.length > 0 && (
+				<div style={{ marginTop: isStory ? 12 : 8 }}>
+					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>Top genres</div>
+					<div style={{ display: "flex", flexDirection: "column", gap: isStory ? 6 : 4 }}>
+						{genres.map((g, i) => {
+							const pct = genreTotal > 0 ? g.count / genreTotal : 0;
+							return (
+								<div
+									key={g.genre}
+									data-testid="share-wrapped-genre"
+									style={{ display: "flex", alignItems: "center", gap: 10 }}
+								>
+									<span
+										style={{
+											flex: "0 0 auto",
+											fontSize: 12,
+											color: "#fff",
+											fontWeight: 600,
+											width: 96,
+										}}
+									>
+										{g.genre}
+									</span>
+									<div
+										style={{
+											flex: 1,
+											height: 8,
+											background: "rgba(255,255,255,.1)",
+											borderRadius: 4,
+											overflow: "hidden",
+										}}
+									>
+										<div
+											style={{
+												height: "100%",
+												width: `${(g.count / genreMaxCount) * 100}%`,
+												background: "var(--spice-button, #1ed760)",
+												opacity: 1 - i * 0.18,
+											}}
+										/>
+									</div>
+									<span
+										style={{
+											fontSize: 11,
+											color: "rgba(255,255,255,.6)",
+											fontVariantNumeric: "tabular-nums",
+										}}
+									>
+										{Math.round(pct * 100)}%
+									</span>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+			)}
+		</div>
+	);
 }
+
+const KICKER_STYLE: React.CSSProperties = {
+	fontSize: 11,
+	color: "rgba(255,255,255,.6)",
+	textTransform: "uppercase",
+	letterSpacing: ".1em",
+	fontWeight: 700,
+	marginBottom: 10,
+};
 
 function ShareTop5({ stats }: { stats: StatsResult }) {
 	const tracks = stats.topTracks.slice(0, 5);
@@ -519,13 +737,14 @@ function ShareTop5({ stats }: { stats: StatsResult }) {
 	);
 }
 
-function ShareTime({ stats }: { stats: StatsResult }) {
+function ShareTime({ stats, periodLabel }: { stats: StatsResult; periodLabel: string }) {
 	const totalHours = Math.floor(stats.totalDuration / 3_600_000);
 	const topArtist = stats.topArtists[0]?.artistName ?? "";
+	const head = periodLabel.trim().length > 0 ? `${periodLabel} · I listened` : "Listening time";
 
 	return (
 		<div>
-			<div style={KICKER_STYLE}>This month I listened</div>
+			<div style={KICKER_STYLE}>{head}</div>
 			<div
 				data-testid="share-time-hero"
 				style={{ display: "flex", alignItems: "baseline", gap: 8 }}
@@ -683,260 +902,12 @@ function ShareThrowback({ stats }: { stats: StatsResult }) {
 					{track.trackName}
 				</div>
 				<div style={{ fontSize: 13, color: "rgba(255,255,255,.7)" }}>
-					{track.artistName} · {track.count} plays
+					{track.artistName} · {track.count === 1 ? "1 play" : `${track.count} plays`}
 				</div>
 			</div>
 		</div>
 	);
 }
-
-function ShareWrapped({ stats, size }: { stats: StatsResult; size: ShareSize }) {
-	const isStory = size === "story";
-	const totalHours = Math.floor(stats.totalDuration / 3_600_000);
-	const streak = stats.streak ?? 0;
-	const tracks = stats.topTracks.slice(0, isStory ? 5 : 4);
-	const artists = stats.topArtists.slice(0, 3);
-	const genres = stats.topGenres.slice(0, 3);
-	const genreMaxCount = genres[0]?.count ?? 1;
-	const genreTotal = genres.reduce((s, x) => s + x.count, 0);
-	const peakLabel = formatHour(stats.peakHour, false);
-
-	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 8, height: "100%" }}>
-			<div data-testid="share-wrapped-hero">
-				<div style={WRAPPED_KICKER}>This month</div>
-				<div style={{ display: "flex", alignItems: "baseline", gap: 6, lineHeight: 0.9 }}>
-					<span
-						style={{
-							fontSize: isStory ? 52 : 42,
-							fontWeight: 900,
-							color: "var(--spice-button, #1ed760)",
-							letterSpacing: "-.04em",
-						}}
-					>
-						{totalHours}
-					</span>
-					<span style={{ fontSize: 18, fontWeight: 700 }}>hours</span>
-					<span
-						style={{
-							marginLeft: "auto",
-							fontSize: 9.5,
-							fontWeight: 700,
-							color: "var(--spice-button, #1ed760)",
-							letterSpacing: ".08em",
-							textTransform: "uppercase",
-						}}
-					>
-						{streak}d streak
-					</span>
-				</div>
-				<div style={{ marginTop: 5, fontSize: 10.5, color: "rgba(255,255,255,.6)" }}>
-					{formatNumber(stats.totalPlays)} plays · {stats.uniqueArtistCount} artists · peak{" "}
-					{peakLabel}
-				</div>
-			</div>
-
-			<div style={CHUNK}>
-				<div style={WRAPPED_KICKER}>Top tracks</div>
-				<ol
-					style={{
-						listStyle: "none",
-						margin: 0,
-						padding: 0,
-						display: "flex",
-						flexDirection: "column",
-						gap: isStory ? 6 : 4,
-					}}
-				>
-					{tracks.map((t, i) => (
-						<li
-							key={t.trackUri}
-							data-testid="share-wrapped-track"
-							style={{ display: "flex", alignItems: "center", gap: 8 }}
-						>
-							<span
-								style={{
-									fontSize: 12,
-									fontWeight: 800,
-									color: "var(--spice-button, #1ed760)",
-									width: 12,
-									textAlign: "right",
-									fontVariantNumeric: "tabular-nums",
-								}}
-							>
-								{i + 1}
-							</span>
-							<Tile seed={t.trackUri} sz={isStory ? 22 : 20} imageUrl={t.albumArt} />
-							<div style={{ minWidth: 0, flex: 1 }}>
-								<div
-									style={{
-										fontSize: isStory ? 11 : 10.5,
-										fontWeight: 600,
-										whiteSpace: "nowrap",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
-									}}
-								>
-									{t.trackName}
-								</div>
-								<div
-									style={{
-										fontSize: isStory ? 9 : 8.5,
-										color: "rgba(255,255,255,.55)",
-										whiteSpace: "nowrap",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
-									}}
-								>
-									{t.artistName}
-								</div>
-							</div>
-							<span
-								style={{
-									fontSize: 9,
-									color: "rgba(255,255,255,.4)",
-									fontVariantNumeric: "tabular-nums",
-								}}
-							>
-								{t.count}
-							</span>
-						</li>
-					))}
-				</ol>
-			</div>
-
-			{isStory && (
-				<div style={CHUNK}>
-					<div style={WRAPPED_KICKER}>Top artists</div>
-					<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-						{artists.map((a, i) => (
-							<div
-								key={a.artistUri}
-								data-testid="share-wrapped-artist"
-								style={{ display: "flex", alignItems: "center", gap: 10 }}
-							>
-								<span
-									style={{
-										fontSize: 12,
-										fontWeight: 800,
-										color: "var(--spice-button, #1ed760)",
-										width: 12,
-										textAlign: "right",
-										fontVariantNumeric: "tabular-nums",
-									}}
-								>
-									{i + 1}
-								</span>
-								<Avatar seed={a.artistUri} sz={26} imageUrl={a.imageUrl ?? undefined} />
-								<div style={{ minWidth: 0, flex: 1 }}>
-									<div
-										style={{
-											fontSize: 12,
-											fontWeight: 600,
-											whiteSpace: "nowrap",
-											overflow: "hidden",
-											textOverflow: "ellipsis",
-										}}
-									>
-										{a.artistName}
-									</div>
-									<div style={{ fontSize: 9.5, color: "rgba(255,255,255,.55)" }}>
-										{a.count} plays
-									</div>
-								</div>
-							</div>
-						))}
-					</div>
-				</div>
-			)}
-
-			{genres.length > 0 && (
-				<div style={CHUNK}>
-					<div style={WRAPPED_KICKER}>Top genres</div>
-					<div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-						{genres.map((g, i) => {
-							const pct = genreTotal > 0 ? g.count / genreTotal : 0;
-							return (
-								<div
-									key={g.genre}
-									data-testid="share-wrapped-genre"
-									style={{ display: "flex", alignItems: "center", gap: 8 }}
-								>
-									<span
-										style={{
-											flex: "0 0 auto",
-											fontSize: 10,
-											fontWeight: 600,
-											width: isStory ? 78 : 90,
-											whiteSpace: "nowrap",
-											overflow: "hidden",
-											textOverflow: "ellipsis",
-										}}
-									>
-										{g.genre}
-									</span>
-									<div
-										style={{
-											flex: 1,
-											height: 5,
-											background: "rgba(255,255,255,.08)",
-											borderRadius: 3,
-											overflow: "hidden",
-										}}
-									>
-										<div
-											style={{
-												height: "100%",
-												width: `${(g.count / genreMaxCount) * 100}%`,
-												background: "var(--spice-button, #1ed760)",
-												opacity: 1 - i * 0.2,
-												borderRadius: 3,
-											}}
-										/>
-									</div>
-									<span
-										style={{
-											fontSize: 9,
-											color: "rgba(255,255,255,.5)",
-											fontVariantNumeric: "tabular-nums",
-										}}
-									>
-										{Math.round(pct * 100)}%
-									</span>
-								</div>
-							);
-						})}
-					</div>
-				</div>
-			)}
-		</div>
-	);
-}
-
-const KICKER_STYLE: React.CSSProperties = {
-	fontSize: 11,
-	color: "rgba(255,255,255,.6)",
-	textTransform: "uppercase",
-	letterSpacing: ".1em",
-	fontWeight: 700,
-	marginBottom: 10,
-};
-
-const WRAPPED_KICKER: React.CSSProperties = {
-	fontSize: 9.5,
-	color: "rgba(255,255,255,.6)",
-	textTransform: "uppercase",
-	letterSpacing: ".1em",
-	fontWeight: 700,
-	marginBottom: 6,
-};
-
-const CHUNK: React.CSSProperties = {
-	background: "rgba(255,255,255,.04)",
-	border: "1px solid rgba(255,255,255,.08)",
-	borderRadius: 10,
-	padding: "10px 12px",
-};
 
 // Canvas 2D export for share images (no DOM snapshot dependency).
 
@@ -1045,13 +1016,15 @@ function getSharePalette(followTheme: boolean): SharePalette {
 }
 
 export function loadImage(url: string): Promise<HTMLImageElement | null> {
+	const resolved = normalizeSpotifyImageUrl(url);
+	if (!resolved) return Promise.resolve(null);
 	return new Promise((resolve) => {
 		const img = new Image();
 		img.crossOrigin = "anonymous";
 		img.onload = () => resolve(img);
 		img.onerror = () => resolve(null);
 		setTimeout(() => resolve(null), 5000);
-		img.src = url;
+		img.src = resolved;
 	});
 }
 
@@ -1291,11 +1264,20 @@ function estimateContentHeight(variant: ShareVariant, size: ShareSize): number {
 	if (variant === "throwback") return size === "story" ? 1180 : 780;
 	if (variant === "top5") return size === "story" ? 1460 : 720;
 	if (variant === "streak") return size === "story" ? 1180 : 560;
-	if (variant === "wrapped") return size === "story" ? 2000 : 1120;
+	if (variant === "wrapped") return size === "story" ? 1380 : 620;
 	return size === "story" ? 620 : 560;
 }
 
 // ── Per-variant content drawers ──
+
+interface Top5CanvasOptions {
+	listTitle?: string;
+	includeStoryInsight?: boolean;
+	/** Square Wrapped: smaller rows so lists + footer fit in 1080×1080. */
+	wrappedSquareTight?: boolean;
+	/** Story Wrapped: slightly denser rows so tracks + artists + genres fit in 1080×1920. */
+	wrappedStoryTight?: boolean;
+}
 
 async function drawTop5Content(
 	ctx: CanvasRenderingContext2D,
@@ -1305,18 +1287,23 @@ async function drawTop5Content(
 	x: number,
 	y: number,
 	w: number,
-) {
+	options?: Top5CanvasOptions,
+): Promise<number> {
 	const isStory = size === "story";
-	y = cvKicker(ctx, "My top 5", x, y, palette);
-	y += isStory ? 48 : 32;
+	const listTitle = options?.listTitle ?? "My top 5";
+	const includeStoryInsight = options?.includeStoryInsight !== false;
+	const storyTight = options?.wrappedStoryTight === true && isStory;
+	const tightSq = options?.wrappedSquareTight === true && !isStory;
+	y = cvKicker(ctx, listTitle, x, y, palette);
+	y += isStory ? (storyTight ? 36 : 48) : tightSq ? 24 : 32;
 	const tracks = stats.topTracks.slice(0, 5);
-	if (tracks.length === 0) return;
+	if (tracks.length === 0) return y;
 
-	const rankW = 56;
-	const tileSz = isStory ? 124 : 96;
+	const rankW = tightSq ? 44 : storyTight ? 48 : 56;
+	const tileSz = isStory ? (storyTight ? 102 : 124) : tightSq ? 68 : 96;
 	const gapArt = CV_GAP + 8;
-	const cntPx = isStory ? 32 : 28;
-	const playsLblPx = 18;
+	const cntPx = isStory ? (storyTight ? 28 : 32) : tightSq ? 22 : 28;
+	const playsLblPx = storyTight ? 16 : tightSq ? 15 : 18;
 
 	ctx.font = `700 ${cntPx}px ${CV_FONT}`;
 	let playNumMax = 0;
@@ -1333,26 +1320,30 @@ async function drawTop5Content(
 	const textAvail = Math.max(72, x + w - playsReserve - CV_GAP - textX);
 	const titleBase = (ryLocal: number) => ryLocal + Math.round(tileSz * 0.38);
 	const artistBase = (ryLocal: number) => ryLocal + Math.round(tileSz * 0.78);
-	const rowGap = isStory ? 36 : 24;
+	const rowGap = isStory ? (storyTight ? 22 : 36) : tightSq ? 12 : 24;
+	const rankNumPx = isStory ? (storyTight ? 52 : 64) : tightSq ? 48 : 64;
+	const titlePx = isStory ? (storyTight ? 38 : 44) : tightSq ? 30 : 40;
+	const artistPx = isStory ? (storyTight ? 26 : 30) : tightSq ? 22 : 28;
+	const artRadius = isStory ? (storyTight ? 8 : 10) : tightSq ? 6 : 8;
 
 	for (let i = 0; i < tracks.length; i++) {
 		const t = tracks[i];
 		const ry = y + i * (tileSz + rowGap);
 		ctx.fillStyle = cvRgb(palette.accent);
-		ctx.font = `800 64px ${CV_FONT}`;
+		ctx.font = `800 ${rankNumPx}px ${CV_FONT}`;
 		ctx.textAlign = "right";
 		ctx.fillText(`${i + 1}`, x + rankW, ry + tileSz / 2 + 18);
 		ctx.textAlign = "left";
 
 		const artX = x + rankW + gapArt;
-		if (!(await cvDrawArt(ctx, t.albumArt, artX, ry, tileSz, isStory ? 10 : 8)))
-			cvPlaceholder(ctx, artX, ry, tileSz, isStory ? 10 : 8);
+		if (!(await cvDrawArt(ctx, t.albumArt, artX, ry, tileSz, artRadius)))
+			cvPlaceholder(ctx, artX, ry, tileSz, artRadius);
 
 		ctx.fillStyle = palette.text;
-		ctx.font = `600 ${isStory ? 44 : 40}px ${CV_FONT}`;
+		ctx.font = `600 ${titlePx}px ${CV_FONT}`;
 		ctx.fillText(cvTruncate(ctx, t.trackName, textAvail), textX, titleBase(ry));
 		ctx.fillStyle = palette.dimText;
-		ctx.font = `${isStory ? 30 : 28}px ${CV_FONT}`;
+		ctx.font = `${artistPx}px ${CV_FONT}`;
 		ctx.fillText(cvTruncate(ctx, t.artistName, textAvail), textX, artistBase(ry));
 
 		const playsEdge = x + w;
@@ -1369,7 +1360,7 @@ async function drawTop5Content(
 	}
 	y += tracks.length * (tileSz + rowGap);
 
-	if (isStory && stats.totalPlays > 0) {
+	if (isStory && stats.totalPlays > 0 && includeStoryInsight) {
 		const totalFive = tracks.reduce((s, t) => s + t.count, 0);
 		const sharePct = Math.round((totalFive / stats.totalPlays) * 100);
 		const chunkH = 224;
@@ -1402,7 +1393,117 @@ async function drawTop5Content(
 		ctx.font = `${22}px ${CV_FONT}`;
 		ctx.fillText(`of ${formatNumber(stats.totalPlays)} total`, x + w - 16, cy + 144);
 		ctx.textAlign = "left";
+		y += 48 + chunkH;
 	}
+	return y;
+}
+
+interface TopArtistRowsOptions {
+	wrappedSquareTight?: boolean;
+	wrappedStoryTight?: boolean;
+}
+
+async function drawTopArtistRowsTop5Style(
+	ctx: CanvasRenderingContext2D,
+	artists: TopArtist[],
+	size: ShareSize,
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
+	rowOptions?: TopArtistRowsOptions,
+): Promise<number> {
+	if (artists.length === 0) return y;
+	y = cvKicker(ctx, "Top artists", x, y, palette);
+	const isStory = size === "story";
+	const storyTight = rowOptions?.wrappedStoryTight === true && isStory;
+	const tightSq = rowOptions?.wrappedSquareTight === true && !isStory;
+	y += isStory ? (storyTight ? 36 : 48) : tightSq ? 22 : 32;
+	const rankW = tightSq ? 44 : storyTight ? 48 : 56;
+	const tileSz = isStory ? (storyTight ? 102 : 124) : tightSq ? 68 : 96;
+	const gapArt = CV_GAP + 8;
+	const textX = x + rankW + gapArt + tileSz + gapArt;
+	const textAvail = Math.max(72, x + w - CV_GAP - textX);
+	const titleBase = (ryLocal: number) => ryLocal + Math.round(tileSz * 0.38);
+	const subBase = (ryLocal: number) => ryLocal + Math.round(tileSz * 0.78);
+	const rowGap = isStory ? (storyTight ? 22 : 36) : tightSq ? 12 : 24;
+	const rArt = isStory ? (storyTight ? 8 : 10) : tightSq ? 6 : 8;
+	const rankNumPx = isStory ? (storyTight ? 52 : 64) : tightSq ? 48 : 64;
+	const titlePx = isStory ? (storyTight ? 38 : 44) : tightSq ? 30 : 40;
+	const subPx = isStory ? (storyTight ? 26 : 30) : tightSq ? 22 : 28;
+
+	for (let i = 0; i < artists.length; i++) {
+		const a = artists[i];
+		const ry = y + i * (tileSz + rowGap);
+		ctx.fillStyle = cvRgb(palette.accent);
+		ctx.font = `800 ${rankNumPx}px ${CV_FONT}`;
+		ctx.textAlign = "right";
+		ctx.fillText(`${i + 1}`, x + rankW, ry + tileSz / 2 + 18);
+		ctx.textAlign = "left";
+		const artX = x + rankW + gapArt;
+		if (!(await cvDrawArt(ctx, a.imageUrl ?? undefined, artX, ry, tileSz, rArt)))
+			cvPlaceholder(ctx, artX, ry, tileSz, rArt);
+		ctx.fillStyle = palette.text;
+		ctx.font = `600 ${titlePx}px ${CV_FONT}`;
+		ctx.fillText(cvTruncate(ctx, a.artistName, textAvail), textX, titleBase(ry));
+		ctx.fillStyle = palette.dimText;
+		ctx.font = `${subPx}px ${CV_FONT}`;
+		const sub = a.count === 1 ? "1 play" : `${formatNumber(a.count)} plays`;
+		ctx.fillText(cvTruncate(ctx, sub, textAvail), textX, subBase(ry));
+	}
+	y += artists.length * (tileSz + rowGap);
+	return y;
+}
+
+async function drawWrappedGenreBars(
+	ctx: CanvasRenderingContext2D,
+	top: TopGenre[],
+	size: ShareSize,
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
+	squareWrappedTight = false,
+	storyWrappedTight = false,
+): Promise<number> {
+	if (top.length === 0) return y;
+	const maxCount = top[0].count;
+	const totalCount = top.reduce((s, g) => s + g.count, 0);
+	y = cvKicker(ctx, "Top genres", x, y, palette, false, 26);
+	const isStory = size === "story";
+	const storyTight = storyWrappedTight && isStory;
+	const tightSq = squareWrappedTight && !isStory;
+	y += isStory ? (storyTight ? 32 : 40) : tightSq ? 22 : 32;
+	const barH = isStory ? (storyTight ? 30 : 36) : tightSq ? 26 : 32;
+	const rowGap = isStory ? (storyTight ? 26 : 36) : tightSq ? 18 : 28;
+	const labelWPref = isStory ? 320 : 300;
+	const pctReserve = isStory ? 120 : tightSq ? 88 : 100;
+	const minBarW = isStory ? 72 : tightSq ? 52 : 64;
+	const genreLblFontPx = isStory ? (storyTight ? 34 : 40) : tightSq ? 28 : 36;
+	const labelCap = Math.max(160, Math.min(labelWPref, w - pctReserve - minBarW - CV_GAP - 28));
+	const genrePctColor = palette.specGenrePctMuted ?? palette.dimText;
+
+	for (let i = 0; i < top.length; i++) {
+		const g = top[i];
+		const ry = y + i * (barH + rowGap);
+		const pct = totalCount > 0 ? g.count / totalCount : 0;
+		ctx.fillStyle = palette.text;
+		ctx.font = `600 ${genreLblFontPx}px ${CV_FONT}`;
+		ctx.fillText(cvTruncate(ctx, g.genre, labelCap), x, ry + barH - 4);
+		const barX = x + labelCap + CV_GAP;
+		const barW = Math.max(minBarW, w - pctReserve - (barX - x) - CV_GAP);
+		ctx.fillStyle = "rgba(255,255,255,0.1)";
+		cvFillRoundRect(ctx, barX, ry, barW, barH, barH / 2);
+		ctx.fillStyle = cvRgb(palette.accent, 1 - i * 0.13);
+		cvFillRoundRect(ctx, barX, ry, barW * (g.count / maxCount), barH, barH / 2);
+		ctx.fillStyle = genrePctColor;
+		ctx.font = `600 ${isStory ? (storyTight ? 30 : 34) : tightSq ? 26 : 32}px ${CV_FONT}`;
+		ctx.textAlign = "right";
+		ctx.fillText(`${Math.round(pct * 100)}%`, x + w, ry + barH - 4);
+		ctx.textAlign = "left";
+	}
+	y += top.length * (barH + rowGap);
+	return y;
 }
 
 async function drawTimeContent(
@@ -1410,32 +1511,34 @@ async function drawTimeContent(
 	stats: StatsResult,
 	size: ShareSize,
 	palette: SharePalette,
+	periodLabel: string,
 	periodDayCount: number,
 	x: number,
 	y: number,
 	w: number,
 ) {
-	y = cvKicker(ctx, "This month I listened", x, y, palette);
+	const head = periodLabel.trim().length > 0 ? `${periodLabel} · I listened` : "Listening time";
+	y = cvKicker(ctx, head, x, y, palette, true, size === "story" ? 34 : 30);
 	const isStory = size === "story";
 	y += isStory ? 80 : 32;
 
 	const totalHours = Math.floor(stats.totalDuration / 3_600_000);
-	const heroNumPx = isStory ? 380 : 320;
-	const hoursWordPx = isStory ? 96 : 80;
-	const heroBaseline = y + Math.floor(heroNumPx * 0.82);
+	const heroNumPx = isStory ? 380 : 300;
+	const hoursWordPx = isStory ? 96 : 72;
+	const numBaseline = y + Math.floor(heroNumPx * 0.78);
 
+	ctx.textAlign = "left";
+	ctx.textBaseline = "alphabetic";
 	ctx.font = `900 ${heroNumPx}px ${CV_FONT}`;
-	const heroW = ctx.measureText(`${totalHours}`).width;
 	ctx.fillStyle = cvRgb(palette.accent);
-	ctx.fillText(`${totalHours}`, x, heroBaseline);
+	ctx.fillText(`${totalHours}`, x, numBaseline);
 
 	ctx.fillStyle = palette.text;
 	ctx.font = `700 ${hoursWordPx}px ${CV_FONT}`;
-	const hrsWordW = ctx.measureText("hours").width;
-	const gapH = Math.max(8, w - heroW - hrsWordW);
-	ctx.fillText("hours", x + heroW + Math.min(24, gapH), heroBaseline);
+	const hoursBaseline = numBaseline + Math.floor(hoursWordPx * 1.05) + (isStory ? 28 : 22);
+	ctx.fillText("hours", x, hoursBaseline);
 
-	y += Math.floor(heroNumPx * 0.74) + (isStory ? 56 : 36);
+	y = hoursBaseline + Math.floor(hoursWordPx * 0.35) + (isStory ? 48 : 40);
 
 	const topArtist = stats.topArtists[0]?.artistName ?? "";
 	if (topArtist) {
@@ -1514,7 +1617,7 @@ async function drawTimeContent(
 		if (!(await cvDrawArt(ctx, a.imageUrl ?? undefined, avatarX, ry, avatar, avatar / 2)))
 			cvPlaceholder(ctx, avatarX, ry, avatar, avatar / 2);
 		const nameX = avatarX + avatar + 22;
-		const playsLbl = `${formatNumber(a.count)} plays`;
+		const playsLbl = `${formatNumber(a.count)} ${a.count === 1 ? "play" : "plays"}`;
 		ctx.font = `${28}px ${CV_FONT}`;
 		ctx.textAlign = "right";
 		ctx.fillStyle = palette.dimText;
@@ -1722,7 +1825,7 @@ async function drawStreakContent(
 	ctx.fillStyle = palette.text;
 	ctx.font = `700 ${36}px ${CV_FONT}`;
 	const bestDayStr = formatShareHeatmapBestDay(bestDay.date);
-	const playsLbl = `${bestDay.count} plays`;
+	const playsLbl = `${bestDay.count} ${bestDay.count === 1 ? "play" : "plays"}`;
 	ctx.font = `800 ${36}px ${CV_FONT}`;
 	const playsW = ctx.measureText(playsLbl).width + CV_GAP;
 	ctx.font = `700 ${36}px ${CV_FONT}`;
@@ -1755,7 +1858,7 @@ async function drawThrowbackContent(
 	const artX = Math.floor((canvasWidth - artPx) / 2);
 	if (!(await cvDrawArt(ctx, track.albumArt, artX, y, artPx, isStory ? 20 : 20)))
 		cvPlaceholder(ctx, artX, y, artPx, isStory ? 20 : 20);
-	y += artPx + (isStory ? 60 : 36);
+	y += artPx + (isStory ? 96 : 72);
 
 	ctx.textAlign = "left";
 	ctx.fillStyle = palette.text;
@@ -1765,7 +1868,8 @@ async function drawThrowbackContent(
 	y += isStory ? 110 : 70;
 	ctx.fillStyle = palette.mutedText;
 	ctx.font = `${isStory ? 44 : 32}px ${CV_FONT}`;
-	ctx.fillText(cvTruncate(ctx, `${track.artistName} · ${track.count} plays`, w), x, y);
+	const playPhrase = track.count === 1 ? "1 play" : `${track.count} plays`;
+	ctx.fillText(cvTruncate(ctx, `${track.artistName} · ${playPhrase}`, w), x, y);
 
 	if (!isStory || stats.totalPlays <= 0) return;
 
@@ -1810,236 +1914,265 @@ async function drawThrowbackContent(
 	ctx.stroke();
 }
 
+type WrappedListLayout = {
+	rankW: number;
+	tileSz: number;
+	rowGap: number;
+	rankNumPx: number;
+	titlePx: number;
+	subPx: number;
+	cntPx: number;
+	playsLblPx: number;
+	artRadius: number;
+};
+
+async function drawWrappedCompactTrackRows(
+	ctx: CanvasRenderingContext2D,
+	tracks: TopTrack[],
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
+	layout: WrappedListLayout,
+): Promise<number> {
+	if (tracks.length === 0) return y;
+	y = cvKicker(ctx, "Top tracks", x, y, palette, false, layout.tileSz <= 52 ? 18 : 22);
+	y += layout.tileSz <= 52 ? 14 : 18;
+	const { rankW, tileSz, rowGap, rankNumPx, titlePx, subPx, cntPx, playsLblPx, artRadius } = layout;
+	const gapArt = 10;
+	ctx.font = `700 ${cntPx}px ${CV_FONT}`;
+	let playNumMax = 0;
+	for (const t of tracks) playNumMax = Math.max(playNumMax, ctx.measureText(`${t.count}`).width);
+	ctx.font = `600 ${playsLblPx}px ${CV_FONT}`;
+	const defaultLetterSpacing = ctx.letterSpacing;
+	ctx.letterSpacing = "0.06em";
+	const playsLblW = ctx.measureText("PLAYS").width;
+	ctx.letterSpacing = defaultLetterSpacing;
+	const playsReserve = Math.ceil(playNumMax + 10 + playsLblW + CV_PAD / 2);
+	const textX = x + rankW + gapArt + tileSz + gapArt;
+	const textAvail = Math.max(48, x + w - playsReserve - CV_GAP - textX);
+	const titleBase = (ry: number) => ry + Math.round(tileSz * 0.34);
+	const artistBase = (ry: number) => ry + Math.round(tileSz * 0.72);
+
+	for (let i = 0; i < tracks.length; i++) {
+		const t = tracks[i];
+		const ry = y + i * (tileSz + rowGap);
+		ctx.fillStyle = cvRgb(palette.accent);
+		ctx.font = `800 ${rankNumPx}px ${CV_FONT}`;
+		ctx.textAlign = "right";
+		ctx.fillText(`${i + 1}`, x + rankW, ry + tileSz / 2 + Math.round(rankNumPx * 0.12));
+		ctx.textAlign = "left";
+		const artX = x + rankW + gapArt;
+		if (!(await cvDrawArt(ctx, t.albumArt, artX, ry, tileSz, artRadius)))
+			cvPlaceholder(ctx, artX, ry, tileSz, artRadius);
+		ctx.fillStyle = palette.text;
+		ctx.font = `600 ${titlePx}px ${CV_FONT}`;
+		ctx.fillText(cvTruncate(ctx, t.trackName, textAvail), textX, titleBase(ry));
+		ctx.fillStyle = palette.dimText;
+		ctx.font = `${subPx}px ${CV_FONT}`;
+		ctx.fillText(cvTruncate(ctx, t.artistName, textAvail), textX, artistBase(ry));
+		const playsEdge = x + w;
+		ctx.fillStyle = palette.text;
+		ctx.font = `700 ${cntPx}px ${CV_FONT}`;
+		ctx.textAlign = "right";
+		ctx.fillText(`${t.count}`, playsEdge, titleBase(ry));
+		ctx.fillStyle = palette.dimText;
+		ctx.font = `600 ${playsLblPx}px ${CV_FONT}`;
+		ctx.letterSpacing = "0.06em";
+		ctx.fillText("PLAYS", playsEdge, artistBase(ry));
+		ctx.letterSpacing = defaultLetterSpacing;
+		ctx.textAlign = "left";
+	}
+	return y + tracks.length * (tileSz + rowGap);
+}
+
+async function drawWrappedCompactArtistRows(
+	ctx: CanvasRenderingContext2D,
+	artists: TopArtist[],
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
+	layout: WrappedListLayout,
+): Promise<number> {
+	if (artists.length === 0) return y;
+	y = cvKicker(ctx, "Top artists", x, y, palette, false, layout.tileSz <= 52 ? 18 : 22);
+	y += layout.tileSz <= 52 ? 14 : 18;
+	const { rankW, tileSz, rowGap, rankNumPx, titlePx, subPx, artRadius } = layout;
+	const gapArt = 10;
+	const textX = x + rankW + gapArt + tileSz + gapArt;
+	const textAvail = Math.max(48, x + w - CV_GAP - textX);
+	const titleBase = (ry: number) => ry + Math.round(tileSz * 0.34);
+	const subBase = (ry: number) => ry + Math.round(tileSz * 0.72);
+
+	for (let i = 0; i < artists.length; i++) {
+		const a = artists[i];
+		const ry = y + i * (tileSz + rowGap);
+		ctx.fillStyle = cvRgb(palette.accent);
+		ctx.font = `800 ${rankNumPx}px ${CV_FONT}`;
+		ctx.textAlign = "right";
+		ctx.fillText(`${i + 1}`, x + rankW, ry + tileSz / 2 + Math.round(rankNumPx * 0.12));
+		ctx.textAlign = "left";
+		const artX = x + rankW + gapArt;
+		if (!(await cvDrawArt(ctx, a.imageUrl ?? undefined, artX, ry, tileSz, artRadius)))
+			cvPlaceholder(ctx, artX, ry, tileSz, artRadius);
+		ctx.fillStyle = palette.text;
+		ctx.font = `600 ${titlePx}px ${CV_FONT}`;
+		ctx.fillText(cvTruncate(ctx, a.artistName, textAvail), textX, titleBase(ry));
+		ctx.fillStyle = palette.dimText;
+		ctx.font = `${subPx}px ${CV_FONT}`;
+		const sub = a.count === 1 ? "1 play" : `${formatNumber(a.count)} plays`;
+		ctx.fillText(cvTruncate(ctx, sub, textAvail), textX, subBase(ry));
+	}
+	return y + artists.length * (tileSz + rowGap);
+}
+
+async function drawWrappedCompactGenreRows(
+	ctx: CanvasRenderingContext2D,
+	top: TopGenre[],
+	palette: SharePalette,
+	x: number,
+	y: number,
+	w: number,
+	opts: { barH: number; rowGap: number; labelMax: number; labelPx: number; pctPx: number },
+): Promise<number> {
+	if (top.length === 0) return y;
+	const maxCount = top[0].count;
+	const totalCount = top.reduce((s, g) => s + g.count, 0);
+	y = cvKicker(ctx, "Top genres", x, y, palette, false, opts.labelPx + 4);
+	y += opts.rowGap > 12 ? 16 : 12;
+	const { barH, rowGap, labelMax, labelPx, pctPx } = opts;
+	const genrePctColor = palette.specGenrePctMuted ?? palette.dimText;
+	const pctReserve = 72;
+
+	for (let i = 0; i < top.length; i++) {
+		const g = top[i];
+		const ry = y + i * (barH + rowGap);
+		const pct = totalCount > 0 ? g.count / totalCount : 0;
+		ctx.fillStyle = palette.text;
+		ctx.font = `600 ${labelPx}px ${CV_FONT}`;
+		ctx.fillText(cvTruncate(ctx, g.genre, labelMax), x, ry + barH - 3);
+		const barX = x + labelMax + CV_GAP;
+		const barW = Math.max(48, w - pctReserve - (barX - x) - CV_GAP);
+		ctx.fillStyle = "rgba(255,255,255,0.1)";
+		cvFillRoundRect(ctx, barX, ry, barW, barH, barH / 2);
+		ctx.fillStyle = cvRgb(palette.accent, 1 - i * 0.15);
+		cvFillRoundRect(ctx, barX, ry, barW * (g.count / maxCount), barH, barH / 2);
+		ctx.fillStyle = genrePctColor;
+		ctx.font = `600 ${pctPx}px ${CV_FONT}`;
+		ctx.textAlign = "right";
+		ctx.fillText(`${Math.round(pct * 100)}%`, x + w, ry + barH - 3);
+		ctx.textAlign = "left";
+	}
+	return y + top.length * (barH + rowGap);
+}
+
 async function drawWrappedContent(
 	ctx: CanvasRenderingContext2D,
 	stats: StatsResult,
 	size: ShareSize,
 	palette: SharePalette,
+	periodLabel: string,
 	x: number,
 	y: number,
 	w: number,
 	allowStreak: boolean,
-	captionText: string,
+	_captionText: string,
 ): Promise<void> {
 	const isStory = size === "story";
+	const head = periodLabel.trim().length > 0 ? `${periodLabel} · Wrapped` : "Wrapped";
 	const totalHours = Math.floor(stats.totalDuration / 3_600_000);
-	const streak = allowStreak ? (stats.streak ?? 0) : 0;
-	const tracks = stats.topTracks.slice(0, isStory ? 5 : 3);
-	const artists = stats.topArtists.slice(0, isStory ? 3 : 0);
-	const genres = stats.topGenres.slice(0, 3);
-	const genreMaxCount = genres[0]?.count ?? 1;
-	const genreTotal = genres.reduce((s, g) => s + g.count, 0);
 	const peakLbl = formatShareSpecPeakHour(stats.peakHour);
-	const captionMuted = palette.specWrappedFootnoteMuted ?? palette.dimText;
+	const streak = allowStreak ? (stats.streak ?? 0) : 0;
+	let meta = `${formatNumber(stats.totalPlays)} plays · ${stats.uniqueArtistCount} artists · peak ${peakLbl}`;
+	if (streak > 0) meta += ` · ${streak}-day streak`;
 
-	y = cvKicker(ctx, "This month", x, y, palette, false, 28);
-	y += 16;
+	ctx.textAlign = "left";
+	ctx.textBaseline = "alphabetic";
 
-	let hrsBigPx = isStory ? 180 : 150;
-	let hrsWordPxAdj = isStory ? 56 : 48;
+	/* ── Kicker ── */
+	y = cvKicker(ctx, head, x, y, palette, true, isStory ? 26 : 20);
+	y += isStory ? 16 : 12;
 
-	let streakReserve = CV_PAD + 16;
-	let streakLbl = "";
-	let streakPrevLs = "";
-	if (allowStreak && streak > 0) {
-		streakPrevLs = ctx.letterSpacing;
-		ctx.font = `700 ${26}px ${CV_FONT}`;
-		ctx.letterSpacing = "0.08em";
-		streakLbl = `${streak}d streak`.toUpperCase();
-		streakReserve = Math.ceil(ctx.measureText(streakLbl).width * 1.06) + CV_GAP + CV_PAD;
-		ctx.letterSpacing = streakPrevLs;
-	}
-
-	const contentRight = allowStreak && streak > 0 ? x + w - streakReserve : x + w;
-	const availHero = Math.max(100, contentRight - x);
-
-	let hoursWide = 0;
-	let wordWide = 0;
-	let gapHr = 16;
-	for (let tries = 0; tries < 40; tries++) {
-		ctx.font = `900 ${hrsBigPx}px ${CV_FONT}`;
-		hoursWide = ctx.measureText(`${totalHours}`).width;
-		ctx.font = `700 ${hrsWordPxAdj}px ${CV_FONT}`;
-		wordWide = ctx.measureText("hours").width;
-		gapHr = Math.max(8, Math.min(16, availHero - hoursWide - wordWide));
-		if (hoursWide + gapHr + wordWide <= availHero + 1) break;
-		if (hrsBigPx >= hrsWordPxAdj) hrsBigPx -= 8;
-		else hrsWordPxAdj -= 2;
-		hrsBigPx = Math.max(72, hrsBigPx);
-		hrsWordPxAdj = Math.max(30, hrsWordPxAdj);
-	}
-
-	const heroBaseline = y + Math.floor(hrsBigPx * 0.82);
-
-	ctx.font = `900 ${hrsBigPx}px ${CV_FONT}`;
-	ctx.fillStyle = cvRgb(palette.accent);
-	ctx.fillText(`${totalHours}`, x, heroBaseline);
-
-	ctx.fillStyle = palette.text;
-	ctx.font = `700 ${hrsWordPxAdj}px ${CV_FONT}`;
-	ctx.fillText("hours", x + hoursWide + gapHr, heroBaseline);
-
-	if (allowStreak && streak > 0 && streakLbl) {
+	/* ── Hero: story = stacked; square = hours beside number to save vertical space ── */
+	if (isStory) {
+		const heroNumPx = 188;
+		const hoursWordPx = 48;
+		const numBaseline = y + Math.floor(heroNumPx * 0.78);
+		ctx.font = `900 ${heroNumPx}px ${CV_FONT}`;
 		ctx.fillStyle = cvRgb(palette.accent);
-		ctx.font = `700 ${26}px ${CV_FONT}`;
-		ctx.textAlign = "right";
-		ctx.letterSpacing = "0.08em";
-		ctx.fillText(streakLbl, x + w, heroBaseline);
-		ctx.textAlign = "left";
-		ctx.letterSpacing = streakPrevLs;
-	}
-
-	y = heroBaseline + 28;
-	ctx.fillStyle = palette.specWrappedMetaMuted ?? palette.dimText;
-	ctx.font = `${28}px ${CV_FONT}`;
-	ctx.fillText(
-		cvTruncate(
-			ctx,
-			`${formatNumber(stats.totalPlays)} plays · ${stats.uniqueArtistCount} artists · peak ${peakLbl}`,
-			w,
-		),
-		x,
-		y,
-	);
-	y += 16 + (isStory ? 32 : 24);
-
-	const innerL = x + 24;
-	const innerR = x + w - 24;
-	const gapLabel = 18;
-	const gapRow = 18;
-	const padChunk = 28;
-
-	const tileS = isStory ? 56 : 52;
-	const kickerBand = 54;
-	const hTracksChunk =
-		padChunk + kickerBand + gapLabel + tracks.length * (tileS + gapRow) + padChunk;
-	cvChunkBg(ctx, x - 8, y, w + 16, hTracksChunk, palette);
-	let cursorY = y + padChunk;
-	cursorY = cvKicker(ctx, "Top tracks", innerL, cursorY, palette, false, 26) + gapLabel;
-
-	for (let i = 0; i < tracks.length; i++) {
-		const t = tracks[i];
-		const ry = cursorY + i * (tileS + gapRow);
-		const rankR = innerL + 32;
-		const tileL = innerL + 32 + gapLabel;
-		const textL = tileL + tileS + gapLabel;
-		const titleB = ry + Math.round(tileS * 0.36);
-		const artistB = ry + Math.round(tileS * 0.8);
-
-		ctx.fillStyle = cvRgb(palette.accent);
-		ctx.font = `800 ${32}px ${CV_FONT}`;
-		ctx.textAlign = "right";
-		ctx.fillText(`${i + 1}`, rankR, titleB);
-		ctx.textAlign = "left";
-		if (!(await cvDrawArt(ctx, t.albumArt, tileL, ry, tileS, isStory ? 6 : 6)))
-			cvPlaceholder(ctx, tileL, ry, tileS, isStory ? 6 : 6);
-
-		const cnt = `${t.count}`;
-		ctx.font = `${22}px ${CV_FONT}`;
-		const cntW = ctx.measureText(cnt).width;
-		const avail = Math.max(40, innerR - textL - cntW - CV_GAP);
+		ctx.fillText(`${totalHours}`, x, numBaseline);
 		ctx.fillStyle = palette.text;
-		ctx.font = `600 ${30}px ${CV_FONT}`;
-		ctx.fillText(cvTruncate(ctx, t.trackName, avail), textL, titleB);
-		ctx.fillStyle = palette.dimText;
-		ctx.font = `${22}px ${CV_FONT}`;
-		ctx.fillText(cvTruncate(ctx, t.artistName, avail), textL, artistB);
-		ctx.fillStyle = "rgba(255,255,255,0.45)";
-		ctx.textAlign = "right";
-		ctx.fillText(cnt, innerR, titleB);
-		ctx.textAlign = "left";
-	}
-	y += hTracksChunk + gapRow;
-
-	if (isStory && artists.length > 0) {
-		const aSz = 64;
-		const hArtistChunk =
-			padChunk + kickerBand + gapLabel + artists.length * (aSz + gapRow) + padChunk;
-		cvChunkBg(ctx, x - 8, y, w + 16, hArtistChunk, palette);
-		cursorY = y + padChunk;
-		cursorY = cvKicker(ctx, "Top artists", innerL, cursorY, palette, false, 26) + gapLabel;
-		for (let i = 0; i < artists.length; i++) {
-			const a = artists[i];
-			const ry = cursorY + i * (aSz + gapRow);
-			const rankR = innerL + 32;
-			const avatarL = innerL + 32 + gapLabel;
-			const textL = avatarL + aSz + gapLabel;
-			const nameMid = ry + aSz / 2 + 10;
-
-			ctx.fillStyle = cvRgb(palette.accent);
-			ctx.font = `800 ${32}px ${CV_FONT}`;
-			ctx.textAlign = "right";
-			ctx.fillText(`${i + 1}`, rankR, nameMid);
-			ctx.textAlign = "left";
-			if (!(await cvDrawArt(ctx, a.imageUrl, avatarL, ry, aSz, aSz / 2)))
-				cvPlaceholder(ctx, avatarL, ry, aSz, aSz / 2);
-			ctx.fillStyle = palette.dimText;
-			ctx.font = `${22}px ${CV_FONT}`;
-			const playsLbl = `${a.count} plays`;
-			const playsW = ctx.measureText(playsLbl).width + CV_GAP;
-			ctx.fillStyle = palette.text;
-			ctx.font = `600 ${30}px ${CV_FONT}`;
-			ctx.fillText(
-				cvTruncate(ctx, a.artistName, Math.max(48, innerR - textL - playsW)),
-				textL,
-				nameMid - 2,
-			);
-			ctx.fillStyle = palette.dimText;
-			ctx.font = `${22}px ${CV_FONT}`;
-			ctx.fillText(playsLbl, textL, nameMid + 28);
-		}
-		y += hArtistChunk + gapRow;
+		ctx.font = `700 ${hoursWordPx}px ${CV_FONT}`;
+		const hoursBaseline = numBaseline + Math.floor(hoursWordPx * 1.02) + 18;
+		ctx.fillText("hours", x, hoursBaseline);
+		y = hoursBaseline + Math.floor(hoursWordPx * 0.28) + 28;
+	} else {
+		const numPx = 112;
+		const wordPx = 32;
+		ctx.font = `900 ${numPx}px ${CV_FONT}`;
+		ctx.fillStyle = cvRgb(palette.accent);
+		const numW = ctx.measureText(`${totalHours}`).width;
+		const baseline = y + Math.floor(numPx * 0.78);
+		ctx.fillText(`${totalHours}`, x, baseline);
+		ctx.fillStyle = palette.text;
+		ctx.font = `700 ${wordPx}px ${CV_FONT}`;
+		ctx.fillText("hours", x + numW + 14, baseline);
+		y = baseline + Math.floor(Math.max(numPx, wordPx) * 0.22) + 18;
 	}
 
-	if (genres.length > 0) {
-		const usableW = innerR - innerL;
-		const gLblCap = Math.max(
-			120,
-			Math.min(isStory ? 240 : 220, usableW - CV_GAP - 120 - CV_GAP - 72),
+	ctx.fillStyle = palette.mutedText;
+	const metaPx = isStory ? 26 : 19;
+	ctx.font = `${metaPx}px ${CV_FONT}`;
+	ctx.fillText(cvTruncate(ctx, meta, w), x, y);
+	y += isStory ? 34 : 24;
+
+	/* ── Lists: tighter caps on square so footer band stays clear ── */
+	const trackSlice = isStory ? stats.topTracks.slice(0, 4) : stats.topTracks.slice(0, 3);
+	const artistSlice = isStory ? stats.topArtists.slice(0, 4) : stats.topArtists.slice(0, 3);
+	const genreSlice = isStory ? stats.topGenres.slice(0, 3) : stats.topGenres.slice(0, 2);
+
+	const storyLayout: WrappedListLayout = {
+		rankW: 44,
+		tileSz: 70,
+		rowGap: 10,
+		rankNumPx: 42,
+		titlePx: 30,
+		subPx: 22,
+		cntPx: 24,
+		playsLblPx: 15,
+		artRadius: 8,
+	};
+	const squareLayout: WrappedListLayout = {
+		rankW: 32,
+		tileSz: 46,
+		rowGap: 7,
+		rankNumPx: 26,
+		titlePx: 18,
+		subPx: 15,
+		cntPx: 17,
+		playsLblPx: 12,
+		artRadius: 6,
+	};
+	const listLayout = isStory ? storyLayout : squareLayout;
+
+	y = await drawWrappedCompactTrackRows(ctx, trackSlice, palette, x, y, w, listLayout);
+	y += isStory ? 16 : 12;
+	y = await drawWrappedCompactArtistRows(ctx, artistSlice, palette, x, y, w, listLayout);
+
+	if (genreSlice.length > 0) {
+		y += isStory ? 16 : 10;
+		y = await drawWrappedCompactGenreRows(
+			ctx,
+			genreSlice,
+			palette,
+			x,
+			y,
+			w,
+			isStory
+				? { barH: 22, rowGap: 12, labelMax: 220, labelPx: 26, pctPx: 24 }
+				: { barH: 16, rowGap: 8, labelMax: 160, labelPx: 18, pctPx: 17 },
 		);
-		const genreRowGap = 16;
-		const genreRowStride = 56;
-		const hGenreChunk =
-			padChunk + kickerBand + gapLabel + genres.length * (genreRowStride + genreRowGap) + padChunk;
-		cvChunkBg(ctx, x - 8, y, w + 16, hGenreChunk, palette);
-		cursorY = y + padChunk;
-		cursorY = cvKicker(ctx, "Top genres", innerL, cursorY, palette, false, 26) + gapLabel;
-		for (let i = 0; i < genres.length; i++) {
-			const g = genres[i];
-			const pct = genreTotal > 0 ? g.count / genreTotal : 0;
-			const gy = cursorY + i * (genreRowStride + genreRowGap);
-			const pctStr = `${Math.round(pct * 100)}%`;
-			ctx.font = `600 ${24}px ${CV_FONT}`;
-			const pctMeas = ctx.measureText(pctStr).width + CV_GAP;
-			ctx.font = `600 ${28}px ${CV_FONT}`;
-			const bx = innerL + gLblCap + gapLabel;
-			const bw = Math.max(48, innerR - bx - pctMeas - CV_GAP);
-			ctx.fillStyle = palette.text;
-			ctx.font = `600 ${28}px ${CV_FONT}`;
-			ctx.fillText(cvTruncate(ctx, g.genre, gLblCap), innerL, gy + 38);
-			const barH = 16;
-			ctx.fillStyle = "rgba(255,255,255,0.08)";
-			cvFillRoundRect(ctx, bx, gy + 22, bw, barH, barH / 2);
-			ctx.fillStyle = cvRgb(palette.accent, 1 - i * 0.18);
-			cvFillRoundRect(ctx, bx, gy + 22, bw * (g.count / genreMaxCount), barH, barH / 2);
-			ctx.fillStyle = palette.specGenrePctMuted ?? palette.dimText;
-			ctx.font = `600 ${24}px ${CV_FONT}`;
-			ctx.textAlign = "right";
-			ctx.fillText(pctStr, innerR, gy + 38);
-			ctx.textAlign = "left";
-		}
-		y += hGenreChunk + gapRow;
-	}
-
-	if (captionText) {
-		y += gapRow + 16;
-		ctx.fillStyle = captionMuted;
-		ctx.font = `${22}px ${CV_FONT}`;
-		ctx.textAlign = "center";
-		const capLim = Math.max(80, w - 72);
-		const capShown = cvTruncate(ctx, captionText, capLim);
-		ctx.fillText(capShown, x + w / 2, y);
-		ctx.textAlign = "left";
 	}
 }
 
@@ -2078,29 +2211,32 @@ export async function renderShareCardCanvas(
 	canvas.height = h;
 	const ctx = canvas.getContext("2d");
 	if (!ctx) throw new Error("Canvas 2D context unavailable");
+	await hydrateShareCardAssets(stats);
 	const palette = getSharePalette(!!options?.followTheme);
 	const providerId = options?.activeProviderId ?? "local";
 	const allowStreak = providerId === "local";
 	const safeVariant = !allowStreak && variant === "streak" ? "top5" : variant;
 
-	const isWrapped = safeVariant === "wrapped";
 	const captionText = username ? `@${username} · ${periodLabel}` : periodLabel;
 
 	drawBackground(ctx, w, h, palette);
 	drawWatermarkBar(ctx, w, captionText, palette);
-	if (!isWrapped) {
-		drawFooterBar(ctx, w, h, captionText, palette);
-	}
 
 	const periodDays = Math.max(1, options?.periodDayCount ?? stats.listeningDays ?? 28);
 
 	const contentX = CV_PAD;
-	const contentTop = isWrapped ? 130 : 180;
-	const contentBottom = isWrapped ? 120 : 140;
+	const contentTop = safeVariant === "wrapped" ? 168 : 180;
+	const contentBottom =
+		safeVariant === "wrapped" && size === "square"
+			? 108
+			: safeVariant === "wrapped" && size === "story"
+				? 96
+				: 140;
+	const wrapFooterReserve = safeVariant === "wrapped" ? (size === "story" ? 96 : 92) : 72;
 	const availableHeight = h - contentTop - contentBottom;
 	const estimatedHeight = estimateContentHeight(safeVariant, size);
 	const extraSpace = Math.max(0, availableHeight - estimatedHeight);
-	const topBias = isWrapped ? 0.4 : 0.35;
+	const topBias = safeVariant === "wrapped" ? 0.06 : 0.35;
 	const contentY = contentTop + Math.floor(extraSpace * topBias);
 	const contentW = w - CV_PAD * 2;
 
@@ -2109,7 +2245,17 @@ export async function renderShareCardCanvas(
 			await drawTop5Content(ctx, stats, size, palette, contentX, contentY, contentW);
 			break;
 		case "time":
-			await drawTimeContent(ctx, stats, size, palette, periodDays, contentX, contentY, contentW);
+			await drawTimeContent(
+				ctx,
+				stats,
+				size,
+				palette,
+				periodLabel,
+				periodDays,
+				contentX,
+				contentY,
+				contentW,
+			);
 			break;
 		case "genre":
 			await drawGenreContent(ctx, stats, size, palette, contentX, contentY, contentW);
@@ -2120,20 +2266,30 @@ export async function renderShareCardCanvas(
 		case "throwback":
 			await drawThrowbackContent(ctx, stats, size, palette, contentX, contentY, contentW, w);
 			break;
-		case "wrapped":
+		case "wrapped": {
+			const clipTop = Math.max(0, contentTop - 24);
+			ctx.save();
+			ctx.beginPath();
+			ctx.rect(0, clipTop, w, h - wrapFooterReserve - clipTop);
+			ctx.clip();
 			await drawWrappedContent(
 				ctx,
 				stats,
 				size,
 				palette,
+				periodLabel,
 				contentX,
 				contentY,
 				contentW,
 				allowStreak,
 				captionText,
 			);
+			ctx.restore();
 			break;
+		}
 	}
+
+	drawFooterBar(ctx, w, h, captionText, palette);
 
 	return canvas;
 }

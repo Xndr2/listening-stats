@@ -1,4 +1,5 @@
 import type { RecentPlay } from "../../shared/types/stats";
+import { normalizeSpotifyImageUrl } from "../../shared/util/spotify-image-url";
 import { formatRelativeTime } from "../format";
 import { navigateToUri } from "../utils";
 import { SkeletonBlock } from "./SkeletonPrimitives";
@@ -41,22 +42,25 @@ export function RecentlyPlayed({ recentPlays = [], loading = false }: RecentlyPl
 								/>
 							</div>
 						))
-					: recentPlays.map((play) => (
-							<div
-								key={`${play.trackUri}-${play.playedAt}`}
-								className="recently-played-item"
-								onClick={() => navigateToUri(play.trackUri)}
-							>
-								{play.albumArt ? (
-									<img src={play.albumArt} alt="" className="recently-played-art" />
-								) : (
-									<div className="recently-played-art" />
-								)}
-								<div className="recently-played-name">{play.trackName}</div>
-								<div className="recently-played-artist">{play.artistName}</div>
-								<div className="recently-played-time">{formatRelativeTime(play.playedAt)}</div>
-							</div>
-						))}
+					: recentPlays.map((play) => {
+							const art = normalizeSpotifyImageUrl(play.albumArt);
+							return (
+								<div
+									key={`${play.trackUri}-${play.playedAt}`}
+									className="recently-played-item"
+									onClick={() => navigateToUri(play.trackUri)}
+								>
+									{art ? (
+										<img src={art} alt="" className="recently-played-art" />
+									) : (
+										<div className="recently-played-art" />
+									)}
+									<div className="recently-played-name">{play.trackName}</div>
+									<div className="recently-played-artist">{play.artistName}</div>
+									<div className="recently-played-time">{formatRelativeTime(play.playedAt)}</div>
+								</div>
+							);
+						})}
 			</div>
 		</div>
 	);

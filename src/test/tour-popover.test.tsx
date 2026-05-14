@@ -26,7 +26,7 @@ describe("TourPopover", () => {
 			}),
 			container,
 		);
-		expect(container.textContent).toContain("Step 1 of 8");
+		expect(container.textContent).toContain(`Step 1 of ${TOUR_STEPS.length}`);
 		expect(container.textContent).toContain(TOUR_STEPS[0].label);
 		expect(container.textContent).toContain(TOUR_STEPS[0].text);
 	});
@@ -41,7 +41,7 @@ describe("TourPopover", () => {
 			}),
 			container,
 		);
-		expect(container.textContent).toContain("Step 3 of 8");
+		expect(container.textContent).toContain(`Step 3 of ${TOUR_STEPS.length}`);
 		expect(container.textContent).toContain(TOUR_STEPS[2].label);
 		expect(container.textContent).toContain(TOUR_STEPS[2].text);
 	});
@@ -57,7 +57,7 @@ describe("TourPopover", () => {
 			container,
 		);
 		const dots = container.querySelectorAll(".tour-dot");
-		expect(dots.length).toBe(8);
+		expect(dots.length).toBe(TOUR_STEPS.length);
 		expect(dots[1].classList.contains("active")).toBe(true);
 		expect(dots[0].classList.contains("active")).toBe(false);
 	});

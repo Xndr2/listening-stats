@@ -63,6 +63,36 @@ function extractFailure(
 	return null;
 }
 
+function genresFromArtists(artists: SfmTopArtist[]): TopGenre[] {
+	const genreCount = new Map<string, number>();
+	for (const ta of artists) {
+		for (const genre of ta.artist.genres) {
+			genreCount.set(genre, (genreCount.get(genre) ?? 0) + ta.streams);
+		}
+	}
+	return Array.from(genreCount.entries())
+		.sort((a, b) => b[1] - a[1])
+		.map(([genre, count], i) => ({ rank: i + 1, genre, count }));
+}
+
+/** Prefer stats.fm `/top/genres` when the API returns rows (works even when artist.genres[] is empty). */
+function topGenresFromApiOrArtists(
+	apiRows: SfmTopGenre[] | null | undefined,
+	artists: SfmTopArtist[],
+): TopGenre[] {
+	const rows = apiRows ?? [];
+	if (rows.length > 0) {
+		return [...rows]
+			.sort((a, b) => b.streams - a.streams)
+			.map((g, i) => ({
+				rank: i + 1,
+				genre: g.genre.tag,
+				count: g.streams,
+			}));
+	}
+	return genresFromArtists(artists);
+}
+
 function deriveAlbumsFromTracks(tracks: SfmTopTrack[]): TopAlbum[] {
 	const albumMap = new Map<
 		string,
@@ -177,7 +207,7 @@ export class StatsFmProvider implements StatsProvider {
 		const [
 			tracksRes,
 			artistsRes,
-			_genresRes,
+			genresRes,
 			statsRes,
 			recentRes,
 			albumsRes,
@@ -215,22 +245,29 @@ export class StatsFmProvider implements StatsProvider {
 		// Extract fulfilled data with fallbacks
 		const tracks = extractData<SfmTopTrack[]>(tracksRes) ?? [];
 		const artists = extractData<SfmTopArtist[]>(artistsRes) ?? [];
+		const apiGenreRows = extractData<SfmTopGenre[]>(genresRes) ?? [];
 
 		// Diff artist Spotify IDs vs prior window (externalIds.spotify[0]; skip rows without ID).
 		const priorArtists = extractData<SfmTopArtist[]>(priorArtistsRes) ?? [];
-		let newArtistCount: number | undefined;
-		if (priorArtists.length > 0) {
+		let newArtistCount = 0;
+		if (priorBoundaries) {
 			const currentIds = new Set(
 				artists.map((a) => a.artist.externalIds?.spotify?.[0]).filter((s): s is string => !!s),
 			);
-			const priorIds = new Set(
-				priorArtists.map((a) => a.artist.externalIds?.spotify?.[0]).filter((s): s is string => !!s),
-			);
-			let count = 0;
-			for (const id of currentIds) {
-				if (!priorIds.has(id)) count++;
+			if (priorArtists.length > 0) {
+				const priorIds = new Set(
+					priorArtists
+						.map((a) => a.artist.externalIds?.spotify?.[0])
+						.filter((s): s is string => !!s),
+				);
+				let count = 0;
+				for (const id of currentIds) {
+					if (!priorIds.has(id)) count++;
+				}
+				newArtistCount = count;
+			} else {
+				newArtistCount = currentIds.size;
 			}
-			newArtistCount = count;
 		}
 
 		const streamStats = extractData<SfmStreamStats>(statsRes);
@@ -343,16 +380,7 @@ export class StatsFmProvider implements StatsProvider {
 				}))
 			: deriveAlbumsFromTracks(tracks);
 
-		// Genre counts weighted by stream totals from top artists
-		const genreCount = new Map<string, number>();
-		for (const ta of artists) {
-			for (const genre of ta.artist.genres) {
-				genreCount.set(genre, (genreCount.get(genre) ?? 0) + ta.streams);
-			}
-		}
-		const topGenres: TopGenre[] = Array.from(genreCount.entries())
-			.sort((a, b) => b[1] - a[1])
-			.map(([genre, count], i) => ({ rank: i + 1, genre, count }));
+		const topGenres: TopGenre[] = topGenresFromApiOrArtists(apiGenreRows, artists);
 
 		// Recent plays
 		const recentPlays: RecentPlay[] = recent.map((s) => ({
@@ -439,6 +467,7 @@ export class StatsFmProvider implements StatsProvider {
 		});
 		const tracksPromise = sfmGet<SfmTopTrack[]>(`/users/${username}/top/tracks`, rangeParams);
 		const artistsPromise = sfmGet<SfmTopArtist[]>(`/users/${username}/top/artists`, rangeParams);
+		const genresPromise = sfmGet<SfmTopGenre[]>(`/users/${username}/top/genres`, rangeParams);
 		const albumsPromise = isPlus
 			? sfmGet<SfmTopAlbum[]>(`/users/${username}/top/albums`, rangeParams)
 			: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopAlbum[]>);
@@ -493,20 +522,37 @@ export class StatsFmProvider implements StatsProvider {
 		let dailyPlayCounts: Array<{ date: string; count: number }> | undefined;
 		let newArtistCount: number | undefined;
 		let priorPeriodTotalDuration: number | undefined;
+		let priorArtistsReady = !priorBoundaries;
 
 		const emitNewArtistCount = () => {
-			if (artists.length === 0 || priorArtists.length === 0) return;
+			if (!priorBoundaries) {
+				newArtistCount = 0;
+				onWave({ newArtistCount }, 2);
+				return;
+			}
+			if (!priorArtistsReady) return;
+			if (artists.length === 0) {
+				newArtistCount = 0;
+				onWave({ newArtistCount }, 2);
+				return;
+			}
 			const currentIds = new Set(
 				artists.map((a) => a.artist.externalIds?.spotify?.[0]).filter((s): s is string => !!s),
 			);
-			const priorIds = new Set(
-				priorArtists.map((a) => a.artist.externalIds?.spotify?.[0]).filter((s): s is string => !!s),
-			);
-			let count = 0;
-			for (const id of currentIds) {
-				if (!priorIds.has(id)) count++;
+			if (priorArtists.length > 0) {
+				const priorIds = new Set(
+					priorArtists
+						.map((a) => a.artist.externalIds?.spotify?.[0])
+						.filter((s): s is string => !!s),
+				);
+				let count = 0;
+				for (const id of currentIds) {
+					if (!priorIds.has(id)) count++;
+				}
+				newArtistCount = count;
+			} else {
+				newArtistCount = currentIds.size;
 			}
-			newArtistCount = count;
 			onWave({ newArtistCount }, 2);
 		};
 
@@ -535,7 +581,7 @@ export class StatsFmProvider implements StatsProvider {
 					onWave({ topAlbums }, 2);
 				}
 			}),
-			artistsPromise.then((res) => {
+			Promise.all([artistsPromise, genresPromise]).then(([res, gRes]) => {
 				artists = res.ok ? res.data : [];
 				topArtists = artists.map((ta) => ({
 					rank: ta.position,
@@ -550,15 +596,8 @@ export class StatsFmProvider implements StatsProvider {
 				}));
 				onWave({ topArtists }, 2);
 
-				const genreCount = new Map<string, number>();
-				for (const ta of artists) {
-					for (const genre of ta.artist.genres) {
-						genreCount.set(genre, (genreCount.get(genre) ?? 0) + ta.streams);
-					}
-				}
-				topGenres = Array.from(genreCount.entries())
-					.sort((a, b) => b[1] - a[1])
-					.map(([genre, count], i) => ({ rank: i + 1, genre, count }));
+				const apiRows = gRes.ok ? gRes.data : null;
+				topGenres = topGenresFromApiOrArtists(apiRows, artists);
 				onWave({ topGenres }, 2);
 				emitNewArtistCount();
 			}),
@@ -603,6 +642,7 @@ export class StatsFmProvider implements StatsProvider {
 			}),
 			priorPromise.then((res) => {
 				priorArtists = res.ok ? res.data : [];
+				priorArtistsReady = true;
 				emitNewArtistCount();
 			}),
 		];
