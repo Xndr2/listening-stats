@@ -115,7 +115,7 @@ function OverviewHero({
 				<span
 					data-testid="hero-hours"
 					style={{
-						fontSize: 64,
+						fontSize: 80,
 						fontWeight: 800,
 						letterSpacing: "-0.04em",
 						lineHeight: 1,
@@ -124,13 +124,13 @@ function OverviewHero({
 				>
 					{h}
 				</span>
-				<span style={{ fontSize: 24, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>
+				<span style={{ fontSize: 28, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>
 					h
 				</span>
 				<span
 					data-testid="hero-minutes"
 					style={{
-						fontSize: 36,
+						fontSize: 48,
 						fontWeight: 700,
 						letterSpacing: "-0.03em",
 						fontVariantNumeric: "tabular-nums",
@@ -138,7 +138,7 @@ function OverviewHero({
 				>
 					{m.toString().padStart(2, "0")}
 				</span>
-				<span style={{ fontSize: 18, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>
+				<span style={{ fontSize: 22, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>
 					m
 				</span>
 				{showDelta && deltaPct != null && (

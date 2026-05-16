@@ -88,24 +88,24 @@ describe("TopGenres component", () => {
 		expect(bars[2]?.classList.contains("peak")).toBe(false);
 	});
 
-	it("bar width of rank-1 genre is '100%'", async () => {
+	it("bar width proportional to totalCount for rank-1 genre", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
 			container,
 		);
 		const bars = container.querySelectorAll<HTMLElement>(".top-genres-bar");
-		expect(bars[0]?.style.width).toBe("100%");
+		expect(bars[0]?.style.width).toBe("57.14285714285714%");
 	});
 
-	it("bar width proportional  -  genre with half the count of max gets '50%' width", async () => {
+	it("bar width proportional  -  genre with half the top count gets '28.57%' width", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
 		Spicetify.ReactDOM.render(
 			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
 			container,
 		);
 		const bars = container.querySelectorAll<HTMLElement>(".top-genres-bar");
-		expect(bars[1]?.style.width).toBe("50%");
+		expect(bars[1]?.style.width).toBe("28.57142857142857%");
 	});
 
 	it("genre name displayed in .top-genres-name button, percentage in .top-genres-pct", async () => {

@@ -86,7 +86,7 @@ export function CalendarHeatmap({ dailyPlayCounts }: CalendarHeatmapProps) {
 		1,
 	);
 
-	const colWidth = "11px";
+	const colWidth = "16px";
 	const gridCols = `repeat(${numWeeks}, ${colWidth})`;
 
 	return (

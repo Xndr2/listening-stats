@@ -10,7 +10,6 @@ export function TopGenres({ topGenres, onGenreClick, activeGenre }: TopGenresPro
 	if (!topGenres || topGenres.length === 0) return null;
 
 	const genres = topGenres.slice(0, 6);
-	const maxCount = Math.max(1, genres[0]?.count ?? 0);
 	const totalCount = topGenres.reduce((s, g) => s + g.count, 0) || 1;
 
 	return (
@@ -21,7 +20,7 @@ export function TopGenres({ topGenres, onGenreClick, activeGenre }: TopGenresPro
 			</header>
 			<div className="top-genres-list">
 				{genres.map((genre, i) => {
-					const pct = (genre.count / maxCount) * 100;
+					const pct = totalCount > 0 ? (genre.count / totalCount) * 100 : 0;
 					return (
 						<div key={genre.genre} className="top-genres-row">
 							<button
