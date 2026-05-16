@@ -42,11 +42,7 @@ export function PlayCountPill({
 				"play-count-bubble",
 				[
 					React.createElement("div", { key: "i", className: "play-count-bubble-icon" }, "\u{25B6}"),
-					React.createElement(
-						"span",
-						{ key: "b", className: "play-count-badge play-count-badge--new" },
-						"NEW",
-					),
+					React.createElement("span", { key: "b", className: "play-count-badge play-count-badge--new" }, "NEW"),
 				],
 				firstListenTooltip,
 			);
@@ -114,11 +110,7 @@ export function PlayCountPill({
 
 	if (variant === "minimal") {
 		const extra = periodStreams != null && periodLabel ? ` (${periodStreams} ${periodLabel})` : "";
-		return React.createElement(
-			"div",
-			{ className: "play-count-minimal", title: tooltip },
-			`×${count}${extra}`,
-		);
+		return React.createElement("div", { className: "play-count-minimal", title: tooltip }, `×${count}${extra}`);
 	}
 
 	return React.createElement(

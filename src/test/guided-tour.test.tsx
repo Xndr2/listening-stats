@@ -93,9 +93,7 @@ describe("GuidedTour integration", () => {
 			const nextBtn = document.querySelector(".tour-btn-next") as HTMLButtonElement;
 			nextBtn.click();
 		}
-		expect(document.body.textContent).toContain(
-			`Step ${TOUR_STEPS.length} of ${TOUR_STEPS.length}`,
-		);
+		expect(document.body.textContent).toContain(`Step ${TOUR_STEPS.length} of ${TOUR_STEPS.length}`);
 		const finishBtn = document.querySelector(".tour-btn-next") as HTMLButtonElement;
 		expect(finishBtn.textContent).toBe("Finish");
 		finishBtn.click();

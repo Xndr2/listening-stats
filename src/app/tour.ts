@@ -90,12 +90,8 @@ export function getTourSteps(context?: TourContext): TourStep[] {
 	if (context.activePage === "world") {
 		return [BASE_TOUR_STEPS[0], BASE_TOUR_STEPS[1], ACTION_TOUR_STEPS[1]];
 	}
-	const sectionSteps = context.sectionIds
-		.map((id) => SECTION_TOUR_STEPS[id])
-		.filter((s): s is TourStep => !!s);
-	const actionSteps = context.hasShare
-		? ACTION_TOUR_STEPS
-		: ACTION_TOUR_STEPS.filter((s) => s.id !== "share");
+	const sectionSteps = context.sectionIds.map((id) => SECTION_TOUR_STEPS[id]).filter((s): s is TourStep => !!s);
+	const actionSteps = context.hasShare ? ACTION_TOUR_STEPS : ACTION_TOUR_STEPS.filter((s) => s.id !== "share");
 	return [...BASE_TOUR_STEPS, ...sectionSteps, ...actionSteps];
 }
 

@@ -75,13 +75,7 @@ describe("LocalProvider", () => {
 		it("returns LOCAL_PERIODS (5 periods)", () => {
 			const periods = provider.getSupportedPeriods();
 			expect(periods).toHaveLength(5);
-			expect(periods.map((p) => p.id)).toEqual([
-				"today",
-				"this-week",
-				"this-month",
-				"last-6-months",
-				"all-time",
-			]);
+			expect(periods.map((p) => p.id)).toEqual(["today", "this-week", "this-month", "last-6-months", "all-time"]);
 		});
 	});
 
@@ -301,9 +295,7 @@ describe("LocalProvider", () => {
 
 		it("calculateStats calls enrichArtists with artist URIs from results", async () => {
 			const artistUri = "spotify:artist:enrich_me";
-			await db.playEvents.add(
-				makePlayEvent({ artistUri, artistName: "Enrich Me", startedAt: 1000 }),
-			);
+			await db.playEvents.add(makePlayEvent({ artistUri, artistName: "Enrich Me", startedAt: 1000 }));
 
 			await provider.calculateStats(allTimePeriod);
 
@@ -314,9 +306,7 @@ describe("LocalProvider", () => {
 
 		it("topGenres populated from db.artists enrichment data", async () => {
 			const artistUri = "spotify:artist:genretest";
-			await db.playEvents.add(
-				makePlayEvent({ artistUri, artistName: "Genre Test", startedAt: 1000 }),
-			);
+			await db.playEvents.add(makePlayEvent({ artistUri, artistName: "Genre Test", startedAt: 1000 }));
 
 			// Pre-populate db.artists with genre data (simulating already-enriched)
 			await db.artists.put({
@@ -457,9 +447,7 @@ describe("LocalProvider", () => {
 		});
 
 		it("returns streak=1 when only today has a play event", async () => {
-			await db.playEvents.add(
-				makePlayEvent({ startedAt: new Date(2026, 3, 1, 12, 0, 0).getTime() }),
-			);
+			await db.playEvents.add(makePlayEvent({ startedAt: new Date(2026, 3, 1, 12, 0, 0).getTime() }));
 
 			const result = await provider.calculateStats(allTimePeriod);
 			expect(result.streak).toBe(1);
@@ -467,9 +455,7 @@ describe("LocalProvider", () => {
 
 		it("returns streak=0 when last play was 2+ days ago (grace period expired)", async () => {
 			// Event only 3 days ago  -  no event yesterday or today
-			await db.playEvents.add(
-				makePlayEvent({ startedAt: new Date(2026, 2, 29, 12, 0, 0).getTime() }),
-			);
+			await db.playEvents.add(makePlayEvent({ startedAt: new Date(2026, 2, 29, 12, 0, 0).getTime() }));
 
 			const result = await provider.calculateStats(allTimePeriod);
 			expect(result.streak).toBe(0);
@@ -478,9 +464,7 @@ describe("LocalProvider", () => {
 		it("streak uses local timezone day boundaries, not UTC", async () => {
 			// Event at 11:30 PM local time  -  this must count as "today" in local TZ
 			// Using new Date(2026, 3, 1, 23, 30, 0) which is local timezone aware
-			await db.playEvents.add(
-				makePlayEvent({ startedAt: new Date(2026, 3, 1, 23, 30, 0).getTime() }),
-			);
+			await db.playEvents.add(makePlayEvent({ startedAt: new Date(2026, 3, 1, 23, 30, 0).getTime() }));
 
 			const result = await provider.calculateStats(allTimePeriod);
 			// The 11:30 PM event should count as today, giving streak of 1

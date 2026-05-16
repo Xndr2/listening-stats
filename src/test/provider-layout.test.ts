@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	getActivityMode,
-	getOverviewTilesForProvider,
-	getSectionsForProvider,
-} from "../app/capabilities";
+import { getActivityMode, getOverviewTilesForProvider, getSectionsForProvider } from "../app/capabilities";
 import type { ProviderCapabilities } from "../shared/stats/provider";
 
 const localCaps: ProviderCapabilities = {
@@ -37,14 +33,7 @@ describe("Provider-specific layout  -  local provider renders a complete dashboa
 	it("local provider includes all 6 sections", () => {
 		const sections = getSectionsForProvider(localCaps);
 		const ids = sections.map((s) => s.id);
-		expect(ids).toEqual([
-			"overview",
-			"top-genres",
-			"top-lists",
-			"activity",
-			"consistency",
-			"recently-played",
-		]);
+		expect(ids).toEqual(["overview", "top-genres", "top-lists", "activity", "consistency", "recently-played"]);
 		expect(ids.length).toBe(6);
 	});
 

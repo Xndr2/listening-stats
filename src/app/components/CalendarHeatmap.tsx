@@ -126,10 +126,7 @@ export function CalendarHeatmap({ dailyPlayCounts }: CalendarHeatmapProps) {
 						key={t}
 						className="heatmap-legend-swatch"
 						style={{
-							background:
-								t === 0.05
-									? "rgba(var(--spice-rgb-misc), 0.05)"
-									: `rgba(var(--spice-rgb-button), ${t})`,
+							background: t === 0.05 ? "rgba(var(--spice-rgb-misc), 0.05)" : `rgba(var(--spice-rgb-button), ${t})`,
 						}}
 					/>
 				))}

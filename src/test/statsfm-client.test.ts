@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { circuitBreaker } from "../shared/api/circuit-breaker";
-import {
-	type StatsFmHealthPayload,
-	sfmCircuitBreaker,
-	sfmGet,
-	validateUsername,
-} from "../shared/api/statsfm-client";
+import { type StatsFmHealthPayload, sfmCircuitBreaker, sfmGet, validateUsername } from "../shared/api/statsfm-client";
 
 // Helper to build a fake fetch Response
 function makeResponse(status: number, body: unknown = null): Response {

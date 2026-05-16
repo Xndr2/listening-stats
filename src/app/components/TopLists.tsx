@@ -154,9 +154,7 @@ export function TopLists({
 								}}
 							>
 								<span className={`rank-number ${getRankClass(artist.rank)}`}>{artist.rank}</span>
-								{artistAvatar ? (
-									<img src={artistAvatar} alt="" className="track-art track-art--round" />
-								) : null}
+								{artistAvatar ? <img src={artistAvatar} alt="" className="track-art track-art--round" /> : null}
 								<div
 									style={{
 										flex: 1,
@@ -191,9 +189,7 @@ export function TopLists({
 											textOverflow: "ellipsis",
 										}}
 									>
-										<span style={{ fontVariantNumeric: "tabular-nums" }}>
-											{formatNumber(artist.count)} plays
-										</span>
+										<span style={{ fontVariantNumeric: "tabular-nums" }}>{formatNumber(artist.count)} plays</span>
 										{primaryGenre && (
 											<>
 												<span style={{ opacity: 0.4 }}>·</span>
@@ -212,9 +208,7 @@ export function TopLists({
 													}}
 													style={{
 														color:
-															activeGenre === primaryGenre
-																? "var(--spice-button)"
-																: "rgba(var(--spice-rgb-text), 0.7)",
+															activeGenre === primaryGenre ? "var(--spice-button)" : "rgba(var(--spice-rgb-text), 0.7)",
 														cursor: "pointer",
 													}}
 												>
@@ -297,9 +291,5 @@ export function TopLists({
 		),
 	};
 
-	return (
-		<div className="top-lists-grid">
-			{visibleColumns.map((id) => columnRenderers[id]?.() ?? null)}
-		</div>
-	);
+	return <div className="top-lists-grid">{visibleColumns.map((id) => columnRenderers[id]?.() ?? null)}</div>;
 }

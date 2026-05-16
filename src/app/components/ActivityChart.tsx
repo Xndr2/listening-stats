@@ -36,10 +36,7 @@ export function ActivityChart({ hourlyDistribution, peakHour }: ActivityChartPro
 							label={`${formatHour(hr, prefs.use24HourTime)}: ${val} plays`}
 							placement="top"
 						>
-							<div
-								className={`activity-bar${isPeak ? " peak" : ""}`}
-								style={{ height: `${heightPct}%` }}
-							/>
+							<div className={`activity-bar${isPeak ? " peak" : ""}`} style={{ height: `${heightPct}%` }} />
 						</Spicetify.ReactComponent.TooltipWrapper>
 					);
 				})}

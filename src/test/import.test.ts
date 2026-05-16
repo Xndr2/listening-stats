@@ -122,9 +122,7 @@ describe("parseV1Csv", () => {
 	});
 
 	it("assigns synthetic URIs with listening-stats: prefix", async () => {
-		const csv = buildV1Csv([
-			"Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z",
-		]);
+		const csv = buildV1Csv(["Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z"]);
 		const result = await parseV1Csv(csv);
 		const ev = result.events[0];
 		expect(ev.trackUri).toMatch(/^listening-stats:track:/);
@@ -205,9 +203,7 @@ describe("parseV1Csv", () => {
 	});
 
 	it("returns ParseResult shape with events, errors, errorDetails", async () => {
-		const csv = buildV1Csv([
-			"Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z",
-		]);
+		const csv = buildV1Csv(["Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z"]);
 		const result = await parseV1Csv(csv);
 		expect(result).toHaveProperty("events");
 		expect(result).toHaveProperty("errors");
@@ -353,9 +349,7 @@ describe("parseJsonEvents", () => {
 			topArtists: [],
 			totalTimeMs: 0,
 		};
-		await expect(parseJsonEvents(JSON.stringify(statsResult))).rejects.toThrow(
-			"raw play events array",
-		);
+		await expect(parseJsonEvents(JSON.stringify(statsResult))).rejects.toThrow("raw play events array");
 	});
 
 	it("throws for non-array JSON  -  error message contains 'not a valid JSON' or 'raw play events array'", async () => {
@@ -400,10 +394,7 @@ describe("importFileEvents", () => {
 	});
 
 	it("inserts events into the DB and returns correct imported count", async () => {
-		const events = [
-			makePlayEvent({ startedAt: 1000 }),
-			makePlayEvent({ startedAt: 2000, trackName: "Track 2" }),
-		];
+		const events = [makePlayEvent({ startedAt: 1000 }), makePlayEvent({ startedAt: 2000, trackName: "Track 2" })];
 		const result = await importFileEvents(events);
 		expect(result.imported).toBe(2);
 		expect(result.skipped).toBe(0);
@@ -424,10 +415,7 @@ describe("importFileEvents", () => {
 	});
 
 	it("re-importing the same events skips all duplicates", async () => {
-		const events = [
-			makePlayEvent({ startedAt: 1000 }),
-			makePlayEvent({ startedAt: 2000, trackName: "Track 2" }),
-		];
+		const events = [makePlayEvent({ startedAt: 1000 }), makePlayEvent({ startedAt: 2000, trackName: "Track 2" })];
 		const first = await importFileEvents(events);
 		expect(first.imported).toBe(2);
 
@@ -518,9 +506,7 @@ describe("Integration: CSV parse then import", () => {
 	});
 
 	it("re-importing same CSV file deduplicates all events", async () => {
-		const csv = buildV1Csv([
-			"Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z",
-		]);
+		const csv = buildV1Csv(["Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z"]);
 		const parsed = await parseV1Csv(csv);
 		await importFileEvents(parsed.events);
 		const second = await importFileEvents(parsed.events);

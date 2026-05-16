@@ -27,10 +27,7 @@ describe("TopGenres component", () => {
 
 	it("renders .section-card wrapper with 'Top Genres' heading when topGenres has items", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }), container);
 		const card = container.querySelector(".section-card");
 		expect(card).not.toBeNull();
 		expect(card?.textContent).toContain("Top Genres");
@@ -38,10 +35,7 @@ describe("TopGenres component", () => {
 
 	it("renders kicker 'Composition' and title 'Top Genres'", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }), container);
 		const kicker = container.querySelector(".section-kicker");
 		expect(kicker?.textContent).toBe("Composition");
 		const title = container.querySelector(".section-title");
@@ -50,39 +44,27 @@ describe("TopGenres component", () => {
 
 	it("renders nothing (null) when topGenres is empty array", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(TopGenres, { topGenres: [] }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(TopGenres, { topGenres: [] }), container);
 		expect(container.innerHTML).toBe("");
 	});
 
 	it("renders max 6 .top-genres-row elements (design spec)", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(TopGenres, { topGenres: manyGenres }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(TopGenres, { topGenres: manyGenres }), container);
 		const rows = container.querySelectorAll(".top-genres-row");
 		expect(rows.length).toBe(6);
 	});
 
 	it("first genre bar has .peak class", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }), container);
 		const bars = container.querySelectorAll(".top-genres-bar");
 		expect(bars[0]?.classList.contains("peak")).toBe(true);
 	});
 
 	it("non-first genre bars do NOT have .peak class", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }), container);
 		const bars = container.querySelectorAll(".top-genres-bar");
 		expect(bars[1]?.classList.contains("peak")).toBe(false);
 		expect(bars[2]?.classList.contains("peak")).toBe(false);
@@ -90,30 +72,21 @@ describe("TopGenres component", () => {
 
 	it("bar width of rank-1 genre is '100%'", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }), container);
 		const bars = container.querySelectorAll<HTMLElement>(".top-genres-bar");
 		expect(bars[0]?.style.width).toBe("100%");
 	});
 
 	it("bar width proportional  -  genre with half the count of max gets '50%' width", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }), container);
 		const bars = container.querySelectorAll<HTMLElement>(".top-genres-bar");
 		expect(bars[1]?.style.width).toBe("50%");
 	});
 
 	it("genre name displayed in .top-genres-name button, percentage in .top-genres-pct", async () => {
 		const { TopGenres } = await import("../app/components/TopGenres");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(TopGenres, { topGenres: mockGenres }), container);
 		const names = container.querySelectorAll(".top-genres-name");
 		const pcts = container.querySelectorAll(".top-genres-pct");
 		expect(names[0]?.textContent).toBe("pop");

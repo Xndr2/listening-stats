@@ -42,10 +42,7 @@ function publishSfmHealth(payload: StatsFmHealthPayload): void {
 	window.dispatchEvent(new CustomEvent(EVENTS.STATSFM_HEALTH_CHANGED, { detail: payload }));
 }
 
-export async function sfmGet<T>(
-	path: string,
-	params?: Record<string, string>,
-): Promise<SfmResult<T>> {
+export async function sfmGet<T>(path: string, params?: Record<string, string>): Promise<SfmResult<T>> {
 	if (sfmCircuitBreaker.isOpen()) {
 		publishSfmHealth({
 			lastFetchAt: Date.now(),

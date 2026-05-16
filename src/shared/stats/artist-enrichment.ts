@@ -45,9 +45,7 @@ export async function enrichArtists(artistUris: string[]): Promise<void> {
 	for (let i = 0; i < unenriched.length; i += BATCH_SIZE) {
 		const batch = unenriched.slice(i, i + BATCH_SIZE);
 		const ids = batch.map((uri) => uri.replace(/^spotify:artist:/i, "")).join(",");
-		const result = await cosmosGet<SpotifyArtistsResponse>(
-			`https://api.spotify.com/v1/artists?ids=${ids}`,
-		);
+		const result = await cosmosGet<SpotifyArtistsResponse>(`https://api.spotify.com/v1/artists?ids=${ids}`);
 
 		if (!result.ok) continue;
 

@@ -268,8 +268,7 @@ describe("buildStatsFmTooltip", () => {
 	});
 
 	it("truncates lastError > 60 chars with ellipsis", () => {
-		const longError =
-			"This is a very long error message that exceeds sixty characters in total length";
+		const longError = "This is a very long error message that exceeds sixty characters in total length";
 		const health: StatsFmHealthPayload = {
 			lastFetchAt: FROZEN_MS,
 			lastSuccessAt: null,
@@ -409,30 +408,21 @@ describe("EmptyState component", () => {
 	it('renders "No listening data yet" text', async () => {
 		const EmptyState = (await import("../app/components/EmptyState")).default;
 		const onOpenSettings = vi.fn();
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(EmptyState, { onOpenSettings }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(EmptyState, { onOpenSettings }), container);
 		expect(container.textContent).toContain("No listening data yet");
 	});
 
 	it('renders "Open Settings" button', async () => {
 		const EmptyState = (await import("../app/components/EmptyState")).default;
 		const onOpenSettings = vi.fn();
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(EmptyState, { onOpenSettings }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(EmptyState, { onOpenSettings }), container);
 		expect(container.textContent).toContain("Open Settings");
 	});
 
 	it("calls onOpenSettings when button is clicked", async () => {
 		const EmptyState = (await import("../app/components/EmptyState")).default;
 		const onOpenSettings = vi.fn();
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(EmptyState, { onOpenSettings }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(EmptyState, { onOpenSettings }), container);
 		const button = container.querySelector("button");
 		button?.click();
 		expect(onOpenSettings).toHaveBeenCalledOnce();
@@ -607,9 +597,7 @@ describe("OverviewCards tooltips", () => {
 			},
 		];
 		const filtered = filterOverviewCards(testCards, localCaps);
-		expect(filtered[0].tooltip).toBe(
-			"Consecutive calendar days with at least one play (local timezone)",
-		);
+		expect(filtered[0].tooltip).toBe("Consecutive calendar days with at least one play (local timezone)");
 	});
 
 	it("shows Listening Days tooltip for stats.fm provider", async () => {
@@ -622,9 +610,7 @@ describe("OverviewCards tooltips", () => {
 			},
 		];
 		const filtered = filterOverviewCards(testCards, statsfmFreeCaps);
-		expect(filtered[0].tooltip).toBe(
-			"Number of days with at least one play in the selected period",
-		);
+		expect(filtered[0].tooltip).toBe("Number of days with at least one play in the selected period");
 	});
 
 	it("renders stat grid cards for stats.fm provider plus hero cell", async () => {
@@ -660,20 +646,14 @@ describe("RecentlyPlayedSkeleton component", () => {
 
 	it("renders 6 items with recently-played-item wrapper", async () => {
 		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(RecentlyPlayedSkeleton, null),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(RecentlyPlayedSkeleton, null), container);
 		const items = container.querySelectorAll(".recently-played-item");
 		expect(items).toHaveLength(6);
 	});
 
 	it("each item has a 120x120 skeleton art div", async () => {
 		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(RecentlyPlayedSkeleton, null),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(RecentlyPlayedSkeleton, null), container);
 		const arts = container.querySelectorAll(".recently-played-skeleton-art");
 		expect(arts).toHaveLength(6);
 		arts.forEach((art) => {
@@ -683,10 +663,7 @@ describe("RecentlyPlayedSkeleton component", () => {
 
 	it("each item has text and subtext skeleton lines", async () => {
 		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(RecentlyPlayedSkeleton, null),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(RecentlyPlayedSkeleton, null), container);
 		const texts = container.querySelectorAll(".recently-played-skeleton-text");
 		const subtexts = container.querySelectorAll(".recently-played-skeleton-subtext");
 		expect(texts).toHaveLength(6);
@@ -695,10 +672,7 @@ describe("RecentlyPlayedSkeleton component", () => {
 
 	it("renders inside a recently-played container with aria-hidden", async () => {
 		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(RecentlyPlayedSkeleton, null),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(RecentlyPlayedSkeleton, null), container);
 		const wrapper = container.querySelector(".recently-played");
 		expect(wrapper).not.toBeNull();
 		expect(wrapper?.getAttribute("aria-hidden")).toBe("true");

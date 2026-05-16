@@ -40,20 +40,6 @@ function buildWindow(points: DailyPoint[], period: Period): DailyPoint[] {
 	return points.filter((p) => p.date >= startDay && p.date <= endDay);
 }
 
-function computeLongestGap(points: DailyPoint[]): number {
-	let longest = 0;
-	let current = 0;
-	for (const p of points) {
-		if (p.count > 0) {
-			current = 0;
-			continue;
-		}
-		current += 1;
-		longest = Math.max(longest, current);
-	}
-	return longest;
-}
-
 function formatDayLabel(date: string): string {
 	let ts = new Date(date);
 	if (!Number.isFinite(ts.getTime())) {
@@ -99,11 +85,9 @@ export function ConsistencySection({
 	}
 	const points = buildWindow(dailyPlayCounts ?? [], activePeriod);
 	const totalDays = points.length;
-	const activeDays =
-		points.length > 0 ? points.filter((p) => p.count > 0).length : (listeningDays ?? 0);
+	const activeDays = points.length > 0 ? points.filter((p) => p.count > 0).length : (listeningDays ?? 0);
 	const avgPlaysPerActiveDay = activeDays > 0 ? totalPlays / activeDays : 0;
 	const avgMinutesPerActiveDay = activeDays > 0 ? totalDuration / 60000 / activeDays : 0;
-	const longestGap = computeLongestGap(points);
 	const coveragePct = totalDays > 0 ? Math.round((activeDays / totalDays) * 100) : 0;
 	const trend = points.slice(-14);
 	const trendMax = Math.max(...trend.map((p) => p.count), 1);
@@ -151,14 +135,11 @@ export function ConsistencySection({
 					value={streak != null && streak > 0 ? `${streak}d` : "-"}
 					sub="consecutive days"
 					tooltip="Consecutive calendar days with at least one play (local timezone)."
-					accent={streak != null && streak > 0}
 				/>
 			</div>
 			{!isTodayPeriod && (
 				<div className="consistency-footer">
-					<Tooltip
-						label={`You listened on ${activeDays} of ${totalDays || activeDays} days in this period.`}
-					>
+					<Tooltip label={`You listened on ${activeDays} of ${totalDays || activeDays} days in this period.`}>
 						<div className="consistency-coverage">
 							<div className="consistency-coverage-label">Active-day coverage</div>
 							<div className="consistency-coverage-row">
@@ -209,11 +190,7 @@ export function ConsistencySection({
 									{trend.map((p) => {
 										const isPeak = p.count > 0 && p.count === trendMax;
 										return (
-											<Tooltip
-												key={p.date}
-												label={`${formatDayLabel(p.date)}: ${p.count} plays`}
-												placement="top"
-											>
+											<Tooltip key={p.date} label={`${formatDayLabel(p.date)}: ${p.count} plays`} placement="top">
 												<div className="consistency-sparkline-bar-wrap">
 													<div
 														className={`consistency-sparkline-bar${isPeak ? " peak" : ""}`}

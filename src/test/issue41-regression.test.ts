@@ -33,16 +33,9 @@ function setActiveProvider(id: "local" | "statsfm"): void {
 	providerRegistry.setActive(id);
 }
 
-async function renderOverview(
-	container: HTMLElement,
-	stats: StatsResult,
-	period: Period = mockPeriod,
-) {
+async function renderOverview(container: HTMLElement, stats: StatsResult, period: Period = mockPeriod) {
 	const OverviewSection = (await import("../app/components/OverviewSection")).default;
-	Spicetify.ReactDOM.render(
-		Spicetify.React.createElement(OverviewSection, { stats, activePeriod: period }),
-		container,
-	);
+	Spicetify.ReactDOM.render(Spicetify.React.createElement(OverviewSection, { stats, activePeriod: period }), container);
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -133,9 +126,7 @@ describe("Issue 41: card reflow for missing/unavailable cards", () => {
 	it("hiddenSections: 'streak' excluded from rendered cards", async () => {
 		setPreference("hiddenSections", ["streak"]);
 		await renderOverview(container, { ...baseStats, streak: 3, newArtistCount: 5 });
-		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) =>
-			c.getAttribute("data-card-id"),
-		);
+		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) => c.getAttribute("data-card-id"));
 		expect(ids).not.toContain("streak");
 	});
 
@@ -184,19 +175,13 @@ describe("Issue 41: onboarding is in-page window", () => {
 
 	it("wizard does not use role=dialog", async () => {
 		const { SetupWizard } = await import("../app/components/SetupWizard");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(SetupWizard, { onComplete: vi.fn() }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(SetupWizard, { onComplete: vi.fn() }), container);
 		expect(container.querySelector('[role="dialog"]')).toBeNull();
 	});
 
 	it("wizard does not use aria-modal", async () => {
 		const { SetupWizard } = await import("../app/components/SetupWizard");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(SetupWizard, { onComplete: vi.fn() }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(SetupWizard, { onComplete: vi.fn() }), container);
 		expect(container.querySelector("[aria-modal]")).toBeNull();
 	});
 });

@@ -133,9 +133,7 @@ describe("StatsProvider interface (type-level checks)", () => {
 
 	it("ProviderRegistry setActive throws when provider not registered", () => {
 		const registry = new ProviderRegistry();
-		expect(() => registry.setActive("nonexistent")).toThrow(
-			'Provider "nonexistent" not registered',
-		);
+		expect(() => registry.setActive("nonexistent")).toThrow('Provider "nonexistent" not registered');
 	});
 
 	it("ProviderRegistry getAll returns ProviderInfo for all registered providers", () => {

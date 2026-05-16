@@ -14,15 +14,7 @@ export const SECTION_IDS = [
 export const COLUMN_IDS = ["top-tracks", "top-artists", "top-albums"] as const;
 
 export const OVERVIEW_CARD_IDS = {
-	local: [
-		"tracks",
-		"unique-artists",
-		"streak",
-		"new-artists",
-		"peak-hour",
-		"skip-rate",
-		"est-payout",
-	],
+	local: ["tracks", "unique-artists", "streak", "new-artists", "peak-hour", "skip-rate", "est-payout"],
 	statsfm: ["unique-artists", "new-artists", "top-genre", "est-payout"],
 } as const;
 
@@ -190,9 +182,7 @@ export function getPreferences(): Preferences {
 						? parsed.playCountShowPeriodStreams
 						: DEFAULTS.playCountShowPeriodStreams,
 				receiveBetaUpdates:
-					typeof parsed.receiveBetaUpdates === "boolean"
-						? parsed.receiveBetaUpdates
-						: DEFAULTS.receiveBetaUpdates,
+					typeof parsed.receiveBetaUpdates === "boolean" ? parsed.receiveBetaUpdates : DEFAULTS.receiveBetaUpdates,
 				showAnnouncementBanner:
 					typeof parsed.showAnnouncementBanner === "boolean"
 						? parsed.showAnnouncementBanner

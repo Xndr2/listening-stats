@@ -23,20 +23,14 @@ describe("DisplayTab playCountVariant toggle", () => {
 
 	it("renders play count variant selector with 4 options", async () => {
 		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }), container);
 		const buttons = container.querySelectorAll("[data-testid='play-count-variant'] button");
 		expect(buttons.length).toBe(4);
 	});
 
 	it("highlights the default 'pill' variant", async () => {
 		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }), container);
 		const buttons = container.querySelectorAll("[data-testid='play-count-variant'] button");
 		const pillBtn = Array.from(buttons).find((b) => b.textContent === "Pill");
 		expect(pillBtn?.className).toContain("btn-primary");
@@ -45,10 +39,7 @@ describe("DisplayTab playCountVariant toggle", () => {
 	it("clicking 'Bubble' updates preference to bubble", async () => {
 		const onPrefsChanged = vi.fn();
 		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, { onPrefsChanged }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged }), container);
 		const buttons = container.querySelectorAll("[data-testid='play-count-variant'] button");
 		const bubbleBtn = Array.from(buttons).find((b) => b.textContent === "Bubble") as HTMLElement;
 		bubbleBtn.click();
@@ -59,10 +50,7 @@ describe("DisplayTab playCountVariant toggle", () => {
 	it("clicking 'Minimal' updates preference to minimal", async () => {
 		const onPrefsChanged = vi.fn();
 		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, { onPrefsChanged }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged }), container);
 		const buttons = container.querySelectorAll("[data-testid='play-count-variant'] button");
 		const minimalBtn = Array.from(buttons).find((b) => b.textContent === "Minimal") as HTMLElement;
 		minimalBtn.click();
@@ -73,10 +61,7 @@ describe("DisplayTab playCountVariant toggle", () => {
 	it("clicking 'Off' updates preference to off", async () => {
 		const onPrefsChanged = vi.fn();
 		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, { onPrefsChanged }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged }), container);
 		const buttons = container.querySelectorAll("[data-testid='play-count-variant'] button");
 		const offBtn = Array.from(buttons).find((b) => b.textContent === "Off") as HTMLElement;
 		offBtn.click();
@@ -86,10 +71,7 @@ describe("DisplayTab playCountVariant toggle", () => {
 
 	it("shows Extra play context row when local provider is active", async () => {
 		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }), container);
 		const row = container.querySelector("[data-testid='play-count-extra-context']");
 		expect(row).not.toBeNull();
 		expect(row?.textContent).toMatch(/New play/);
@@ -99,10 +81,7 @@ describe("DisplayTab playCountVariant toggle", () => {
 		const { setPreference } = await import("../app/preferences");
 		setPreference("playCountVariant", "minimal");
 		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }), container);
 		const buttons = container.querySelectorAll("[data-testid='play-count-variant'] button");
 		const minimalBtn = Array.from(buttons).find((b) => b.textContent === "Minimal");
 		expect(minimalBtn?.className).toContain("btn-primary");

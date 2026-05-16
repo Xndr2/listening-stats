@@ -66,12 +66,7 @@ export function AnnouncementBanner({
 						{actionLabel}
 					</a>
 				))}
-			<button
-				type="button"
-				className="announcement-banner-dismiss"
-				onClick={onDismiss}
-				aria-label="Dismiss"
-			>
+			<button type="button" className="announcement-banner-dismiss" onClick={onDismiss} aria-label="Dismiss">
 				×
 			</button>
 		</div>
