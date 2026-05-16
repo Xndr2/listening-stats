@@ -90,7 +90,7 @@ function genresFromArtists(artists: SfmTopArtist[]): TopGenre[] {
 	const weighted = new Map<string, number>();
 	for (const ta of artists) {
 		for (const genre of ta.artist.genres) {
-			weighted.set(genre, (weighted.get(genre) ?? 0) + (+(ta.streams ?? 0)));
+			weighted.set(genre, (weighted.get(genre) ?? 0) + +(ta.streams ?? 0));
 		}
 	}
 	const hasWeight = [...weighted.values()].some((c) => c > 0);
@@ -112,10 +112,7 @@ function genresFromArtists(artists: SfmTopArtist[]): TopGenre[] {
 }
 
 /** Prefer stats.fm `/top/genres` when the API returns rows with non-zero counts (works even when artist.genres[] is empty). */
-function topGenresFromApiOrArtists(
-	apiRows: SfmTopGenre[] | null | undefined,
-	artists: SfmTopArtist[],
-): TopGenre[] {
+function topGenresFromApiOrArtists(apiRows: SfmTopGenre[] | null | undefined, artists: SfmTopArtist[]): TopGenre[] {
 	const rows = apiRows ?? [];
 	if (rows.length > 0) {
 		const mapped = [...rows]

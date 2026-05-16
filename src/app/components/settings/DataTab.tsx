@@ -126,9 +126,9 @@ export function DataTab({ onRefresh }: Props) {
 	const handleExportJson = async () => {
 		try {
 			const activeProvider = providerRegistry.getActive();
-			const allTimePeriod = activeProvider?.getSupportedPeriods().find(
-				(p) => p.id.endsWith("all-time") || p.label === "All Time",
-			) ?? LOCAL_PERIODS[4];
+			const allTimePeriod =
+				activeProvider?.getSupportedPeriods().find((p) => p.id.endsWith("all-time") || p.label === "All Time") ??
+				LOCAL_PERIODS[4];
 			const stats = await activeProvider?.calculateStats(allTimePeriod);
 			if (!stats) {
 				Spicetify.showNotification("No active provider", true);
@@ -144,9 +144,9 @@ export function DataTab({ onRefresh }: Props) {
 	const handleExportCsv = async () => {
 		try {
 			const activeProvider = providerRegistry.getActive();
-			const allTimePeriod = activeProvider?.getSupportedPeriods().find(
-				(p) => p.id.endsWith("all-time") || p.label === "All Time",
-			) ?? LOCAL_PERIODS[4];
+			const allTimePeriod =
+				activeProvider?.getSupportedPeriods().find((p) => p.id.endsWith("all-time") || p.label === "All Time") ??
+				LOCAL_PERIODS[4];
 			const stats = await activeProvider?.calculateStats(allTimePeriod);
 			if (!stats) {
 				Spicetify.showNotification("No active provider", true);
