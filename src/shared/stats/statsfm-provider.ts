@@ -86,28 +86,44 @@ function extractFailure(result: PromiseSettledResult<SfmResult<unknown>>): { sta
 }
 
 function genresFromArtists(artists: SfmTopArtist[]): TopGenre[] {
-	const genreCount = new Map<string, number>();
+	// Weighted: multiply each genre occurrence by ta.streams
+	const weighted = new Map<string, number>();
 	for (const ta of artists) {
 		for (const genre of ta.artist.genres) {
-			genreCount.set(genre, (genreCount.get(genre) ?? 0) + ta.streams);
+			weighted.set(genre, (weighted.get(genre) ?? 0) + +(ta.streams ?? 0));
 		}
 	}
-	return Array.from(genreCount.entries())
+	const hasWeight = [...weighted.values()].some((c) => c > 0);
+	if (hasWeight) {
+		return Array.from(weighted.entries())
+			.sort((a, b) => b[1] - a[1])
+			.map(([genre, count], i) => ({ rank: i + 1, genre, count }));
+	}
+	// Fallback: unweighted (1 per artist per genre) when streams are missing/zero
+	const unweighted = new Map<string, number>();
+	for (const ta of artists) {
+		for (const genre of ta.artist.genres) {
+			unweighted.set(genre, (unweighted.get(genre) ?? 0) + 1);
+		}
+	}
+	return Array.from(unweighted.entries())
 		.sort((a, b) => b[1] - a[1])
 		.map(([genre, count], i) => ({ rank: i + 1, genre, count }));
 }
 
-/** Prefer stats.fm `/top/genres` when the API returns rows (works even when artist.genres[] is empty). */
+/** Prefer stats.fm `/top/genres` when the API returns rows with non-zero counts (works even when artist.genres[] is empty). */
 function topGenresFromApiOrArtists(apiRows: SfmTopGenre[] | null | undefined, artists: SfmTopArtist[]): TopGenre[] {
 	const rows = apiRows ?? [];
 	if (rows.length > 0) {
-		return [...rows]
+		const mapped = [...rows]
 			.sort((a, b) => b.streams - a.streams)
 			.map((g, i) => ({
 				rank: i + 1,
 				genre: g.genre.tag,
-				count: g.streams,
+				count: +(g.streams ?? 0),
 			}));
+		const totalCount = mapped.reduce((s, g) => s + g.count, 0);
+		if (totalCount > 0) return mapped;
 	}
 	return genresFromArtists(artists);
 }
@@ -131,15 +147,16 @@ function deriveAlbumsFromTracks(tracks: SfmTopTrack[]): TopAlbum[] {
 		const existing = albumMap.get(key);
 		const artistName = tt.track.artists[0]?.name ?? "";
 		const albumUri = prefixUri(album.externalIds?.spotify?.[0], "album") ?? "";
+		const streams = tt.streams ?? 0;
 		if (existing) {
-			existing.streams += tt.streams;
+			existing.streams += streams;
 		} else {
 			albumMap.set(key, {
 				albumName: album.name,
 				artistName,
 				albumArt: album.image,
 				albumUri,
-				streams: tt.streams,
+				streams,
 			});
 		}
 	}
@@ -335,29 +352,32 @@ export class StatsFmProvider implements StatsProvider {
 		}
 
 		// Map tracks
-		const topTracks: TopTrack[] = tracks.map((tt) => ({
-			rank: tt.position,
-			trackUri:
-				prefixUri(tt.track.externalIds?.spotify?.[0], "track") ??
-				`listening-stats:track:${tt.track.name}${tt.track.artists[0]?.name ?? ""}`,
-			trackName: tt.track.name,
-			artistName: tt.track.artists[0]?.name ?? "",
-			artistUri:
-				prefixUri(tt.track.artists[0]?.externalIds?.spotify?.[0], "artist") ??
-				`listening-stats:artist:${tt.track.artists[0]?.name ?? ""}`,
-			albumName: tt.track.albums[0]?.name ?? "",
-			albumUri: prefixUri(tt.track.albums[0]?.externalIds?.spotify?.[0], "album") ?? "",
-			albumArt: tt.track.albums[0]?.image,
-			count: tt.streams,
-			durationMs: tt.track.durationMs * tt.streams,
-		}));
+		const topTracks: TopTrack[] = tracks.map((tt) => {
+			const streams = tt.streams ?? 0;
+			return {
+				rank: tt.position,
+				trackUri:
+					prefixUri(tt.track.externalIds?.spotify?.[0], "track") ??
+					`listening-stats:track:${tt.track.name}${tt.track.artists[0]?.name ?? ""}`,
+				trackName: tt.track.name,
+				artistName: tt.track.artists[0]?.name ?? "",
+				artistUri:
+					prefixUri(tt.track.artists[0]?.externalIds?.spotify?.[0], "artist") ??
+					`listening-stats:artist:${tt.track.artists[0]?.name ?? ""}`,
+				albumName: tt.track.albums[0]?.name ?? "",
+				albumUri: prefixUri(tt.track.albums[0]?.externalIds?.spotify?.[0], "album") ?? "",
+				albumArt: tt.track.albums[0]?.image,
+				count: streams,
+				durationMs: tt.track.durationMs * streams,
+			};
+		});
 
 		// Genres from stats.fm artist payload (no extra Spotify batch here)
 		const topArtists: TopArtist[] = artists.map((ta) => ({
 			rank: ta.position,
 			artistUri: prefixUri(ta.artist.externalIds?.spotify?.[0], "artist") ?? `listening-stats:artist:${ta.artist.name}`,
 			artistName: ta.artist.name,
-			count: ta.streams,
+			count: ta.streams ?? 0,
 			durationMs: ta.playedMs ?? 0,
 			genres: ta.artist.genres,
 			imageUrl: ta.artist.image ?? null,
@@ -373,7 +393,7 @@ export class StatsFmProvider implements StatsProvider {
 					albumName: ab.album.name,
 					artistName: ab.album.artists[0]?.name ?? "",
 					albumArt: ab.album.image,
-					count: ab.streams,
+					count: ab.streams ?? 0,
 					durationMs: 0,
 				}))
 			: deriveAlbumsFromTracks(tracks);
@@ -556,22 +576,25 @@ export class StatsFmProvider implements StatsProvider {
 		const wave2Tasks: Promise<void>[] = [
 			tracksPromise.then((res) => {
 				tracks = res.ok ? res.data : [];
-				topTracks = tracks.map((tt) => ({
-					rank: tt.position,
-					trackUri:
-						prefixUri(tt.track.externalIds?.spotify?.[0], "track") ??
-						`listening-stats:track:${tt.track.name}${tt.track.artists[0]?.name ?? ""}`,
-					trackName: tt.track.name,
-					artistName: tt.track.artists[0]?.name ?? "",
-					artistUri:
-						prefixUri(tt.track.artists[0]?.externalIds?.spotify?.[0], "artist") ??
-						`listening-stats:artist:${tt.track.artists[0]?.name ?? ""}`,
-					albumName: tt.track.albums[0]?.name ?? "",
-					albumUri: prefixUri(tt.track.albums[0]?.externalIds?.spotify?.[0], "album") ?? "",
-					albumArt: tt.track.albums[0]?.image,
-					count: tt.streams,
-					durationMs: tt.track.durationMs * tt.streams,
-				}));
+				topTracks = tracks.map((tt) => {
+					const streams = tt.streams ?? 0;
+					return {
+						rank: tt.position,
+						trackUri:
+							prefixUri(tt.track.externalIds?.spotify?.[0], "track") ??
+							`listening-stats:track:${tt.track.name}${tt.track.artists[0]?.name ?? ""}`,
+						trackName: tt.track.name,
+						artistName: tt.track.artists[0]?.name ?? "",
+						artistUri:
+							prefixUri(tt.track.artists[0]?.externalIds?.spotify?.[0], "artist") ??
+							`listening-stats:artist:${tt.track.artists[0]?.name ?? ""}`,
+						albumName: tt.track.albums[0]?.name ?? "",
+						albumUri: prefixUri(tt.track.albums[0]?.externalIds?.spotify?.[0], "album") ?? "",
+						albumArt: tt.track.albums[0]?.image,
+						count: streams,
+						durationMs: tt.track.durationMs * streams,
+					};
+				});
 				onWave({ topTracks }, 2);
 				if (!isPlus) {
 					topAlbums = deriveAlbumsFromTracks(tracks);
@@ -585,7 +608,7 @@ export class StatsFmProvider implements StatsProvider {
 					artistUri:
 						prefixUri(ta.artist.externalIds?.spotify?.[0], "artist") ?? `listening-stats:artist:${ta.artist.name}`,
 					artistName: ta.artist.name,
-					count: ta.streams,
+					count: ta.streams ?? 0,
 					durationMs: ta.playedMs ?? 0,
 					genres: ta.artist.genres,
 					imageUrl: ta.artist.image ?? null,
@@ -608,7 +631,7 @@ export class StatsFmProvider implements StatsProvider {
 					albumName: ab.album.name,
 					artistName: ab.album.artists[0]?.name ?? "",
 					albumArt: ab.album.image,
-					count: ab.streams,
+					count: ab.streams ?? 0,
 					durationMs: 0,
 				}));
 				onWave({ topAlbums }, 2);
