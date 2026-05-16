@@ -302,6 +302,7 @@ function App() {
 	const availableSectionIds = new Set(getSectionsForProvider(activeCaps).map((s) => s.id));
 
 	const prefs = getPreferences();
+	const showStreak = capabilities?.hasStreakData || activeProviderId === "statsfm";
 	void prefsVersion;
 	const isHidden = (id: string) => prefs.hiddenSections.includes(id);
 
@@ -444,7 +445,7 @@ function App() {
 						peakWeekday={stats.peakWeekday ?? 0}
 						dailyPlayCounts={stats.dailyPlayCounts}
 						streak={stats.streak}
-						showStreak={capabilities.hasStreakData}
+							showStreak={showStreak}
 					/>
 				);
 			}
@@ -466,6 +467,7 @@ function App() {
 						totalDuration={stats.totalDuration}
 						listeningDays={stats.listeningDays}
 						dailyPlayCounts={stats.dailyPlayCounts}
+						streak={stats.streak}
 						activePeriod={activePeriod}
 						activeProviderId={activeProviderId}
 					/>

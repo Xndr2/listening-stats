@@ -16,7 +16,7 @@ const localCaps: ProviderCapabilities = {
 };
 
 const statsfmPlusCaps: ProviderCapabilities = {
-	hasActivityData: false,
+	hasActivityData: true,
 	hasConsistencyData: true,
 	hasGenreData: true,
 	hasStreakData: false,
@@ -25,7 +25,7 @@ const statsfmPlusCaps: ProviderCapabilities = {
 };
 
 const statsfmFreeCaps: ProviderCapabilities = {
-	hasActivityData: false,
+	hasActivityData: true,
 	hasConsistencyData: true,
 	hasGenreData: true,
 	hasStreakData: false,
@@ -47,20 +47,20 @@ describe("getSectionsForProvider", () => {
 		]);
 	});
 
-	it("excludes activity section for stats.fm Plus (no activity data from API)", () => {
+	it("includes activity section for stats.fm Plus (activity data available)", () => {
 		const sections = getSectionsForProvider(statsfmPlusCaps);
 		const ids = sections.map((s) => s.id);
-		expect(ids).not.toContain("activity");
+		expect(ids).toContain("activity");
 		expect(ids).toContain("consistency");
-		expect(ids).toEqual(["overview", "top-genres", "top-lists", "consistency", "recently-played"]);
+		expect(ids).toEqual(["overview", "top-genres", "top-lists", "activity", "consistency", "recently-played"]);
 	});
 
-	it("excludes activity section for stats.fm free tier (no activity data)", () => {
+	it("includes activity section for stats.fm free tier (activity data available)", () => {
 		const sections = getSectionsForProvider(statsfmFreeCaps);
 		const ids = sections.map((s) => s.id);
-		expect(ids).not.toContain("activity");
+		expect(ids).toContain("activity");
 		expect(ids).toContain("consistency");
-		expect(ids).toEqual(["overview", "top-genres", "top-lists", "consistency", "recently-played"]);
+		expect(ids).toEqual(["overview", "top-genres", "top-lists", "activity", "consistency", "recently-played"]);
 	});
 
 	it("excludes top-genres when hasGenreData is false", () => {
@@ -95,7 +95,7 @@ describe("getOverviewTilesForProvider", () => {
 		expect(ids).not.toContain("peak-hour");
 	});
 
-	it("stats.fm tile catalog excludes streak without API data", () => {
+	it("stats.fm tile catalog does not include streak tile", () => {
 		const tiles = getOverviewTilesForProvider("statsfm", statsfmPlusCaps);
 		const streak = tiles.find((t) => t.id === "streak");
 		expect(streak).toBeUndefined();
@@ -136,12 +136,12 @@ describe("getActivityMode", () => {
 		expect(getActivityMode(localCaps)).toBe("full");
 	});
 
-	it("returns 'hidden' for stats.fm Plus without activity data", () => {
-		expect(getActivityMode(statsfmPlusCaps)).toBe("hidden");
+	it("returns 'full' for stats.fm Plus with activity data", () => {
+		expect(getActivityMode(statsfmPlusCaps)).toBe("full");
 	});
 
-	it("returns 'hidden' for stats.fm free tier without activity data", () => {
-		expect(getActivityMode(statsfmFreeCaps)).toBe("hidden");
+	it("returns 'full' for stats.fm free tier with activity data", () => {
+		expect(getActivityMode(statsfmFreeCaps)).toBe("full");
 	});
 
 	it("returns 'hidden' when activity section is not applicable", () => {

@@ -420,6 +420,8 @@ export function DisplayTab({
 				</div>
 			)}
 
+
+
 			<div className="settings-row">
 				<div>
 					<div className="settings-label">Layout</div>

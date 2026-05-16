@@ -12,6 +12,7 @@ interface ConsistencySectionProps {
 	totalDuration: number;
 	listeningDays?: number;
 	dailyPlayCounts?: DailyPoint[];
+	streak?: number;
 	activePeriod: Period;
 	activeProviderId?: string;
 }
@@ -21,6 +22,7 @@ interface MetricCardProps {
 	value: string | number;
 	sub: string;
 	tooltip: string;
+	accent?: boolean;
 }
 
 function ymd(ts: number): string {
@@ -72,6 +74,7 @@ export function ConsistencySection({
 	totalDuration,
 	listeningDays,
 	dailyPlayCounts,
+	streak,
 	activePeriod,
 	activeProviderId = "statsfm",
 }: ConsistencySectionProps) {
@@ -108,9 +111,9 @@ export function ConsistencySection({
 	const isLocalProvider = activeProviderId === "local";
 	const Tooltip = Spicetify.ReactComponent.TooltipWrapper;
 
-	const MetricCard = ({ label, value, sub, tooltip }: MetricCardProps) => (
+	const MetricCard = ({ label, value, sub, tooltip, accent }: MetricCardProps) => (
 		<Tooltip label={tooltip}>
-			<div className="consistency-metric">
+			<div className={`consistency-metric${accent ? " consistency-metric--accent" : ""}`}>
 				<div className="consistency-metric-label">{label}</div>
 				<div className="consistency-metric-value">{value}</div>
 				<div className="consistency-metric-sub">{sub}</div>
@@ -144,10 +147,11 @@ export function ConsistencySection({
 					tooltip="Average listening duration in minutes across active days."
 				/>
 				<MetricCard
-					label="Longest gap"
-					value={longestGap}
-					sub="days without plays"
-					tooltip="Longest consecutive run of days in this period without any streams."
+					label="Current streak"
+					value={streak != null && streak > 0 ? `${streak}d` : "-"}
+					sub="consecutive days"
+					tooltip="Consecutive calendar days with at least one play (local timezone)."
+					accent={streak != null && streak > 0}
 				/>
 			</div>
 			{!isTodayPeriod && (

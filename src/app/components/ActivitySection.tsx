@@ -21,8 +21,8 @@ const WEEKDAYS_FULL = [
 
 const TAB_OPTIONS: { value: ActivityTabId; label: string }[] = [
 	{ value: "hour", label: "By hour" },
-	{ value: "weekday", label: "By weekday" },
-	{ value: "day", label: "By day" },
+	{ value: "weekday", label: "By week" },
+	{ value: "day", label: "By month" },
 ];
 
 interface ActivitySectionProps {

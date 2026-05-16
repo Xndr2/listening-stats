@@ -252,7 +252,7 @@ describe("OverviewSection grid topology", () => {
 	});
 
 	it("renders .overview-right-block containing top 4 visible tiles", async () => {
-		// newArtistCount provided → all 7 IDs visible → top4 = first 4 = tracks/unique-artists/streak/new-artists
+		// newArtistCount provided → 6 IDs visible → top4 = first 4 = tracks/unique-artists/new-artists/peak-hour
 		await renderOverview({ ...baseStats, streak: 3, newArtistCount: 5 })(container);
 		const rightBlock = container.querySelector(".overview-right-block");
 		expect(rightBlock).not.toBeNull();
@@ -260,23 +260,23 @@ describe("OverviewSection grid topology", () => {
 		expect(cards.length).toBe(4);
 	});
 
-	it("renders .overview-bottom-row containing next 3 visible tiles", async () => {
+	it("renders .overview-bottom-row containing next 2 visible tiles", async () => {
 		await renderOverview({ ...baseStats, streak: 3, newArtistCount: 5 })(container);
 		const bottomRow = container.querySelector(".overview-bottom-row");
 		expect(bottomRow).not.toBeNull();
 		const cards = bottomRow!.querySelectorAll(".overview-card");
-		expect(cards.length).toBe(3);
+		expect(cards.length).toBe(2);
 	});
 
-	it("when newArtistCount is undefined, all 7 tiles render (new artists shows 0)", async () => {
+	it("when newArtistCount is undefined, all 6 tiles render (streak no longer in overview)", async () => {
 		await renderOverview({ ...baseStats, streak: 3 })(container);
 		const allCards = container.querySelectorAll(".overview-card");
-		expect(allCards.length).toBe(7);
+		expect(allCards.length).toBe(6);
 		const newArtists = container.querySelector('[data-card-id="new-artists"]');
 		expect(newArtists).not.toBeNull();
 		expect(newArtists?.querySelector(".overview-card-value")?.textContent).toBe("0");
 		expect(container.querySelectorAll(".overview-right-block .overview-card").length).toBe(4);
-		expect(container.querySelectorAll(".overview-bottom-row .overview-card").length).toBe(3);
+		expect(container.querySelectorAll(".overview-bottom-row .overview-card").length).toBe(2);
 	});
 
 	it("data-card-id attributes preserved on all tiles", async () => {
@@ -286,7 +286,6 @@ describe("OverviewSection grid topology", () => {
 		expect(ids).toEqual([
 			"tracks",
 			"unique-artists",
-			"streak",
 			"new-artists",
 			"peak-hour",
 			"skip-rate",
@@ -311,7 +310,7 @@ describe("OverviewSection tiles by provider", () => {
 		localStorage.clear();
 	});
 
-	it("Local provider with 7 IDs and newArtistCount defined renders all 7 tiles in default order", async () => {
+	it("Local provider with 6 IDs and newArtistCount defined renders all 6 tiles in default order", async () => {
 		setActiveProvider("local");
 		await renderOverview({ ...baseStats, streak: 3, newArtistCount: 5 })(container);
 		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) =>
@@ -320,7 +319,6 @@ describe("OverviewSection tiles by provider", () => {
 		expect(ids).toEqual([
 			"tracks",
 			"unique-artists",
-			"streak",
 			"new-artists",
 			"peak-hour",
 			"skip-rate",
@@ -328,7 +326,7 @@ describe("OverviewSection tiles by provider", () => {
 		]);
 	});
 
-	it("stats.fm provider renders top-genre in place of peak-hour, hides streak and skip-rate, tracks in hero only", async () => {
+	it("stats.fm provider renders top-genre in place of peak-hour, hides tracks and skip-rate", async () => {
 		setActiveProvider("statsfm");
 		await renderOverview({
 			...baseStats,
@@ -346,8 +344,8 @@ describe("OverviewSection tiles by provider", () => {
 		expect(ids).not.toContain("skip-rate");
 	});
 
-	it("stats.fm streak tile is hidden (data not available from stats.fm API)", async () => {
-		setActiveProvider("statsfm");
+	it("streak tile is hidden from overview", async () => {
+		setActiveProvider("local");
 		await renderOverview({ ...baseStats, streak: 7, newArtistCount: 5 })(container);
 		expect(container.querySelector('[data-card-id="streak"]')).toBeNull();
 	});
@@ -356,25 +354,6 @@ describe("OverviewSection tiles by provider", () => {
 		setActiveProvider("statsfm");
 		await renderOverview({ ...baseStats, streak: 0, skipRate: 0.5, newArtistCount: 5 })(container);
 		expect(container.querySelector('[data-card-id="skip-rate"]')).toBeNull();
-	});
-
-	it("Local: streak tile with stats.streak > 0 has accent color on value span", async () => {
-		setActiveProvider("local");
-		await renderOverview({ ...baseStats, streak: 5, newArtistCount: 3 })(container);
-		const streakCard = container.querySelector('[data-card-id="streak"]');
-		const value = streakCard?.querySelector<HTMLElement>(".overview-card-value");
-		expect(value).not.toBeNull();
-		expect(value?.style.color).toContain("--spice-button");
-	});
-
-	it("Local: streak tile with stats.streak == 0 renders dash without accent", async () => {
-		setActiveProvider("local");
-		await renderOverview({ ...baseStats, streak: 0, newArtistCount: 3 })(container);
-		const streakCard = container.querySelector('[data-card-id="streak"]');
-		const value = streakCard?.querySelector<HTMLElement>(".overview-card-value");
-		expect(value?.textContent).toBe("-");
-		// No accent inline style applied
-		expect(value?.style.color === "" || !value?.style.color.includes("--spice-button")).toBe(true);
 	});
 
 	it("new-artists tile shows 0 when stats.newArtistCount is undefined", async () => {
@@ -425,13 +404,12 @@ describe("OverviewSection ordering and hide prefs", () => {
 	it("respects custom overviewOrder.local  -  cards rendered in user's stored order", async () => {
 		setPreference("overviewOrder", {
 			local: [
-				"streak",
+				"est-payout",
 				"tracks",
 				"unique-artists",
 				"new-artists",
 				"peak-hour",
 				"skip-rate",
-				"est-payout",
 			],
 			statsfm: ["top-genre", "unique-artists", "new-artists", "est-payout"],
 		});
@@ -439,7 +417,7 @@ describe("OverviewSection ordering and hide prefs", () => {
 		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) =>
 			c.getAttribute("data-card-id"),
 		);
-		expect(ids[0]).toBe("streak");
+		expect(ids[0]).toBe("est-payout");
 		expect(ids[1]).toBe("tracks");
 	});
 

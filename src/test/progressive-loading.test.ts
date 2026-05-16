@@ -121,12 +121,10 @@ function setupSfmGetDispatcher() {
 			return Promise.resolve({
 				ok: true,
 				data: {
-					items: {
-						hours: { 14: { count: 38, durationMs: 0 }, 15: { count: 20, durationMs: 0 } },
-						weekDays: { 1: { count: 45, durationMs: 0 }, 6: { count: 112, durationMs: 0 } },
-						months: {},
-						years: {},
-					},
+					hours: { 14: { count: 38, durationMs: 0 }, 15: { count: 20, durationMs: 0 } },
+					weekDays: { 1: { count: 45, durationMs: 0 }, 6: { count: 112, durationMs: 0 } },
+					months: {},
+					years: {},
 				},
 			});
 		}
@@ -441,7 +439,7 @@ describe("generation counter stale-callback cancellation", () => {
 			if (path.includes("/streams/stats/dates"))
 				return Promise.resolve({
 					ok: true,
-					data: { items: { hours: {}, weekDays: {}, months: {}, years: {} } },
+					data: { hours: {}, weekDays: {}, months: {}, years: {} },
 				});
 			if (path.includes("/streams/recent")) return Promise.resolve({ ok: true, data: [] });
 			return Promise.resolve({ ok: false, status: 0, message: "skipped" });

@@ -136,12 +136,10 @@ function setupSfmGetDispatcher(isPlus = false) {
 			return Promise.resolve({
 				ok: true,
 				data: {
-					items: {
-						hours: { 14: { count: 38, durationMs: 0 }, 15: { count: 20, durationMs: 0 } },
-						weekDays: { 1: { count: 45, durationMs: 0 }, 6: { count: 112, durationMs: 0 } },
-						months: {},
-						years: {},
-					},
+					hours: { 14: { count: 38, durationMs: 0 }, 15: { count: 20, durationMs: 0 } },
+					weekDays: { 1: { count: 45, durationMs: 0 }, 6: { count: 112, durationMs: 0 } },
+					months: {},
+					years: {},
 				},
 			});
 		}
@@ -718,15 +716,14 @@ describe("StatsFmProvider", () => {
 			expect(result.peakHour).toBe(0);
 		});
 
-		it("calculateStats result does not include streak field (streak is undefined)", async () => {
+		it("calculateStats result includes streak computed from per-day data", async () => {
 			setupConfig({ isPlus: false });
 			await provider.init();
 			setupSfmGetDispatcher(false);
 
 			const result = await provider.calculateStats(STATSFM_PERIODS[0]);
 
-			// stats.fm payload omits streak
-			expect(result.streak).toBeUndefined();
+			expect(result.streak).toBe(2);
 		});
 
 		it("requests prior-window /top/artists and derives newArtistCount from Spotify URI diff", async () => {
@@ -794,7 +791,7 @@ describe("StatsFmProvider", () => {
 			// No config in localStorage  -  init() leaves this.config null
 			await provider.init();
 			const info = provider.getProviderInfo();
-			expect(info.capabilities.hasActivityData).toBe(false);
+			expect(info.capabilities.hasActivityData).toBe(true);
 			expect(info.capabilities.hasGenreData).toBe(true);
 			expect(info.capabilities.hasStreakData).toBe(false);
 			expect(info.capabilities.hasSkipRate).toBe(false);
@@ -813,7 +810,7 @@ describe("StatsFmProvider", () => {
 			);
 			await provider.init();
 			const info = provider.getProviderInfo();
-			expect(info.capabilities.hasActivityData).toBe(false);
+			expect(info.capabilities.hasActivityData).toBe(true);
 			expect(info.capabilities.hasGenreData).toBe(true);
 			expect(info.capabilities.hasStreakData).toBe(false);
 			expect(info.capabilities.hasSkipRate).toBe(false);
@@ -832,7 +829,7 @@ describe("StatsFmProvider", () => {
 			);
 			await provider.init();
 			const info = provider.getProviderInfo();
-			expect(info.capabilities.hasActivityData).toBe(false);
+			expect(info.capabilities.hasActivityData).toBe(true);
 			expect(info.capabilities.hasGenreData).toBe(true);
 			expect(info.capabilities.hasStreakData).toBe(false);
 			expect(info.capabilities.hasSkipRate).toBe(false);
@@ -943,7 +940,7 @@ describe("StatsFmProvider", () => {
 				if (path.includes("/streams/stats/dates"))
 					return Promise.resolve({
 						ok: true,
-						data: { items: { hours: {}, weekDays: {}, months: {}, years: {} } },
+						data: { hours: {}, weekDays: {}, months: {}, years: {} },
 					});
 				if (path.includes("/streams/stats"))
 					return Promise.resolve({ ok: true, data: makeSfmStreamStats() });

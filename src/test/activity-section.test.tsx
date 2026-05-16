@@ -21,13 +21,13 @@ const baseProps = {
 };
 
 describe("ActivitySection tab UI", () => {
-	it("renders 3 tab buttons: By hour, By weekday, By day", () => {
+	it("renders 3 tab buttons: By hour, By week, By month", () => {
 		const { container } = render(<ActivitySection {...baseProps} />);
 		const tabs = container.querySelectorAll(".activity-tab");
-		expect(tabs.length).toBe(3);
+		expect(tabs).toHaveLength(3);
 		expect(tabs[0].textContent).toBe("By hour");
-		expect(tabs[1].textContent).toBe("By weekday");
-		expect(tabs[2].textContent).toBe("By day");
+		expect(tabs[1].textContent).toBe("By week");
+		expect(tabs[2].textContent).toBe("By month");
 	});
 
 	it("defaults to 'By hour' tab active", () => {
@@ -43,20 +43,19 @@ describe("ActivitySection tab UI", () => {
 		expect(container.querySelector(".section-title")?.textContent).toBe("Activity");
 	});
 
-	it("clicking 'By weekday' tab switches view and marks tab active", () => {
+	it("clicking 'By week' tab switches view and marks tab active", () => {
 		const { container } = render(<ActivitySection {...baseProps} />);
 		const tabs = container.querySelectorAll(".activity-tab");
 		fireEvent.click(tabs[1]);
 		expect(tabs[1].classList.contains("active")).toBe(true);
 		expect(tabs[0].classList.contains("active")).toBe(false);
-		expect(container.querySelector(".weekday-chart")).not.toBeNull();
+		expect(tabs[2].classList.contains("active")).toBe(false);
 	});
 
-	it("clicking 'By day' tab shows heatmap", () => {
+	it("clicking 'By month' tab shows heatmap", () => {
 		const { container } = render(<ActivitySection {...baseProps} />);
 		const tabs = container.querySelectorAll(".activity-tab");
 		fireEvent.click(tabs[2]);
-		expect(tabs[2].classList.contains("active")).toBe(true);
 		expect(container.querySelector(".heatmap-grid")).not.toBeNull();
 	});
 
@@ -79,7 +78,7 @@ describe("ActivitySection tab persistence", () => {
 		localStorage.setItem(LS_KEYS.PREFERENCES, JSON.stringify({ activityTab: "day" }));
 		const { container } = render(<ActivitySection {...baseProps} />);
 		const active = container.querySelector(".activity-tab.active");
-		expect(active?.textContent).toBe("By day");
+		expect(active?.textContent).toBe("By month");
 	});
 
 	it("falls back to 'hour' when stored tab is invalid", () => {

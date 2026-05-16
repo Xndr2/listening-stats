@@ -66,6 +66,7 @@ export interface Preferences {
 	 * track has no qualifying plays yet (skips excluded).
 	 */
 	playCountShowPeriodStreams: boolean;
+
 	activePage: string;
 	/** Include GitHub prereleases when checking for updates */
 	receiveBetaUpdates: boolean;

@@ -217,13 +217,7 @@ export default function OverviewSection({
 			value: formatNumber(stats.uniqueArtistCount),
 			tooltip: "Number of distinct artists played in the selected period",
 		},
-		streak: isStatsFm
-			? undefined
-			: {
-					value: stats.streak != null && stats.streak > 0 ? `${stats.streak}d` : "-",
-					tooltip: "Consecutive calendar days with at least one play (local timezone)",
-					accent: stats.streak != null && stats.streak > 0 ? "var(--spice-button)" : undefined,
-				},
+		streak: undefined,
 		"new-artists": {
 			value: formatNumber(stats.newArtistCount ?? 0),
 			tooltip:
