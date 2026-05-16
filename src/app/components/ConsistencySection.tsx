@@ -40,20 +40,6 @@ function buildWindow(points: DailyPoint[], period: Period): DailyPoint[] {
 	return points.filter((p) => p.date >= startDay && p.date <= endDay);
 }
 
-function computeLongestGap(points: DailyPoint[]): number {
-	let longest = 0;
-	let current = 0;
-	for (const p of points) {
-		if (p.count > 0) {
-			current = 0;
-			continue;
-		}
-		current += 1;
-		longest = Math.max(longest, current);
-	}
-	return longest;
-}
-
 function formatDayLabel(date: string): string {
 	let ts = new Date(date);
 	if (!Number.isFinite(ts.getTime())) {
@@ -102,7 +88,6 @@ export function ConsistencySection({
 	const activeDays = points.length > 0 ? points.filter((p) => p.count > 0).length : (listeningDays ?? 0);
 	const avgPlaysPerActiveDay = activeDays > 0 ? totalPlays / activeDays : 0;
 	const avgMinutesPerActiveDay = activeDays > 0 ? totalDuration / 60000 / activeDays : 0;
-	const longestGap = computeLongestGap(points);
 	const coveragePct = totalDays > 0 ? Math.round((activeDays / totalDays) * 100) : 0;
 	const trend = points.slice(-14);
 	const trendMax = Math.max(...trend.map((p) => p.count), 1);
