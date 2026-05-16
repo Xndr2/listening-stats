@@ -21,8 +21,7 @@ export async function cosmosGet<T>(path: string): Promise<Result<T, ApiError>> {
 		const response = await Spicetify.CosmosAsync.request("GET", path);
 
 		if (response.status === 429) {
-			const retryAfterRaw =
-				response.headers?.["retry-after"] ?? response.headers?.["Retry-After"] ?? "5";
+			const retryAfterRaw = response.headers?.["retry-after"] ?? response.headers?.["Retry-After"] ?? "5";
 			const retryAfter = Number(retryAfterRaw) || 5;
 			circuitBreaker.recordFailure(retryAfter);
 			return { ok: false, error: { type: "rate_limited", retryAfter } };

@@ -228,9 +228,7 @@ describe("v1 compatibility migration retry flag", () => {
 		// Close db so initDatabase has work to do
 		db.close();
 
-		const openSpy = vi
-			.spyOn(db, "open")
-			.mockRejectedValueOnce(new Error("simulated upgrade failure"));
+		const openSpy = vi.spyOn(db, "open").mockRejectedValueOnce(new Error("simulated upgrade failure"));
 
 		try {
 			await initDatabase();

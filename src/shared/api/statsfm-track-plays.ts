@@ -58,10 +58,7 @@ export async function fetchStatsFmTopTrackStreams(
 	return null;
 }
 
-export async function fetchStatsFmLifetimeTrackStreams(
-	username: string,
-	trackUri: string,
-): Promise<number | null> {
+export async function fetchStatsFmLifetimeTrackStreams(username: string, trackUri: string): Promise<number | null> {
 	return fetchStatsFmTopTrackStreams(username, trackUri, "lifetime");
 }
 

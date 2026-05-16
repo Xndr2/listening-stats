@@ -70,10 +70,7 @@ describe("getChartsAsync", () => {
 	});
 
 	it("falls back to WORLD_TRACKS when fetch fails", async () => {
-		const fetchMock = vi
-			.fn()
-			.mockRejectedValueOnce(new Error("network"))
-			.mockRejectedValueOnce(new Error("network"));
+		const fetchMock = vi.fn().mockRejectedValueOnce(new Error("network")).mockRejectedValueOnce(new Error("network"));
 		vi.stubGlobal("fetch", fetchMock);
 
 		const { getChartsAsync, WORLD_TRACKS } = await import("../app/world-charts-service");

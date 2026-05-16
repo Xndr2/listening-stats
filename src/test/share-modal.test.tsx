@@ -113,12 +113,8 @@ describe("ShareModal", () => {
 	it("renders modal chrome and action buttons", async () => {
 		const { container } = await renderShareModal();
 		expect(document.querySelector(".share-modal")).toBeTruthy();
-		expect(document.querySelector("[data-testid='share-copy-btn']")?.textContent).toContain(
-			"Copy image",
-		);
-		expect(document.querySelector("[data-testid='share-download-btn']")?.textContent).toContain(
-			"Save PNG",
-		);
+		expect(document.querySelector("[data-testid='share-copy-btn']")?.textContent).toContain("Copy image");
+		expect(document.querySelector("[data-testid='share-download-btn']")?.textContent).toContain("Save PNG");
 		Spicetify.ReactDOM.unmountComponentAtNode(container);
 		container.remove();
 	});
@@ -134,9 +130,7 @@ describe("ShareModal", () => {
 
 	it("shows follow theme toggle", async () => {
 		const { container } = await renderShareModal();
-		const toggle = document.querySelector<HTMLInputElement>(
-			".share-toggle-row input[type='checkbox']",
-		);
+		const toggle = document.querySelector<HTMLInputElement>(".share-toggle-row input[type='checkbox']");
 		expect(toggle).toBeTruthy();
 		expect(toggle?.checked).toBe(false);
 		toggle?.click();
@@ -148,9 +142,7 @@ describe("ShareModal", () => {
 	it("hides streak variant for statsfm provider", async () => {
 		providerRegistry.setActive("statsfm");
 		const { container } = await renderShareModal();
-		const labels = Array.from(document.querySelectorAll(".share-variant-tab")).map((t) =>
-			t.textContent?.trim(),
-		);
+		const labels = Array.from(document.querySelectorAll(".share-variant-tab")).map((t) => t.textContent?.trim());
 		expect(labels).not.toContain("Streak");
 		Spicetify.ReactDOM.unmountComponentAtNode(container);
 		container.remove();
@@ -159,9 +151,7 @@ describe("ShareModal", () => {
 	it("hides genre variant for local provider", async () => {
 		providerRegistry.setActive("local");
 		const { container } = await renderShareModal();
-		const labels = Array.from(document.querySelectorAll(".share-variant-tab")).map((t) =>
-			t.textContent?.trim(),
-		);
+		const labels = Array.from(document.querySelectorAll(".share-variant-tab")).map((t) => t.textContent?.trim());
 		expect(labels).not.toContain("Genre");
 		Spicetify.ReactDOM.unmountComponentAtNode(container);
 		container.remove();

@@ -9,8 +9,8 @@ const POLL_TIMEOUT_MS = 30_000;
 	function poll() {
 		// Wait until Player.addEventListener exists
 		if (
-			!(globalThis as unknown as { Spicetify?: { Player?: { addEventListener?: unknown } } })
-				.Spicetify?.Player?.addEventListener
+			!(globalThis as unknown as { Spicetify?: { Player?: { addEventListener?: unknown } } }).Spicetify?.Player
+				?.addEventListener
 		) {
 			if (Date.now() - started > POLL_TIMEOUT_MS) {
 				console.error("[listening-stats] Spicetify init timeout: Player API not found after 30s");
@@ -22,8 +22,8 @@ const POLL_TIMEOUT_MS = 30_000;
 
 		// Wait until current track metadata is present
 		if (
-			!(globalThis as unknown as { Spicetify?: { Player?: { data?: { item?: unknown } } } })
-				.Spicetify?.Player?.data?.item
+			!(globalThis as unknown as { Spicetify?: { Player?: { data?: { item?: unknown } } } }).Spicetify?.Player?.data
+				?.item
 		) {
 			if (Date.now() - started > POLL_TIMEOUT_MS) {
 				console.warn("[listening-stats] Spicetify init timeout: Player data not loaded after 30s");

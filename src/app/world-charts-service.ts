@@ -5,12 +5,7 @@ export type {
 	WorldWindow,
 } from "../shared/types/world-charts";
 
-import type {
-	WorldChartDataSource,
-	WorldScope,
-	WorldTrack,
-	WorldWindow,
-} from "../shared/types/world-charts";
+import type { WorldChartDataSource, WorldScope, WorldTrack, WorldWindow } from "../shared/types/world-charts";
 import {
 	enrichWorldTracksWithMytopImages,
 	fetchMytopImageLookups,
@@ -194,9 +189,7 @@ function mapArtistRow(r: ChartArtistPayload): WorldTrack {
 	};
 }
 
-async function fetchChartTracks(
-	range: string,
-): Promise<Array<WorldTrack & { spotifyTrackId?: string }>> {
+async function fetchChartTracks(range: string): Promise<Array<WorldTrack & { spotifyTrackId?: string }>> {
 	const url = `${CHARTS_API}/charts/top/tracks?range=${encodeURIComponent(range)}`;
 	const res = await fetch(url, { headers: { Accept: "application/json" } });
 	if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -219,10 +212,7 @@ export function getCharts(_scope: WorldScope, _window: WorldWindow): WorldTrack[
 	return [...WORLD_TRACKS];
 }
 
-export async function getChartsAsync(
-	_scope: WorldScope,
-	window: WorldWindow,
-): Promise<WorldChartResult<WorldTrack[]>> {
+export async function getChartsAsync(_scope: WorldScope, window: WorldWindow): Promise<WorldChartResult<WorldTrack[]>> {
 	const range = RANGE_BY_WINDOW[window] ?? "today";
 	try {
 		const raw = await fetchChartTracks(range);

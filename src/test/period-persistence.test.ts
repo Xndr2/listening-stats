@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-	restorePeriodForProvider,
-	safeParseProviderPeriods,
-	savePeriodForProvider,
-} from "../app/App";
+import { restorePeriodForProvider, safeParseProviderPeriods, savePeriodForProvider } from "../app/App";
 import { LS_KEYS } from "../shared/constants/storage-keys";
 import type { Period } from "../shared/types/stats";
 
@@ -29,10 +25,7 @@ describe("safeParseProviderPeriods", () => {
 	});
 
 	it("returns parsed map when localStorage has valid JSON", () => {
-		localStorage.setItem(
-			LS_KEYS.PROVIDER_PERIODS,
-			JSON.stringify({ local: "this-week", statsfm: "sfm-months" }),
-		);
+		localStorage.setItem(LS_KEYS.PROVIDER_PERIODS, JSON.stringify({ local: "this-week", statsfm: "sfm-months" }));
 		expect(safeParseProviderPeriods()).toEqual({ local: "this-week", statsfm: "sfm-months" });
 	});
 
@@ -78,10 +71,7 @@ describe("restorePeriodForProvider", () => {
 	});
 
 	it("restores correct period for each provider independently (switching providers test)", () => {
-		localStorage.setItem(
-			LS_KEYS.PROVIDER_PERIODS,
-			JSON.stringify({ local: "this-month", statsfm: "sfm-weeks" }),
-		);
+		localStorage.setItem(LS_KEYS.PROVIDER_PERIODS, JSON.stringify({ local: "this-month", statsfm: "sfm-weeks" }));
 		const localResult = restorePeriodForProvider("local", mockPeriods);
 		const sfmResult = restorePeriodForProvider("statsfm", mockSfmPeriods);
 		expect(localResult.id).toBe("this-month");

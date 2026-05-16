@@ -37,10 +37,7 @@ export function TopListsWaveSkeleton() {
 				>
 					<SkeletonBlock width="80px" height="14px" style={{ marginBottom: "14px" }} />
 					{Array.from({ length: 5 }).map((_, row) => (
-						<div
-							key={row}
-							style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" }}
-						>
+						<div key={row} style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" }}>
 							<SkeletonCircle size={20} style={{ flexShrink: 0 }} />
 							<SkeletonBlock width="36px" height="36px" style={{ flexShrink: 0 }} />
 							<div style={{ flex: 1 }}>
@@ -86,10 +83,7 @@ export function WorldChartsSkeleton() {
 					/>
 					<div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "8px 0" }}>
 						{Array.from({ length: 8 }).map((_, row) => (
-							<div
-								key={row}
-								style={{ display: "flex", gap: "12px", alignItems: "center", padding: "6px 8px" }}
-							>
+							<div key={row} style={{ display: "flex", gap: "12px", alignItems: "center", padding: "6px 8px" }}>
 								<div
 									className="skeleton-shimmer"
 									style={{ width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0 }}
@@ -108,10 +102,7 @@ export function WorldChartsSkeleton() {
 											borderRadius: "4px",
 										}}
 									/>
-									<div
-										className="skeleton-shimmer"
-										style={{ width: "50%", height: "10px", borderRadius: "4px" }}
-									/>
+									<div className="skeleton-shimmer" style={{ width: "50%", height: "10px", borderRadius: "4px" }} />
 								</div>
 								<div
 									className="skeleton-shimmer"
@@ -130,11 +121,7 @@ export function ActivityChartSkeleton() {
 	return (
 		<div className="activity-chart" aria-hidden="true">
 			{Array.from({ length: 24 }).map((_, i) => (
-				<div
-					key={i}
-					className="activity-bar skeleton-shimmer"
-					style={{ height: `${20 + Math.random() * 60}%` }}
-				/>
+				<div key={i} className="activity-bar skeleton-shimmer" style={{ height: `${20 + Math.random() * 60}%` }} />
 			))}
 		</div>
 	);

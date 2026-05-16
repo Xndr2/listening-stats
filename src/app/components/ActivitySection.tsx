@@ -9,15 +9,7 @@ const { useState } = Spicetify.React;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAYS = Array.from({ length: 7 }, (_, i) => i);
 const WEEKDAYS_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const WEEKDAYS_FULL = [
-	"Monday",
-	"Tuesday",
-	"Wednesday",
-	"Thursday",
-	"Friday",
-	"Saturday",
-	"Sunday",
-];
+const WEEKDAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 const TAB_OPTIONS: { value: ActivityTabId; label: string }[] = [
 	{ value: "hour", label: "By hour" },
@@ -109,8 +101,7 @@ export function ActivitySection({
 					<CalendarHeatmap dailyPlayCounts={dailyPlayCounts ?? []} />
 					{showStreak && streak != null && streak > 0 && (
 						<div className="streak-callout">
-							You've listened on <strong>{streak} days</strong> in a row &middot; longest stretch
-							this year.
+							You've listened on <strong>{streak} days</strong> in a row &middot; longest stretch this year.
 						</div>
 					)}
 				</>
@@ -134,10 +125,7 @@ function renderHourlyChart(hourlyDistribution: number[], peakHour: number, use24
 							label={`${formatHour(hr, use24h)}: ${val} plays`}
 							placement="top"
 						>
-							<div
-								className={`activity-bar${isPeak ? " peak" : ""}`}
-								style={{ height: `${heightPct}%` }}
-							/>
+							<div className={`activity-bar${isPeak ? " peak" : ""}`} style={{ height: `${heightPct}%` }} />
 						</Spicetify.ReactComponent.TooltipWrapper>
 					);
 				})}
@@ -164,14 +152,8 @@ function renderWeekdayChart(weekdayDistribution: number[], peakWeekday: number) 
 				return (
 					<div key={day} className="weekday-column">
 						<div className="weekday-bar-area">
-							<Spicetify.ReactComponent.TooltipWrapper
-								label={`${WEEKDAYS_FULL[day]}: ${val} plays`}
-								placement="top"
-							>
-								<div
-									className={`activity-bar${isPeak ? " peak" : ""}`}
-									style={{ height: `${heightPct}%` }}
-								/>
+							<Spicetify.ReactComponent.TooltipWrapper label={`${WEEKDAYS_FULL[day]}: ${val} plays`} placement="top">
+								<div className={`activity-bar${isPeak ? " peak" : ""}`} style={{ height: `${heightPct}%` }} />
 							</Spicetify.ReactComponent.TooltipWrapper>
 						</div>
 						<span className="weekday-label">{WEEKDAYS_ABBR[day]}</span>

@@ -6,16 +6,12 @@ afterEach(() => {
 	cleanup();
 });
 
-const STOPS = [
-	0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000,
-];
+const STOPS = [0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000];
 
 describe("SegmentedControl", () => {
 	it("renders 13 stops", async () => {
 		const { SegmentedControl } = await import("../app/components/SegmentedControl");
-		const { container } = render(
-			React.createElement(SegmentedControl, { stops: STOPS, value: 0, onSelect: vi.fn() }),
-		);
+		const { container } = render(React.createElement(SegmentedControl, { stops: STOPS, value: 0, onSelect: vi.fn() }));
 		const stops = container.querySelectorAll(".segmented-control-stop");
 		expect(stops).toHaveLength(13);
 	});
@@ -33,9 +29,7 @@ describe("SegmentedControl", () => {
 	it("calls onSelect with the stop value when clicked", async () => {
 		const { SegmentedControl } = await import("../app/components/SegmentedControl");
 		const onSelect = vi.fn();
-		const { container } = render(
-			React.createElement(SegmentedControl, { stops: STOPS, value: 0, onSelect }),
-		);
+		const { container } = render(React.createElement(SegmentedControl, { stops: STOPS, value: 0, onSelect }));
 		const stops = container.querySelectorAll(".segmented-control-stop");
 		fireEvent.click(stops[6]); // 30000ms = 30s
 		expect(onSelect).toHaveBeenCalledWith(30000);
@@ -43,9 +37,7 @@ describe("SegmentedControl", () => {
 
 	it("renders the indicator element", async () => {
 		const { SegmentedControl } = await import("../app/components/SegmentedControl");
-		const { container } = render(
-			React.createElement(SegmentedControl, { stops: STOPS, value: 0, onSelect: vi.fn() }),
-		);
+		const { container } = render(React.createElement(SegmentedControl, { stops: STOPS, value: 0, onSelect: vi.fn() }));
 		const indicator = container.querySelector(".segmented-control-indicator");
 		expect(indicator).not.toBeNull();
 	});
@@ -64,9 +56,7 @@ describe("SegmentedControl", () => {
 
 	it("renders default labels as {val/1000}s", async () => {
 		const { SegmentedControl } = await import("../app/components/SegmentedControl");
-		const { container } = render(
-			React.createElement(SegmentedControl, { stops: STOPS, value: 0, onSelect: vi.fn() }),
-		);
+		const { container } = render(React.createElement(SegmentedControl, { stops: STOPS, value: 0, onSelect: vi.fn() }));
 		const stops = container.querySelectorAll(".segmented-control-stop");
 		expect(stops[0].textContent).toBe("0s");
 		expect(stops[1].textContent).toBe("5s");

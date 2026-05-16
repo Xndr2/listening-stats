@@ -1,21 +1,7 @@
-import {
-	type SfmResult,
-	type StatsFmConfig,
-	sfmCircuitBreaker,
-	sfmGet,
-	validateUsername,
-} from "../api/statsfm-client";
+import { type SfmResult, type StatsFmConfig, sfmCircuitBreaker, sfmGet, validateUsername } from "../api/statsfm-client";
 import { LS_KEYS } from "../constants/storage-keys";
 import { classifyStatsFmError, StatsFmError } from "../errors";
-import type {
-	Period,
-	RecentPlay,
-	StatsResult,
-	TopAlbum,
-	TopArtist,
-	TopGenre,
-	TopTrack,
-} from "../types/stats";
+import type { Period, RecentPlay, StatsResult, TopAlbum, TopArtist, TopGenre, TopTrack } from "../types/stats";
 import type {
 	SfmDateStats,
 	SfmPerDayStats,
@@ -54,7 +40,7 @@ function computeStreakFromDays(days: Record<string, { count: number; durationMs:
 	if (dateSet.size === 0) return 0;
 
 	const now = new Date();
-	let cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+	const cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 	const todayKey = toLocalYmd(cursor.toISOString());
 
 	if (!dateSet.has(todayKey)) {
@@ -89,9 +75,7 @@ function extractData<T>(result: PromiseSettledResult<SfmResult<T>>): T | null {
 	return null;
 }
 
-function extractFailure(
-	result: PromiseSettledResult<SfmResult<unknown>>,
-): { status: number; message: string } | null {
+function extractFailure(result: PromiseSettledResult<SfmResult<unknown>>): { status: number; message: string } | null {
 	if (result.status === "fulfilled" && !result.value.ok) {
 		return { status: result.value.status, message: result.value.message };
 	}
@@ -114,10 +98,7 @@ function genresFromArtists(artists: SfmTopArtist[]): TopGenre[] {
 }
 
 /** Prefer stats.fm `/top/genres` when the API returns rows (works even when artist.genres[] is empty). */
-function topGenresFromApiOrArtists(
-	apiRows: SfmTopGenre[] | null | undefined,
-	artists: SfmTopArtist[],
-): TopGenre[] {
+function topGenresFromApiOrArtists(apiRows: SfmTopGenre[] | null | undefined, artists: SfmTopArtist[]): TopGenre[] {
 	const rows = apiRows ?? [];
 	if (rows.length > 0) {
 		return [...rows]
@@ -242,35 +223,26 @@ export class StatsFmProvider implements StatsProvider {
 				})
 			: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopArtist[]>);
 
-		const [
-			tracksRes,
-			artistsRes,
-			genresRes,
-			statsRes,
-			recentRes,
-			albumsRes,
-			perDayRes,
-			datesRes,
-			priorArtistsRes,
-		] = await Promise.allSettled([
-			sfmGet<SfmTopTrack[]>(`/users/${username}/top/tracks`, rangeParams),
-			sfmGet<SfmTopArtist[]>(`/users/${username}/top/artists`, rangeParams),
-			sfmGet<SfmTopGenre[]>(`/users/${username}/top/genres`, rangeParams),
-			sfmGet<SfmStreamStats>(`/users/${username}/streams/stats`, rangeParams),
-			sfmGet<SfmRecentStream[]>(`/users/${username}/streams/recent`, { limit: "12" }),
-			isPlus
-				? sfmGet<SfmTopAlbum[]>(`/users/${username}/top/albums`, rangeParams)
-				: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopAlbum[]>),
-			sfmGet<SfmPerDayStats>(`/users/${username}/streams/stats/per-day`, {
-				range: "lifetime",
-				timeZone,
-			}),
-			sfmGet<SfmDateStats>(`/users/${username}/streams/stats/dates`, {
-				range,
-				timeZone,
-			}),
-			priorPromise,
-		]);
+		const [tracksRes, artistsRes, genresRes, statsRes, recentRes, albumsRes, perDayRes, datesRes, priorArtistsRes] =
+			await Promise.allSettled([
+				sfmGet<SfmTopTrack[]>(`/users/${username}/top/tracks`, rangeParams),
+				sfmGet<SfmTopArtist[]>(`/users/${username}/top/artists`, rangeParams),
+				sfmGet<SfmTopGenre[]>(`/users/${username}/top/genres`, rangeParams),
+				sfmGet<SfmStreamStats>(`/users/${username}/streams/stats`, rangeParams),
+				sfmGet<SfmRecentStream[]>(`/users/${username}/streams/recent`, { limit: "12" }),
+				isPlus
+					? sfmGet<SfmTopAlbum[]>(`/users/${username}/top/albums`, rangeParams)
+					: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopAlbum[]>),
+				sfmGet<SfmPerDayStats>(`/users/${username}/streams/stats/per-day`, {
+					range: "lifetime",
+					timeZone,
+				}),
+				sfmGet<SfmDateStats>(`/users/${username}/streams/stats/dates`, {
+					range,
+					timeZone,
+				}),
+				priorPromise,
+			]);
 
 		const tracksErr = extractFailure(tracksRes);
 		const artistsErr = extractFailure(artistsRes);
@@ -294,9 +266,7 @@ export class StatsFmProvider implements StatsProvider {
 			);
 			if (priorArtists.length > 0) {
 				const priorIds = new Set(
-					priorArtists
-						.map((a) => a.artist.externalIds?.spotify?.[0])
-						.filter((s): s is string => !!s),
+					priorArtists.map((a) => a.artist.externalIds?.spotify?.[0]).filter((s): s is string => !!s),
 				);
 				let count = 0;
 				for (const id of currentIds) {
@@ -345,10 +315,7 @@ export class StatsFmProvider implements StatsProvider {
 				if (hr >= 0 && hr < 24) hourlyDistribution[hr] = val.count;
 			}
 		}
-		const peakHour = hourlyDistribution.reduce(
-			(maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx),
-			0,
-		);
+		const peakHour = hourlyDistribution.reduce((maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx), 0);
 
 		// weekdayDistribution: 7-element array, index 0=Monday through 6=Sunday
 		// API weekDays keys: 1=Monday through 7=Sunday -> subtract 1 for zero-indexed array
@@ -356,8 +323,7 @@ export class StatsFmProvider implements StatsProvider {
 		let peakWeekday: number | undefined;
 		const hasDateData =
 			dateItems != null &&
-			(Object.keys(dateItems.hours ?? {}).length > 0 ||
-				Object.keys(dateItems.weekDays ?? {}).length > 0);
+			(Object.keys(dateItems.hours ?? {}).length > 0 || Object.keys(dateItems.weekDays ?? {}).length > 0);
 
 		if (hasDateData && dateItems?.weekDays) {
 			weekdayDistribution = new Array(7).fill(0) as number[];
@@ -365,10 +331,7 @@ export class StatsFmProvider implements StatsProvider {
 				const idx = Number(key) - 1; // 1-7 -> 0-6
 				if (idx >= 0 && idx < 7) weekdayDistribution[idx] = val.count;
 			}
-			peakWeekday = weekdayDistribution.reduce(
-				(maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx),
-				0,
-			);
+			peakWeekday = weekdayDistribution.reduce((maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx), 0);
 		}
 
 		// Map tracks
@@ -392,9 +355,7 @@ export class StatsFmProvider implements StatsProvider {
 		// Genres from stats.fm artist payload (no extra Spotify batch here)
 		const topArtists: TopArtist[] = artists.map((ta) => ({
 			rank: ta.position,
-			artistUri:
-				prefixUri(ta.artist.externalIds?.spotify?.[0], "artist") ??
-				`listening-stats:artist:${ta.artist.name}`,
+			artistUri: prefixUri(ta.artist.externalIds?.spotify?.[0], "artist") ?? `listening-stats:artist:${ta.artist.name}`,
 			artistName: ta.artist.name,
 			count: ta.streams,
 			durationMs: ta.playedMs ?? 0,
@@ -579,9 +540,7 @@ export class StatsFmProvider implements StatsProvider {
 			);
 			if (priorArtists.length > 0) {
 				const priorIds = new Set(
-					priorArtists
-						.map((a) => a.artist.externalIds?.spotify?.[0])
-						.filter((s): s is string => !!s),
+					priorArtists.map((a) => a.artist.externalIds?.spotify?.[0]).filter((s): s is string => !!s),
 				);
 				let count = 0;
 				for (const id of currentIds) {
@@ -624,8 +583,7 @@ export class StatsFmProvider implements StatsProvider {
 				topArtists = artists.map((ta) => ({
 					rank: ta.position,
 					artistUri:
-						prefixUri(ta.artist.externalIds?.spotify?.[0], "artist") ??
-						`listening-stats:artist:${ta.artist.name}`,
+						prefixUri(ta.artist.externalIds?.spotify?.[0], "artist") ?? `listening-stats:artist:${ta.artist.name}`,
 					artistName: ta.artist.name,
 					count: ta.streams,
 					durationMs: ta.playedMs ?? 0,
@@ -657,9 +615,7 @@ export class StatsFmProvider implements StatsProvider {
 			}),
 			perDayPromise.then((res) => {
 				perDayData = res.ok ? res.data : null;
-				listeningDays = perDayData?.days
-					? Object.values(perDayData.days).filter((d) => d.count > 0).length
-					: undefined;
+				listeningDays = perDayData?.days ? Object.values(perDayData.days).filter((d) => d.count > 0).length : undefined;
 				streak = perDayData?.days ? computeStreakFromDays(perDayData.days) : 0;
 				dailyPlayCounts = perDayData?.days
 					? Object.entries(perDayData.days)
@@ -700,17 +656,13 @@ export class StatsFmProvider implements StatsProvider {
 				if (hr >= 0 && hr < 24) hourlyDistribution[hr] = val.count;
 			}
 		}
-		const peakHour = hourlyDistribution.reduce(
-			(maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx),
-			0,
-		);
+		const peakHour = hourlyDistribution.reduce((maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx), 0);
 
 		let weekdayDistribution: number[] | undefined;
 		let peakWeekday: number | undefined;
 		const hasDateData =
 			dateItems != null &&
-			(Object.keys(dateItems.hours ?? {}).length > 0 ||
-				Object.keys(dateItems.weekDays ?? {}).length > 0);
+			(Object.keys(dateItems.hours ?? {}).length > 0 || Object.keys(dateItems.weekDays ?? {}).length > 0);
 
 		if (hasDateData && dateItems?.weekDays) {
 			weekdayDistribution = new Array(7).fill(0) as number[];
@@ -718,10 +670,7 @@ export class StatsFmProvider implements StatsProvider {
 				const idx = Number(k) - 1;
 				if (idx >= 0 && idx < 7) weekdayDistribution[idx] = val.count;
 			}
-			peakWeekday = weekdayDistribution.reduce(
-				(maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx),
-				0,
-			);
+			peakWeekday = weekdayDistribution.reduce((maxIdx, val, idx, arr) => (val > arr[maxIdx] ? idx : maxIdx), 0);
 		}
 
 		if (datesFailure) {

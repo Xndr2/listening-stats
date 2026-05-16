@@ -4,12 +4,7 @@ import { LOCAL_PERIODS } from "../../../shared/stats/periods";
 import { providerRegistry } from "../../../shared/stats/provider";
 import { statsCache } from "../../../shared/stats/stats-cache";
 import { db } from "../../../shared/storage/db";
-import {
-	importFileEvents,
-	type ParseResult,
-	parseJsonEvents,
-	parseV1Csv,
-} from "../../../shared/storage/import";
+import { importFileEvents, type ParseResult, parseJsonEvents, parseV1Csv } from "../../../shared/storage/import";
 import { downloadFile } from "../../utils";
 
 const { useState, useRef } = Spicetify.React;
@@ -207,10 +202,7 @@ export function DataTab({ onRefresh }: Props) {
 
 	return (
 		<div>
-			<div
-				className="settings-row"
-				style={{ flexDirection: "column", alignItems: "flex-start", gap: "12px" }}
-			>
+			<div className="settings-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "12px" }}>
 				<input
 					ref={fileInputRef}
 					type="file"
@@ -233,11 +225,7 @@ export function DataTab({ onRefresh }: Props) {
 							<div className="settings-label">Import play history</div>
 							<div className="settings-sublabel">Accepts .csv or .json from a v1 export</div>
 						</div>
-						<button
-							type="button"
-							className="btn-primary"
-							onClick={() => fileInputRef.current?.click()}
-						>
+						<button type="button" className="btn-primary" onClick={() => fileInputRef.current?.click()}>
 							Import Data
 						</button>
 					</div>
@@ -248,33 +236,23 @@ export function DataTab({ onRefresh }: Props) {
 						<span className="import-progress-label">
 							Importing... {importProgress.current} / {importProgress.total}
 						</span>
-						<progress
-							className="import-progress-bar"
-							value={importProgress.current}
-							max={importProgress.total}
-						/>
+						<progress className="import-progress-bar" value={importProgress.current} max={importProgress.total} />
 					</div>
 				)}
 
 				{importPhase === "complete" && importSummary && (
 					<div className="import-result-card">
 						<div className="import-result-row">
-							<span className="import-result-count import-result-count--success">
-								{importSummary.imported}
-							</span>
+							<span className="import-result-count import-result-count--success">{importSummary.imported}</span>
 							<span className="import-result-label">imported</span>
 						</div>
 						<div className="import-result-row">
-							<span className="import-result-count import-result-count--neutral">
-								{importSummary.skipped}
-							</span>
+							<span className="import-result-count import-result-count--neutral">{importSummary.skipped}</span>
 							<span className="import-result-label">skipped as duplicates</span>
 						</div>
 						{importSummary.errors > 0 && (
 							<div className="import-result-row">
-								<span className="import-result-count import-result-count--error">
-									{importSummary.errors}
-								</span>
+								<span className="import-result-count import-result-count--error">{importSummary.errors}</span>
 								<span className="import-result-label">errors</span>
 							</div>
 						)}
@@ -340,10 +318,7 @@ export function DataTab({ onRefresh }: Props) {
 			</div>
 
 			{/* Wipe All Data */}
-			<div
-				className="settings-row"
-				style={{ flexDirection: "column", alignItems: "flex-start", gap: "12px" }}
-			>
+			<div className="settings-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "12px" }}>
 				{!confirmWipe ? (
 					<button type="button" className="btn-destructive" onClick={() => setConfirmWipe(true)}>
 						Wipe All Data

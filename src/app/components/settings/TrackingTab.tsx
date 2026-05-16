@@ -10,9 +10,7 @@ import { EVENTS } from "../../../shared/constants/events";
 import { LS_KEYS } from "../../../shared/constants/storage-keys";
 import { SegmentedControl } from "../SegmentedControl";
 
-const THRESHOLD_STOPS = [
-	0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000,
-];
+const THRESHOLD_STOPS = [0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000];
 
 const { useState } = Spicetify.React;
 
@@ -72,11 +70,7 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 				{Toggle ? (
 					<Toggle value={paused} onSelected={handlePause} />
 				) : (
-					<input
-						type="checkbox"
-						checked={paused}
-						onChange={(e) => handlePause(e.currentTarget.checked)}
-					/>
+					<input type="checkbox" checked={paused} onChange={(e) => handlePause(e.currentTarget.checked)} />
 				)}
 			</div>
 
@@ -89,11 +83,7 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 				{Toggle ? (
 					<Toggle value={skipRepeats} onSelected={handleSkipRepeats} />
 				) : (
-					<input
-						type="checkbox"
-						checked={skipRepeats}
-						onChange={(e) => handleSkipRepeats(e.currentTarget.checked)}
-					/>
+					<input type="checkbox" checked={skipRepeats} onChange={(e) => handleSkipRepeats(e.currentTarget.checked)} />
 				)}
 			</div>
 
@@ -120,11 +110,7 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 				{Toggle ? (
 					<Toggle value={logging} onSelected={handleLogging} />
 				) : (
-					<input
-						type="checkbox"
-						checked={logging}
-						onChange={(e) => handleLogging(e.currentTarget.checked)}
-					/>
+					<input type="checkbox" checked={logging} onChange={(e) => handleLogging(e.currentTarget.checked)} />
 				)}
 			</div>
 		</div>

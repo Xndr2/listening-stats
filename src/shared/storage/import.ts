@@ -110,9 +110,7 @@ export async function parseV1Csv(text: string): Promise<ParseResult> {
 				'Import failed: this is a stats summary CSV, not a raw history export. Use "Raw History (CSV)" in v1 to get importable data.',
 			);
 		}
-		throw new Error(
-			`Import failed: unrecognized CSV format (expected v1 export). Got: "${header.slice(0, 60)}"`,
-		);
+		throw new Error(`Import failed: unrecognized CSV format (expected v1 export). Got: "${header.slice(0, 60)}"`);
 	}
 
 	const events: Omit<PlayEvent, "id">[] = [];
@@ -207,11 +205,7 @@ export async function parseJsonEvents(text: string): Promise<ParseResult> {
 
 	if (!Array.isArray(parsed)) {
 		// Detect StatsResult-shaped objects specifically
-		if (
-			typeof parsed === "object" &&
-			parsed !== null &&
-			"topTracks" in (parsed as Record<string, unknown>)
-		) {
+		if (typeof parsed === "object" && parsed !== null && "topTracks" in (parsed as Record<string, unknown>)) {
 			throw new Error("Import failed: JSON must be a raw play events array, not a stats export");
 		}
 		throw new Error("Import failed: JSON must be a raw play events array, not a stats export");

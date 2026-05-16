@@ -12,12 +12,7 @@ vi.mock("../app/world-charts-service", async (importOriginal) => {
 });
 
 import type { WorldChartResult } from "../app/world-charts-service";
-import {
-	getArtistChartsAsync,
-	getChartsAsync,
-	WORLD_ARTISTS,
-	WORLD_TRACKS,
-} from "../app/world-charts-service";
+import { getArtistChartsAsync, getChartsAsync, WORLD_ARTISTS, WORLD_TRACKS } from "../app/world-charts-service";
 import type { WorldTrack } from "../shared/types/world-charts";
 
 const getChartsAsyncMock = vi.mocked(getChartsAsync);

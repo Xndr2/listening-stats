@@ -70,10 +70,7 @@ describe("enrichArtists", () => {
 		cosmosGetMock.mockResolvedValueOnce({
 			ok: true,
 			data: {
-				artists: [
-					makeSpotifyArtist("id001", "Artist 1", []),
-					makeSpotifyArtist("id002", "Artist 2", []),
-				],
+				artists: [makeSpotifyArtist("id001", "Artist 1", []), makeSpotifyArtist("id002", "Artist 2", [])],
 			},
 		});
 
@@ -107,9 +104,7 @@ describe("enrichArtists", () => {
 		cosmosGetMock.mockResolvedValueOnce({
 			ok: true,
 			data: {
-				artists: [
-					makeSpotifyArtist("wr001", "Write Test Artist", ["indie"], "https://img.url/wr001.jpg"),
-				],
+				artists: [makeSpotifyArtist("wr001", "Write Test Artist", ["indie"], "https://img.url/wr001.jpg")],
 			},
 		});
 
@@ -127,9 +122,7 @@ describe("enrichArtists", () => {
 		cosmosGetMock.mockResolvedValueOnce({
 			ok: true,
 			data: {
-				artists: [
-					makeSpotifyArtist("rec001", "Record Artist", ["ambient"], "https://img.url/rec001.jpg"),
-				],
+				artists: [makeSpotifyArtist("rec001", "Record Artist", ["ambient"], "https://img.url/rec001.jpg")],
 			},
 		});
 

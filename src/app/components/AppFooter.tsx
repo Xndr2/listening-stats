@@ -1,9 +1,6 @@
 const { memo } = Spicetify.React;
 
-import {
-	COMMUNITY_BUYMEACOFFEE_URL,
-	COMMUNITY_DISCORD_URL,
-} from "../../shared/constants/community-links";
+import { COMMUNITY_BUYMEACOFFEE_URL, COMMUNITY_DISCORD_URL } from "../../shared/constants/community-links";
 
 interface AppFooterProps {
 	version: string;
@@ -15,12 +12,7 @@ function AppFooterInner({ version, onCheckForUpdates }: AppFooterProps) {
 		<footer className="stats-app-footer">
 			<span className="stats-app-footer-credit">Made with love by Xndr</span>
 			<span className="stats-app-footer-links" aria-label="Community links">
-				<a
-					className="stats-app-footer-link"
-					href={COMMUNITY_DISCORD_URL}
-					target="_blank"
-					rel="noopener noreferrer"
-				>
+				<a className="stats-app-footer-link" href={COMMUNITY_DISCORD_URL} target="_blank" rel="noopener noreferrer">
 					Discord
 				</a>
 				<a

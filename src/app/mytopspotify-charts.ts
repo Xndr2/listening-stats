@@ -5,8 +5,7 @@ const ARTISTS_URL = "https://mytopspotify.io/spotify-top-artists.json";
 
 const FETCH_HEADERS: Record<string, string> = {
 	Accept: "application/json",
-	"User-Agent":
-		"Mozilla/5.0 (compatible; ListeningStats/2.x; +https://github.com/Xndr2/listening-stats)",
+	"User-Agent": "Mozilla/5.0 (compatible; ListeningStats/2.x; +https://github.com/Xndr2/listening-stats)",
 };
 
 function formatMytopListeners(raw: string | undefined): string {

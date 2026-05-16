@@ -56,11 +56,7 @@ describe("classifyStatsFmError", () => {
 
 	it("preserves resetAt when provided", () => {
 		const resetAt = Date.now() + 30_000;
-		const err = classifyStatsFmError(
-			0,
-			"Circuit open  -  stats.fm temporarily unavailable",
-			resetAt,
-		);
+		const err = classifyStatsFmError(0, "Circuit open  -  stats.fm temporarily unavailable", resetAt);
 		expect(err.resetAt).toBe(resetAt);
 	});
 
@@ -72,13 +68,7 @@ describe("classifyStatsFmError", () => {
 
 describe("AppError type", () => {
 	it("has correct shape for all variants", () => {
-		const variants: AppError["variant"][] = [
-			"UserNotFound",
-			"NetworkError",
-			"ServiceDown",
-			"RateLimited",
-			"Unknown",
-		];
+		const variants: AppError["variant"][] = ["UserNotFound", "NetworkError", "ServiceDown", "RateLimited", "Unknown"];
 		for (const variant of variants) {
 			const err: AppError = { variant, message: "test", retryable: true };
 			expect(err.variant).toBe(variant);

@@ -125,9 +125,7 @@ export class TrackingFSM {
 			this._state.state = "completing";
 			const totalPlayedMs =
 				this._state.accumulatedPlayMs +
-				(this._state.isPlaying && this._state.playStartTime !== null
-					? Date.now() - this._state.playStartTime
-					: 0);
+				(this._state.isPlaying && this._state.playStartTime !== null ? Date.now() - this._state.playStartTime : 0);
 			await this._writePlayEvent(totalPlayedMs);
 		}
 
@@ -203,9 +201,7 @@ export class TrackingFSM {
 
 				const totalPlayedMs =
 					this._state.accumulatedPlayMs +
-					(this._state.isPlaying && this._state.playStartTime !== null
-						? Date.now() - this._state.playStartTime
-						: 0);
+					(this._state.isPlaying && this._state.playStartTime !== null ? Date.now() - this._state.playStartTime : 0);
 
 				// Write and re-capture async (don't await in sync handler)
 				void this._writePlayEvent(totalPlayedMs).then(() => {

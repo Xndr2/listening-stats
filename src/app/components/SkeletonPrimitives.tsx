@@ -26,13 +26,7 @@ export function SkeletonBlock({
 	);
 }
 
-export function SkeletonCircle({
-	size = 20,
-	style,
-}: {
-	size?: number;
-	style?: React.CSSProperties;
-}) {
+export function SkeletonCircle({ size = 20, style }: { size?: number; style?: React.CSSProperties }) {
 	return <SkeletonBlock width={size} height={size} radius="50%" style={style} />;
 }
 

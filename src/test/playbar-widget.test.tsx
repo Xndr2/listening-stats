@@ -5,11 +5,7 @@ import { providerRegistry } from "../shared/stats/provider";
 import { db } from "../shared/storage/db";
 import type { PlayEvent } from "../shared/types/play-event";
 
-function makePlayEvent(
-	trackUri: string,
-	startedAt: number,
-	overrides?: Partial<PlayEvent>,
-): PlayEvent {
+function makePlayEvent(trackUri: string, startedAt: number, overrides?: Partial<PlayEvent>): PlayEvent {
 	return {
 		trackUri,
 		trackName: "Test Track",
@@ -118,10 +114,7 @@ describe("PlaybarWidget", () => {
 	it("renders bubble variant when preference is set to bubble", async () => {
 		setPreference("playCountVariant", "bubble");
 		const uri = "spotify:track:abc123";
-		await db.playEvents.bulkAdd([
-			makePlayEvent(uri, Date.now() - 60000),
-			makePlayEvent(uri, Date.now()),
-		]);
+		await db.playEvents.bulkAdd([makePlayEvent(uri, Date.now() - 60000), makePlayEvent(uri, Date.now())]);
 		(Spicetify.Player as any).data = {
 			isPaused: false,
 			item: { uri, name: "Test Track", metadata: {} },
@@ -135,10 +128,7 @@ describe("PlaybarWidget", () => {
 	it("renders minimal variant when preference is set to minimal", async () => {
 		setPreference("playCountVariant", "minimal");
 		const uri = "spotify:track:abc123";
-		await db.playEvents.bulkAdd([
-			makePlayEvent(uri, Date.now() - 60000),
-			makePlayEvent(uri, Date.now()),
-		]);
+		await db.playEvents.bulkAdd([makePlayEvent(uri, Date.now() - 60000), makePlayEvent(uri, Date.now())]);
 		(Spicetify.Player as any).data = {
 			isPaused: false,
 			item: { uri, name: "Test Track", metadata: {} },
@@ -151,10 +141,7 @@ describe("PlaybarWidget", () => {
 
 	it("renders pill even when active provider is stats.fm free tier", async () => {
 		const uri = "spotify:track:abc123";
-		await db.playEvents.bulkAdd([
-			makePlayEvent(uri, Date.now() - 60000),
-			makePlayEvent(uri, Date.now()),
-		]);
+		await db.playEvents.bulkAdd([makePlayEvent(uri, Date.now() - 60000), makePlayEvent(uri, Date.now())]);
 		(Spicetify.Player as any).data = {
 			isPaused: false,
 			item: { uri, name: "Test Track", metadata: {} },
@@ -188,10 +175,7 @@ describe("PlaybarWidget", () => {
 
 	it("renders when active provider is stats.fm Plus tier", async () => {
 		const uri = "spotify:track:abc123";
-		await db.playEvents.bulkAdd([
-			makePlayEvent(uri, Date.now() - 60000),
-			makePlayEvent(uri, Date.now()),
-		]);
+		await db.playEvents.bulkAdd([makePlayEvent(uri, Date.now() - 60000), makePlayEvent(uri, Date.now())]);
 		(Spicetify.Player as any).data = {
 			isPaused: false,
 			item: { uri, name: "Test Track", metadata: {} },
@@ -241,10 +225,7 @@ describe("PlaybarWidget", () => {
 
 	it("updates when PREFS_CHANGED event fires (variant switch)", async () => {
 		const uri = "spotify:track:abc123";
-		await db.playEvents.bulkAdd([
-			makePlayEvent(uri, Date.now() - 60000),
-			makePlayEvent(uri, Date.now()),
-		]);
+		await db.playEvents.bulkAdd([makePlayEvent(uri, Date.now() - 60000), makePlayEvent(uri, Date.now())]);
 		(Spicetify.Player as any).data = {
 			isPaused: false,
 			item: { uri, name: "Test Track", metadata: {} },
@@ -268,10 +249,7 @@ describe("PlaybarWidget", () => {
 		document.body.appendChild(nowPlayingWidget);
 
 		const uri = "spotify:track:abc123";
-		await db.playEvents.bulkAdd([
-			makePlayEvent(uri, Date.now() - 60000),
-			makePlayEvent(uri, Date.now()),
-		]);
+		await db.playEvents.bulkAdd([makePlayEvent(uri, Date.now() - 60000), makePlayEvent(uri, Date.now())]);
 		(Spicetify.Player as any).data = {
 			isPaused: false,
 			item: { uri, name: "Test Track", metadata: {} },

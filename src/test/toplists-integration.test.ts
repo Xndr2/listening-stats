@@ -278,9 +278,7 @@ describe("TopLists section headings", () => {
 	it("Tracks column renders section-heading with kicker 'Most played' and title 'Tracks'", async () => {
 		const { TopLists } = await import("../app/components/TopLists");
 		const stats = makeStats({ topTracks: [makeTrack()] });
-		const { container } = render(
-			React.createElement(TopLists, { stats, loading: false, hiddenSections: [] }),
-		);
+		const { container } = render(React.createElement(TopLists, { stats, loading: false, hiddenSections: [] }));
 		const tracksCard = container.querySelector('[data-column-id="top-tracks"]');
 		expect(tracksCard).not.toBeNull();
 		const heading = tracksCard?.querySelector(".section-heading");
@@ -292,9 +290,7 @@ describe("TopLists section headings", () => {
 	it("Artists column renders section-heading with kicker 'Top' and title 'Artists'", async () => {
 		const { TopLists } = await import("../app/components/TopLists");
 		const stats = makeStats({ topArtists: [makeArtist()] });
-		const { container } = render(
-			React.createElement(TopLists, { stats, loading: false, hiddenSections: [] }),
-		);
+		const { container } = render(React.createElement(TopLists, { stats, loading: false, hiddenSections: [] }));
 		const artistsCard = container.querySelector('[data-column-id="top-artists"]');
 		expect(artistsCard).not.toBeNull();
 		const heading = artistsCard?.querySelector(".section-heading");
@@ -318,9 +314,7 @@ describe("TopLists section headings", () => {
 				},
 			],
 		});
-		const { container } = render(
-			React.createElement(TopLists, { stats, loading: false, hiddenSections: [] }),
-		);
+		const { container } = render(React.createElement(TopLists, { stats, loading: false, hiddenSections: [] }));
 		const albumsCard = container.querySelector('[data-column-id="top-albums"]');
 		expect(albumsCard).not.toBeNull();
 		const heading = albumsCard?.querySelector(".section-heading");
