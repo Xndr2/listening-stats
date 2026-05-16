@@ -46,9 +46,7 @@ const LASTFM_ERROR_MESSAGES: Record<string, string> = {
 
 export function ProvidersTab() {
 	const [username, setUsername] = useState("");
-	const [phase, setPhase] = useState<ConnectPhase>(() =>
-		readStatsFmConfig() ? "connected" : "idle",
-	);
+	const [phase, setPhase] = useState<ConnectPhase>(() => (readStatsFmConfig() ? "connected" : "idle"));
 	const [config, setConfig] = useState<StatsFmConfig | null>(() => readStatsFmConfig());
 	const [connectError, setConnectError] = useState<string | null>(null);
 	const [revalidating, setRevalidating] = useState(false);
@@ -67,9 +65,7 @@ export function ProvidersTab() {
 
 		const result = await validateUsername(username.trim());
 		if (!result.valid) {
-			setConnectError(
-				ERROR_MESSAGES[result.reason] ?? "Connection failed. Check the console for details.",
-			);
+			setConnectError(ERROR_MESSAGES[result.reason] ?? "Connection failed. Check the console for details.");
 			setPhase("error");
 			return;
 		}
@@ -110,9 +106,7 @@ export function ProvidersTab() {
 
 		const result = await validateUsername(config.username);
 		if (!result.valid) {
-			setRevalidateError(
-				ERROR_MESSAGES[result.reason] ?? "Validation failed. Check the console for details.",
-			);
+			setRevalidateError(ERROR_MESSAGES[result.reason] ?? "Validation failed. Check the console for details.");
 			setRevalidating(false);
 			return;
 		}
@@ -191,19 +185,13 @@ export function ProvidersTab() {
 							if (activeProviderId !== p.id) handleProviderSwitch(p.id);
 						}}
 						style={
-							p.id === "statsfm" && !hasStatsFmConfig
-								? { opacity: 0.5, pointerEvents: "none" as const }
-								: undefined
+							p.id === "statsfm" && !hasStatsFmConfig ? { opacity: 0.5, pointerEvents: "none" as const } : undefined
 						}
 					>
 						<div>
-							<div className="settings-label">
-								{p.id === "local" ? "Local Tracking" : "stats.fm"}
-							</div>
+							<div className="settings-label">{p.id === "local" ? "Local Tracking" : "stats.fm"}</div>
 							<div className="settings-sublabel">
-								{p.id === "local"
-									? "Stats tracked directly on this device"
-									: "Import stats from your stats.fm account"}
+								{p.id === "local" ? "Stats tracked directly on this device" : "Import stats from your stats.fm account"}
 							</div>
 						</div>
 					</div>
@@ -266,9 +254,7 @@ export function ProvidersTab() {
 						<span style={{ color: "var(--spice-text)", fontWeight: 700 }}>{config.username}</span>
 						<span className={`tier-badge ${tierClass}`}>{tierLabel}</span>
 					</div>
-					<div className="settings-sublabel">
-						Connected since {new Date(config.connectedAt).toLocaleDateString()}
-					</div>
+					<div className="settings-sublabel">Connected since {new Date(config.connectedAt).toLocaleDateString()}</div>
 					<div
 						style={{
 							display: "flex",

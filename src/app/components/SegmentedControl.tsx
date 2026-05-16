@@ -7,13 +7,7 @@ interface SegmentedControlProps {
 	labelAt?: number[];
 }
 
-export function SegmentedControl({
-	stops,
-	value,
-	onSelect,
-	formatLabel,
-	labelAt,
-}: SegmentedControlProps) {
+export function SegmentedControl({ stops, value, onSelect, formatLabel, labelAt }: SegmentedControlProps) {
 	const selectedIndex = Math.max(0, stops.indexOf(value));
 	const stopWidthPct = 100 / stops.length;
 	const indicatorStyle = {

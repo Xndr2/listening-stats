@@ -1,16 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-	getActivityMode,
-	getOverviewTilesForProvider,
-	getSectionsForProvider,
-} from "../app/capabilities";
-import {
-	COLUMN_IDS,
-	getPreferences,
-	OVERVIEW_CARD_IDS,
-	SECTION_IDS,
-	setPreference,
-} from "../app/preferences";
+import { getActivityMode, getOverviewTilesForProvider, getSectionsForProvider } from "../app/capabilities";
+import { COLUMN_IDS, getPreferences, OVERVIEW_CARD_IDS, SECTION_IDS, setPreference } from "../app/preferences";
 import type { ProviderCapabilities } from "../shared/stats/provider";
 
 const localCaps: ProviderCapabilities = {
@@ -107,29 +97,20 @@ describe("Preference migration/compat  -  pre-redesign preferences survive in re
 
 	it("v2.5 prefs with custom sectionOrder survive redesign", () => {
 		const customOrder = ["recently-played", "overview", "top-genres", "top-lists", "activity"];
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ sectionOrder: customOrder }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ sectionOrder: customOrder }));
 		const prefs = getPreferences();
 		expect(prefs.sectionOrder).toEqual([...customOrder, "consistency"]);
 	});
 
 	it("v2.5 prefs with custom columnOrder survive redesign", () => {
 		const customOrder = ["top-albums", "top-artists", "top-tracks"];
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ columnOrder: customOrder }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ columnOrder: customOrder }));
 		const prefs = getPreferences();
 		expect(prefs.columnOrder).toEqual(customOrder);
 	});
 
 	it("v2.5 prefs with hidden sections interact correctly with capability filtering", () => {
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ hiddenSections: ["top-genres", "activity"] }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ hiddenSections: ["top-genres", "activity"] }));
 		const prefs = getPreferences();
 		const localSections = getSectionsForProvider(localCaps);
 		const visibleSections = prefs.sectionOrder.filter(
@@ -143,15 +124,7 @@ describe("Preference migration/compat  -  pre-redesign preferences survive in re
 	});
 
 	it("v2.5 prefs with custom overviewOrder survive redesign", () => {
-		const customLocal = [
-			"est-payout",
-			"tracks",
-			"unique-artists",
-			"streak",
-			"new-artists",
-			"peak-hour",
-			"skip-rate",
-		];
+		const customLocal = ["est-payout", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "skip-rate"];
 		const customStatsfm = ["top-genre", "unique-artists", "new-artists", "est-payout"];
 		localStorage.setItem(
 			"listening-stats:preferences",
@@ -163,13 +136,7 @@ describe("Preference migration/compat  -  pre-redesign preferences survive in re
 	});
 
 	it("prefs written via setPreference then read back are stable across round-trip", () => {
-		setPreference("sectionOrder", [
-			"top-lists",
-			"overview",
-			"recently-played",
-			"top-genres",
-			"activity",
-		]);
+		setPreference("sectionOrder", ["top-lists", "overview", "recently-played", "top-genres", "activity"]);
 		setPreference("hiddenSections", ["overview"]);
 		setPreference("use24HourTime", true);
 		const prefs = getPreferences();
@@ -197,15 +164,7 @@ describe("Preference migration/compat  -  capability + prefs integration for pro
 	});
 
 	it("switching from local to statsfm: overviewOrder.statsfm is independent of local", () => {
-		const customLocal = [
-			"skip-rate",
-			"tracks",
-			"unique-artists",
-			"streak",
-			"new-artists",
-			"peak-hour",
-			"est-payout",
-		];
+		const customLocal = ["skip-rate", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "est-payout"];
 		setPreference("overviewOrder", {
 			local: customLocal,
 			statsfm: [...OVERVIEW_CARD_IDS.statsfm],
@@ -227,9 +186,7 @@ describe("Preference migration/compat  -  capability + prefs integration for pro
 		const prefs = getPreferences();
 		const sections = getSectionsForProvider(statsfmFreeCaps);
 		const sectionIds = new Set(sections.map((s) => s.id));
-		const visible = prefs.sectionOrder.filter(
-			(id) => sectionIds.has(id) && !prefs.hiddenSections.includes(id),
-		);
+		const visible = prefs.sectionOrder.filter((id) => sectionIds.has(id) && !prefs.hiddenSections.includes(id));
 		expect(visible).toContain("overview");
 		expect(visible).toContain("top-lists");
 		expect(visible).toContain("recently-played");

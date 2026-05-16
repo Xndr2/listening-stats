@@ -43,9 +43,7 @@ describe("useSettingsSortable", () => {
 		const onReorder = vi.fn();
 		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		act(() => {
 			window.dispatchEvent(new PointerEvent("pointermove", { clientX: 0, clientY: 5 }));
@@ -58,9 +56,7 @@ describe("useSettingsSortable", () => {
 		const onReorder = vi.fn();
 		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		act(() => {
 			window.dispatchEvent(new PointerEvent("pointermove", { clientX: 0, clientY: 10 }));
@@ -73,9 +69,7 @@ describe("useSettingsSortable", () => {
 		const onReorder = vi.fn();
 		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		act(() => {
 			window.dispatchEvent(new PointerEvent("pointermove", { clientX: 0, clientY: 20 }));
@@ -99,9 +93,7 @@ describe("useSettingsSortable", () => {
 		});
 		// Start drag
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 50, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 50, clientY: 0 }));
 		});
 		// Move 10px to activate drag, pointer at y=50 (in item b's range)
 		act(() => {
@@ -134,9 +126,7 @@ describe("useSettingsSortable", () => {
 		});
 		// Start drag
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 20 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 20 }));
 		});
 		// Move 10px to activate, pointer at x=50 (in b range)
 		act(() => {
@@ -158,13 +148,9 @@ describe("useSettingsSortable", () => {
 
 	it("applies translate3d on Y axis when orientation='vertical'", () => {
 		const onReorder = vi.fn();
-		const { result } = renderHook(() =>
-			useSettingsSortable({ order: ["a", "b"], onReorder, orientation: "vertical" }),
-		);
+		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b"], onReorder, orientation: "vertical" }));
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		act(() => {
 			window.dispatchEvent(new PointerEvent("pointermove", { clientX: 5, clientY: 20 }));
@@ -181,9 +167,7 @@ describe("useSettingsSortable", () => {
 			useSettingsSortable({ order: ["a", "b"], onReorder, orientation: "horizontal" }),
 		);
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		act(() => {
 			window.dispatchEvent(new PointerEvent("pointermove", { clientX: 20, clientY: 5 }));
@@ -203,9 +187,7 @@ describe("useSettingsSortable", () => {
 		});
 		// Start drag on "a"
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		// Move to activate + position over slot 2 (pointer y=90 → > c's midline at 100? no, 90<100 so slot 2)
 		act(() => {
@@ -231,9 +213,7 @@ describe("useSettingsSortable", () => {
 		});
 		// Drag "a" but keep pointer in slot 0 (y < a midline 20)
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		act(() => {
 			window.dispatchEvent(new PointerEvent("pointermove", { clientX: 0, clientY: 10 }));
@@ -249,9 +229,7 @@ describe("useSettingsSortable", () => {
 		const onReorder = vi.fn();
 		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		act(() => {
 			window.dispatchEvent(new PointerEvent("pointermove", { clientX: 0, clientY: 10 }));
@@ -269,9 +247,7 @@ describe("useSettingsSortable", () => {
 		const onReorder = vi.fn();
 		const { result } = renderHook(() => useSettingsSortable({ order: ["a", "b", "c"], onReorder }));
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		act(() => {
 			window.dispatchEvent(new PointerEvent("pointermove", { clientX: 0, clientY: 10 }));
@@ -290,9 +266,7 @@ describe("useSettingsSortable", () => {
 		const { result } = renderHook(() => useSettingsSortable({ order: ["b", "c"], onReorder }));
 		// Try to start drag with "a" which is NOT in order
 		act(() => {
-			result.current.onItemPointerDown("a")(
-				new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }),
-			);
+			result.current.onItemPointerDown("a")(new PointerEvent("pointerdown", { clientX: 0, clientY: 0 }));
 		});
 		act(() => {
 			window.dispatchEvent(new PointerEvent("pointermove", { clientX: 0, clientY: 20 }));
@@ -304,15 +278,7 @@ describe("useSettingsSortable", () => {
 
 	it("grid orientation handles seven-tile overview order arrays", () => {
 		const onReorder = vi.fn();
-		const sevenIds = [
-			"tracks",
-			"unique-artists",
-			"streak",
-			"new-artists",
-			"peak-hour",
-			"skip-rate",
-			"est-payout",
-		];
+		const sevenIds = ["tracks", "unique-artists", "streak", "new-artists", "peak-hour", "skip-rate", "est-payout"];
 		const { result } = renderHook(() =>
 			useSettingsSortable({
 				order: sevenIds,
@@ -341,9 +307,7 @@ describe("useSettingsSortable", () => {
 
 		// Begin a drag on est-payout (last tile).
 		act(() => {
-			result.current.onItemPointerDown("est-payout")(
-				new PointerEvent("pointerdown", { clientX: 270, clientY: 70 }),
-			);
+			result.current.onItemPointerDown("est-payout")(new PointerEvent("pointerdown", { clientX: 270, clientY: 70 }));
 		});
 
 		// Move pointer to the first row, first tile area.

@@ -1,8 +1,4 @@
-import {
-	GITHUB_API_REPO_BASE,
-	GITHUB_DIST_META_URL,
-	JSDELIVR_DIST_META_URL,
-} from "../constants/github-repo";
+import { GITHUB_API_REPO_BASE, GITHUB_DIST_META_URL, JSDELIVR_DIST_META_URL } from "../constants/github-repo";
 
 export interface ResolvedRelease {
 	tag: string;
@@ -65,9 +61,7 @@ function firstReleaseWithZip(list: ReleasePayload[] | null): ReleasePayload | un
  * - **Beta (Prereleases on):** Newest GitHub release that ships `listening-stats.zip` (includes prereleases),
  *   then fallbacks above if needed.
  */
-export async function resolvePublishedRelease(
-	receiveBetaUpdates: boolean,
-): Promise<ResolvedRelease | null> {
+export async function resolvePublishedRelease(receiveBetaUpdates: boolean): Promise<ResolvedRelease | null> {
 	if (receiveBetaUpdates) {
 		const list = await fetchGitHubJson<ReleasePayload[]>("/releases?per_page=15");
 		const picked = firstReleaseWithZip(list ?? null);
@@ -80,9 +74,7 @@ export async function resolvePublishedRelease(
 		}
 	}
 
-	const latest = await fetchGitHubJson<{ tag_name?: string; prerelease?: boolean }>(
-		"/releases/latest",
-	);
+	const latest = await fetchGitHubJson<{ tag_name?: string; prerelease?: boolean }>("/releases/latest");
 	if (latest?.tag_name) {
 		return {
 			tag: latest.tag_name,

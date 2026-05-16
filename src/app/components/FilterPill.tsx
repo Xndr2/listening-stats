@@ -21,19 +21,10 @@ export function FilterPill({ activeGenre, onClear }: FilterPillProps) {
 
 	return (
 		<div className="filter-pill">
-			<span
-				className="filter-pill-icon"
-				aria-hidden="true"
-				dangerouslySetInnerHTML={{ __html: FilterIcon }}
-			/>
+			<span className="filter-pill-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: FilterIcon }} />
 			<span>Filtering by</span>
 			<strong className="filter-pill-genre">{activeGenre}</strong>
-			<button
-				className="filter-pill-close"
-				type="button"
-				onClick={onClear}
-				aria-label="Clear genre filter"
-			>
+			<button className="filter-pill-close" type="button" onClick={onClear} aria-label="Clear genre filter">
 				×
 			</button>
 		</div>

@@ -195,39 +195,21 @@ describe("renderShareCardBlob (Canvas 2D pipeline)", () => {
 
 	it("produces a PNG blob", async () => {
 		const { renderShareCardBlob } = await import("../app/components/ShareModal");
-		const blob = await renderShareCardBlob(
-			makeMockStats(),
-			"top5",
-			"square",
-			"Last 4 weeks",
-			"testuser",
-		);
+		const blob = await renderShareCardBlob(makeMockStats(), "top5", "square", "Last 4 weeks", "testuser");
 		expect(blob).toBeInstanceOf(Blob);
 		expect(blob.type).toBe("image/png");
 	});
 
 	it("creates canvas with correct dimensions for square", async () => {
 		const { renderShareCardCanvas } = await import("../app/components/ShareModal");
-		const canvas = await renderShareCardCanvas(
-			makeMockStats(),
-			"top5",
-			"square",
-			"Last 4 weeks",
-			"",
-		);
+		const canvas = await renderShareCardCanvas(makeMockStats(), "top5", "square", "Last 4 weeks", "");
 		expect(canvas.width).toBe(1080);
 		expect(canvas.height).toBe(1080);
 	});
 
 	it("creates canvas with correct dimensions for story", async () => {
 		const { renderShareCardCanvas } = await import("../app/components/ShareModal");
-		const canvas = await renderShareCardCanvas(
-			makeMockStats(),
-			"top5",
-			"story",
-			"Last 4 weeks",
-			"",
-		);
+		const canvas = await renderShareCardCanvas(makeMockStats(), "top5", "story", "Last 4 weeks", "");
 		expect(canvas.width).toBe(1080);
 		expect(canvas.height).toBe(1920);
 	});
@@ -244,13 +226,7 @@ describe("renderShareCardBlob (Canvas 2D pipeline)", () => {
 
 	it("renders wrapped variant in story size without error", async () => {
 		const { renderShareCardBlob } = await import("../app/components/ShareModal");
-		const blob = await renderShareCardBlob(
-			makeMockStats(),
-			"wrapped",
-			"story",
-			"Last 4 weeks",
-			"testuser",
-		);
+		const blob = await renderShareCardBlob(makeMockStats(), "wrapped", "story", "Last 4 weeks", "testuser");
 		expect(blob).toBeInstanceOf(Blob);
 	});
 
@@ -302,13 +278,11 @@ describe("exportShareCardPng", () => {
 
 		const clickSpy = vi.fn();
 		const origCE = document.createElement.bind(document);
-		vi.spyOn(document, "createElement").mockImplementation(
-			(tag: string, opts?: ElementCreationOptions) => {
-				const node = origCE.call(document, tag, opts);
-				if (tag === "a") vi.spyOn(node, "click").mockImplementation(clickSpy);
-				return node;
-			},
-		);
+		vi.spyOn(document, "createElement").mockImplementation((tag: string, opts?: ElementCreationOptions) => {
+			const node = origCE.call(document, tag, opts);
+			if (tag === "a") vi.spyOn(node, "click").mockImplementation(clickSpy);
+			return node;
+		});
 
 		await exportShareCardPng(makeMockStats(), "top5", "square", "Last 4 weeks", "");
 
@@ -359,9 +333,9 @@ describe("copyShareCardToClipboard", () => {
 			configurable: true,
 		});
 
-		await expect(
-			copyShareCardToClipboard(makeMockStats(), "top5", "square", "Last 4 weeks", ""),
-		).rejects.toThrow("Clipboard API not available");
+		await expect(copyShareCardToClipboard(makeMockStats(), "top5", "square", "Last 4 weeks", "")).rejects.toThrow(
+			"Clipboard API not available",
+		);
 	});
 });
 
@@ -432,13 +406,11 @@ describe("shareOrDownload", () => {
 
 		const clickSpy = vi.fn();
 		const origCE = document.createElement.bind(document);
-		vi.spyOn(document, "createElement").mockImplementation(
-			(tag: string, opts?: ElementCreationOptions) => {
-				const node = origCE.call(document, tag, opts);
-				if (tag === "a") vi.spyOn(node, "click").mockImplementation(clickSpy);
-				return node;
-			},
-		);
+		vi.spyOn(document, "createElement").mockImplementation((tag: string, opts?: ElementCreationOptions) => {
+			const node = origCE.call(document, tag, opts);
+			if (tag === "a") vi.spyOn(node, "click").mockImplementation(clickSpy);
+			return node;
+		});
 
 		const blob = new Blob(["png"], { type: "image/png" });
 		const result = await shareOrDownload(blob);
@@ -495,9 +467,7 @@ describe("ShareModal busy state", () => {
 		);
 
 		const copyBtn = document.querySelector<HTMLButtonElement>("[data-testid='share-copy-btn']");
-		const downloadBtn = document.querySelector<HTMLButtonElement>(
-			"[data-testid='share-download-btn']",
-		);
+		const downloadBtn = document.querySelector<HTMLButtonElement>("[data-testid='share-download-btn']");
 		expect(copyBtn).toBeTruthy();
 		expect(downloadBtn).toBeTruthy();
 		expect(copyBtn?.disabled).toBe(false);
@@ -555,9 +525,7 @@ describe("ShareModal busy state", () => {
 			container,
 		);
 
-		const downloadBtn = document.querySelector<HTMLButtonElement>(
-			"[data-testid='share-download-btn']",
-		);
+		const downloadBtn = document.querySelector<HTMLButtonElement>("[data-testid='share-download-btn']");
 		downloadBtn?.click();
 
 		await vi.waitFor(() => {

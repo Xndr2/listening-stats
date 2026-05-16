@@ -20,12 +20,7 @@ export function RecentlyPlayed({ recentPlays = [], loading = false }: RecentlyPl
 				{loading
 					? Array.from({ length: 6 }).map((_, i) => (
 							<div key={i} className="recently-played-item" aria-hidden="true">
-								<SkeletonBlock
-									className="recently-played-skeleton-art"
-									width={132}
-									height={132}
-									radius={6}
-								/>
+								<SkeletonBlock className="recently-played-skeleton-art" width={132} height={132} radius={6} />
 								<SkeletonBlock
 									className="recently-played-skeleton-text"
 									width={100}

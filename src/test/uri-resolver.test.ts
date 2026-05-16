@@ -201,9 +201,7 @@ describe("resolveImportedUris", () => {
 		const event2 = events.find((e) => e.trackUri === "listening-stats:track:uri2");
 		expect(event2).toBeDefined();
 		// Second event was never resolved (circuit stopped it)
-		expect(
-			event2?.resolvedAt === null || event2?.resolvedAt === undefined || event2?.resolvedAt === 0,
-		).toBe(true);
+		expect(event2?.resolvedAt === null || event2?.resolvedAt === undefined || event2?.resolvedAt === 0).toBe(true);
 	});
 
 	it("Test 5 (batch update - same synthetic URI): 3 events same URI results in 1 search, all updated", async () => {
@@ -386,8 +384,6 @@ describe("resolveImportedUris", () => {
 		await resolveImportedUris({ delayMs: 0 });
 
 		// Verify cosmosGet was called with encoded URL
-		expect(cosmosGetMock).toHaveBeenCalledWith(
-			expect.stringContaining(encodeURIComponent("Don't Stop Me Now")),
-		);
+		expect(cosmosGetMock).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent("Don't Stop Me Now")));
 	});
 });

@@ -11,24 +11,8 @@ function getThisWeekBoundaries(): PeriodBoundaries {
 	const now = new Date();
 	const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon ... 6=Sat
 	const daysFromMonday = (dayOfWeek + 6) % 7; // Mon=0, Tue=1, ..., Sun=6 (ISO 8601)
-	const monday = new Date(
-		now.getFullYear(),
-		now.getMonth(),
-		now.getDate() - daysFromMonday,
-		0,
-		0,
-		0,
-		0,
-	);
-	const nextMonday = new Date(
-		monday.getFullYear(),
-		monday.getMonth(),
-		monday.getDate() + 7,
-		0,
-		0,
-		0,
-		0,
-	);
+	const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysFromMonday, 0, 0, 0, 0);
+	const nextMonday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7, 0, 0, 0, 0);
 	return { start: monday.getTime(), end: nextMonday.getTime() };
 }
 

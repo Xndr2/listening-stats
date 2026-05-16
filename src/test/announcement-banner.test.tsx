@@ -83,9 +83,7 @@ describe("AnnouncementBanner", () => {
 				}),
 				container,
 			);
-			const dismissBtn = container.querySelector(
-				".announcement-banner-dismiss",
-			) as HTMLButtonElement;
+			const dismissBtn = container.querySelector(".announcement-banner-dismiss") as HTMLButtonElement;
 			expect(dismissBtn).not.toBeNull();
 			dismissBtn.click();
 			expect(onDismiss).toHaveBeenCalledTimes(1);

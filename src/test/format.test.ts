@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	formatDuration,
-	formatEstimatedPayout,
-	formatHour,
-	formatRelativeTime,
-} from "../app/format";
+import { formatDuration, formatEstimatedPayout, formatHour, formatRelativeTime } from "../app/format";
 
 describe("formatDuration", () => {
 	it("returns '<1 min' for durations under 1 minute", () => {

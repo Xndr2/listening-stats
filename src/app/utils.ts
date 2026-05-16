@@ -15,11 +15,7 @@ export function downloadFile(content: string, filename: string, mimeType: string
 	URL.revokeObjectURL(url);
 }
 
-export function downloadBufferAsFile(
-	buffer: ArrayBuffer,
-	filename: string,
-	mimeType = "application/zip",
-): void {
+export function downloadBufferAsFile(buffer: ArrayBuffer, filename: string, mimeType = "application/zip"): void {
 	const blob = new Blob([buffer], { type: mimeType });
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement("a");

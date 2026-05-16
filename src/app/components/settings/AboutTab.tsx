@@ -11,12 +11,7 @@ interface AboutTabProps {
 	onReceiveBetaUpdatesChanged?: () => void;
 }
 
-export function AboutTab({
-	version,
-	onOpenUpdates,
-	onPrefsChanged,
-	onReceiveBetaUpdatesChanged,
-}: AboutTabProps) {
+export function AboutTab({ version, onOpenUpdates, onPrefsChanged, onReceiveBetaUpdatesChanged }: AboutTabProps) {
 	const Toggle = Spicetify.ReactComponent.Toggle;
 	const prefs = getPreferences();
 
@@ -43,8 +38,7 @@ export function AboutTab({
 				<div>
 					<div className="settings-label">Prereleases</div>
 					<div className="settings-sublabel">
-						Same setting as in the updates window - affects version checks and which install command
-						is copied there.
+						Same setting as in the updates window - affects version checks and which install command is copied there.
 					</div>
 				</div>
 				{Toggle ? (
@@ -59,26 +53,16 @@ export function AboutTab({
 			</div>
 
 			<p className="settings-about-short-lead">
-				Changelog, install commands, and release checks are in <strong>Check for updates</strong>{" "}
-				(footer or below).
+				Changelog, install commands, and release checks are in <strong>Check for updates</strong> (footer or below).
 			</p>
 
-			<button
-				type="button"
-				className="btn-secondary settings-about-check-updates"
-				onClick={onOpenUpdates}
-			>
+			<button type="button" className="btn-secondary settings-about-check-updates" onClick={onOpenUpdates}>
 				Check for updates…
 			</button>
 
 			<p className="settings-about-hint">
 				Source:{" "}
-				<a
-					className="settings-inline-link"
-					href={GITHUB_REPO_WEB_URL}
-					target="_blank"
-					rel="noopener noreferrer"
-				>
+				<a className="settings-inline-link" href={GITHUB_REPO_WEB_URL} target="_blank" rel="noopener noreferrer">
 					{GITHUB_REPO_WEB_URL.replace("https://", "")}
 				</a>
 			</p>

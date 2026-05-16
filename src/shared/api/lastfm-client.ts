@@ -9,9 +9,7 @@ const COUNTRY_MAP: Record<string, string> = {
 	jp: "japan",
 };
 
-export type LastfmResult =
-	| { ok: true; data: WorldTrack[] }
-	| { ok: false; status: number; message: string };
+export type LastfmResult = { ok: true; data: WorldTrack[] } | { ok: false; status: number; message: string };
 
 interface LastfmRawTrack {
 	name: string;
@@ -94,11 +92,7 @@ async function fetchChart(
 	}
 }
 
-export async function lastfmGetCharts(
-	scope: WorldScope,
-	_window: WorldWindow,
-	apiKey: string,
-): Promise<LastfmResult> {
+export async function lastfmGetCharts(scope: WorldScope, _window: WorldWindow, apiKey: string): Promise<LastfmResult> {
 	return fetchChart(scope, apiKey, "chart.gettoptracks", "geo.gettoptracks", (json) => {
 		const raw = json?.tracks as { track?: unknown } | undefined;
 		return mapTracks(Array.isArray(raw?.track) ? raw.track : []);
@@ -132,9 +126,7 @@ export function classifyLastfmError(status: number, message: string, resetAt?: n
 	return { variant: "Unknown", message, retryable: true };
 }
 
-export type LastfmValidation =
-	| { valid: true }
-	| { valid: false; reason: "invalid_key" | "network" };
+export type LastfmValidation = { valid: true } | { valid: false; reason: "invalid_key" | "network" };
 
 export async function validateLastfmKey(apiKey: string): Promise<LastfmValidation> {
 	const result = await lastfmGetCharts("world", "today", apiKey);

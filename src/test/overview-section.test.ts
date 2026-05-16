@@ -47,10 +47,7 @@ function renderOverview(stats: StatsResult, activePeriod: Period = mockPeriods[0
 	// shared `container` (set up in each describe's beforeEach).
 	return async (container: HTMLElement) => {
 		const OverviewSection = (await import("../app/components/OverviewSection")).default;
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(OverviewSection, { stats, activePeriod }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(OverviewSection, { stats, activePeriod }), container);
 	};
 }
 
@@ -283,14 +280,7 @@ describe("OverviewSection grid topology", () => {
 		await renderOverview({ ...baseStats, streak: 3, newArtistCount: 5 })(container);
 		const cards = container.querySelectorAll("[data-card-id]");
 		const ids = Array.from(cards).map((c) => c.getAttribute("data-card-id"));
-		expect(ids).toEqual([
-			"tracks",
-			"unique-artists",
-			"new-artists",
-			"peak-hour",
-			"skip-rate",
-			"est-payout",
-		]);
+		expect(ids).toEqual(["tracks", "unique-artists", "new-artists", "peak-hour", "skip-rate", "est-payout"]);
 	});
 });
 
@@ -313,17 +303,8 @@ describe("OverviewSection tiles by provider", () => {
 	it("Local provider with 6 IDs and newArtistCount defined renders all 6 tiles in default order", async () => {
 		setActiveProvider("local");
 		await renderOverview({ ...baseStats, streak: 3, newArtistCount: 5 })(container);
-		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) =>
-			c.getAttribute("data-card-id"),
-		);
-		expect(ids).toEqual([
-			"tracks",
-			"unique-artists",
-			"new-artists",
-			"peak-hour",
-			"skip-rate",
-			"est-payout",
-		]);
+		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) => c.getAttribute("data-card-id"));
+		expect(ids).toEqual(["tracks", "unique-artists", "new-artists", "peak-hour", "skip-rate", "est-payout"]);
 	});
 
 	it("stats.fm provider renders top-genre in place of peak-hour, hides tracks and skip-rate", async () => {
@@ -334,9 +315,7 @@ describe("OverviewSection tiles by provider", () => {
 			newArtistCount: 5,
 			topGenres: [{ rank: 1, genre: "indie rock", count: 42 } as any],
 		})(container);
-		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) =>
-			c.getAttribute("data-card-id"),
-		);
+		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) => c.getAttribute("data-card-id"));
 		expect(ids).toEqual(["unique-artists", "new-artists", "top-genre", "est-payout"]);
 		expect(ids).not.toContain("tracks");
 		expect(ids).not.toContain("peak-hour");
@@ -403,20 +382,11 @@ describe("OverviewSection ordering and hide prefs", () => {
 
 	it("respects custom overviewOrder.local  -  cards rendered in user's stored order", async () => {
 		setPreference("overviewOrder", {
-			local: [
-				"est-payout",
-				"tracks",
-				"unique-artists",
-				"new-artists",
-				"peak-hour",
-				"skip-rate",
-			],
+			local: ["est-payout", "tracks", "unique-artists", "new-artists", "peak-hour", "skip-rate"],
 			statsfm: ["top-genre", "unique-artists", "new-artists", "est-payout"],
 		});
 		await renderOverview({ ...baseStats, streak: 3, newArtistCount: 5 })(container);
-		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) =>
-			c.getAttribute("data-card-id"),
-		);
+		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) => c.getAttribute("data-card-id"));
 		expect(ids[0]).toBe("est-payout");
 		expect(ids[1]).toBe("tracks");
 	});

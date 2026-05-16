@@ -171,13 +171,7 @@ describe("Visible Sections drag-reorder persists sectionOrder + PREFS_CHANGED", 
 
 		const stored = JSON.parse(localStorage.getItem("listening-stats:preferences") ?? "{}");
 		expect(stored.sectionOrder).toBeDefined();
-		expect(stored.sectionOrder).not.toEqual([
-			"overview",
-			"top-genres",
-			"top-lists",
-			"activity",
-			"recently-played",
-		]);
+		expect(stored.sectionOrder).not.toEqual(["overview", "top-genres", "top-lists", "activity", "recently-played"]);
 		expect(stored.sectionOrder.indexOf("overview")).toBeGreaterThan(0); // overview moved down
 		expect(prefsChangedFired).toBeGreaterThanOrEqual(1);
 		expect(onPrefsChanged).toHaveBeenCalled();
@@ -219,15 +213,7 @@ describe("Visible Sections drag-reorder persists sectionOrder + PREFS_CHANGED", 
 		]);
 		setPreference("columnOrder", ["top-albums", "top-tracks", "top-artists"]);
 		setPreference("overviewOrder", {
-			local: [
-				"skip-rate",
-				"tracks",
-				"unique-artists",
-				"streak",
-				"new-artists",
-				"peak-hour",
-				"est-payout",
-			],
+			local: ["skip-rate", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "est-payout"],
 			statsfm: ["est-payout", "top-genre", "new-artists", "unique-artists"],
 		});
 
@@ -256,12 +242,7 @@ describe("Visible Sections drag-reorder persists sectionOrder + PREFS_CHANGED", 
 			"skip-rate",
 			"est-payout",
 		]);
-		expect(prefs.overviewOrder.statsfm).toEqual([
-			"unique-artists",
-			"new-artists",
-			"top-genre",
-			"est-payout",
-		]);
+		expect(prefs.overviewOrder.statsfm).toEqual(["unique-artists", "new-artists", "top-genre", "est-payout"]);
 	});
 
 	it("undo reset layout restores previous layout customization", () => {
@@ -385,9 +366,7 @@ describe("Top Lists Columns grid in DisplayTab", () => {
 
 		// The subsection wrapper should have opacity 0.4 and pointerEvents none
 		// Find by the data attribute we'll add on the wrapper
-		const subsection = document.querySelector<HTMLElement>(
-			'[data-testid="top-lists-columns-subsection"]',
-		);
+		const subsection = document.querySelector<HTMLElement>('[data-testid="top-lists-columns-subsection"]');
 		expect(subsection).not.toBeNull();
 		expect(subsection?.style.opacity).toBe("0.4");
 		expect(subsection?.style.pointerEvents).toBe("none");
@@ -550,20 +529,10 @@ describe("Overview Details grid in DisplayTab", () => {
 
 	it("renders 7 overview tiles split into top 4 (2x2) + bottom 3 (1x3) for local provider", () => {
 		renderFn(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: () => {} }));
-		const tiles = document.querySelectorAll<HTMLElement>(
-			"[data-tile-id]:not([data-tile-id^='top-'])",
-		);
+		const tiles = document.querySelectorAll<HTMLElement>("[data-tile-id]:not([data-tile-id^='top-'])");
 		expect(tiles.length).toBe(7);
 		const ids = Array.from(tiles).map((t) => t.getAttribute("data-tile-id"));
-		expect(ids).toEqual([
-			"tracks",
-			"unique-artists",
-			"streak",
-			"new-artists",
-			"peak-hour",
-			"skip-rate",
-			"est-payout",
-		]);
+		expect(ids).toEqual(["tracks", "unique-artists", "streak", "new-artists", "peak-hour", "skip-rate", "est-payout"]);
 	});
 
 	it("local provider settings shows hero placeholder + 2x2 top grid + 1x3 bottom row", () => {

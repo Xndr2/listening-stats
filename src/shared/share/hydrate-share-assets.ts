@@ -138,9 +138,7 @@ async function hydrateAlbumArtForTracks(tracks: TopTrack[]): Promise<void> {
 }
 
 async function hydrateAlbumArtFromTracksApi(tracks: TopTrack[]): Promise<void> {
-	const need = tracks.filter(
-		(t) => (!t.albumArt || !String(t.albumArt).trim()) && spotifyTrackId(t.trackUri),
-	);
+	const need = tracks.filter((t) => (!t.albumArt || !String(t.albumArt).trim()) && spotifyTrackId(t.trackUri));
 	if (need.length === 0) return;
 
 	const idToTracks = new Map<string, TopTrack[]>();

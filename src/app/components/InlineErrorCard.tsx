@@ -79,9 +79,7 @@ export function InlineErrorCard({ error, onRetry, onOpenSettings }: InlineErrorC
 				<div className="inline-error-title">{config.title}</div>
 				<div className="inline-error-body">{config.body}</div>
 				{error.resetAt !== undefined && countdown > 0 && (
-					<div className="inline-error-countdown">
-						retry in 0:{countdown.toString().padStart(2, "0")}
-					</div>
+					<div className="inline-error-countdown">retry in 0:{countdown.toString().padStart(2, "0")}</div>
 				)}
 			</div>
 			{config.cta && (

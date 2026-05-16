@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	getActivityMode,
-	getOverviewTilesForProvider,
-	getSectionsForProvider,
-} from "../app/capabilities";
+import { getActivityMode, getOverviewTilesForProvider, getSectionsForProvider } from "../app/capabilities";
 import type { ProviderCapabilities } from "../shared/stats/provider";
 
 const localCaps: ProviderCapabilities = {
@@ -37,14 +33,7 @@ describe("getSectionsForProvider", () => {
 	it("returns all 6 sections for local provider", () => {
 		const sections = getSectionsForProvider(localCaps);
 		const ids = sections.map((s) => s.id);
-		expect(ids).toEqual([
-			"overview",
-			"top-genres",
-			"top-lists",
-			"activity",
-			"consistency",
-			"recently-played",
-		]);
+		expect(ids).toEqual(["overview", "top-genres", "top-lists", "activity", "consistency", "recently-played"]);
 	});
 
 	it("includes activity section for stats.fm Plus (activity data available)", () => {

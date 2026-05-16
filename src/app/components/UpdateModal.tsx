@@ -61,9 +61,7 @@ export function UpdateModal({
 	const copiedTimerRef = useRef<number | null>(null);
 
 	const bashCmd = receiveBetaUpdates ? INSTALL_COMMAND_BASH_PRERELEASE : INSTALL_COMMAND_BASH;
-	const psCmd = receiveBetaUpdates
-		? INSTALL_COMMAND_POWERSHELL_PRERELEASE
-		: INSTALL_COMMAND_POWERSHELL;
+	const psCmd = receiveBetaUpdates ? INSTALL_COMMAND_POWERSHELL_PRERELEASE : INSTALL_COMMAND_POWERSHELL;
 
 	useEffect(() => {
 		if (!open) return;
@@ -111,9 +109,7 @@ export function UpdateModal({
 					setCopiedWhich(null);
 					copiedTimerRef.current = null;
 				}, 2500);
-				Spicetify.showNotification(
-					which === "bash" ? "Copied (macOS / Linux)." : "Copied (Windows).",
-				);
+				Spicetify.showNotification(which === "bash" ? "Copied (macOS / Linux)." : "Copied (Windows).");
 			} else {
 				Spicetify.showNotification("Could not copy.", true);
 			}
@@ -125,8 +121,7 @@ export function UpdateModal({
 
 	if (!open) return null;
 
-	const changelogHtml =
-		changelogMd !== null ? markdownLiteToHtml(changelogMd.slice(0, 120_000)) : "";
+	const changelogHtml = changelogMd !== null ? markdownLiteToHtml(changelogMd.slice(0, 120_000)) : "";
 
 	const metaMissing = updateInfo != null && updateInfo.remoteTag === null;
 	const statusLine =
@@ -224,12 +219,7 @@ export function UpdateModal({
 				</div>
 
 				<p className="settings-about-hint update-modal-repo-hint">
-					<a
-						className="settings-inline-link"
-						href={GITHUB_REPO_WEB_URL}
-						target="_blank"
-						rel="noopener noreferrer"
-					>
+					<a className="settings-inline-link" href={GITHUB_REPO_WEB_URL} target="_blank" rel="noopener noreferrer">
 						GitHub
 					</a>
 					{" · "}
@@ -245,10 +235,7 @@ export function UpdateModal({
 
 				<h3 className="update-modal-changelog-title">Changelog</h3>
 				{changelogErr ? <p className="update-modal-changelog-error">{changelogErr}</p> : null}
-				<div
-					className="update-modal-changelog markdown-lite"
-					dangerouslySetInnerHTML={{ __html: changelogHtml }}
-				/>
+				<div className="update-modal-changelog markdown-lite" dangerouslySetInnerHTML={{ __html: changelogHtml }} />
 			</div>
 		</div>,
 		document.body,

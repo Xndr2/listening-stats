@@ -30,12 +30,7 @@ const LOCAL_TILES: readonly string[] = [
 	"est-payout",
 ];
 
-const STATSFM_TILES: readonly string[] = [
-	"unique-artists",
-	"new-artists",
-	"top-genre",
-	"est-payout",
-];
+const STATSFM_TILES: readonly string[] = ["unique-artists", "new-artists", "top-genre", "est-payout"];
 
 const TILE_LABELS: Record<string, string> = {
 	tracks: "Tracks",
@@ -63,10 +58,7 @@ function isTileAvailable(tileId: string, caps: ProviderCapabilities): boolean {
 	return true;
 }
 
-export function getOverviewTilesForProvider(
-	providerId: string,
-	caps: ProviderCapabilities,
-): TileConfig[] {
+export function getOverviewTilesForProvider(providerId: string, caps: ProviderCapabilities): TileConfig[] {
 	const tileIds = providerId === "local" ? LOCAL_TILES : STATSFM_TILES;
 	return tileIds.map((id) => ({
 		id,

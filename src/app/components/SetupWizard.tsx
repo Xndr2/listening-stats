@@ -69,20 +69,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 						<div className="wizard-provider-cards">
 							<button type="button" className="wizard-provider-card" onClick={completeLocal}>
 								<div className="wizard-provider-name">Local Tracking</div>
-								<div className="wizard-provider-desc">
-									Stats tracked on this device. No account required.
-								</div>
+								<div className="wizard-provider-desc">Stats tracked on this device. No account required.</div>
 								<div className="wizard-provider-cta">Start with Local</div>
 							</button>
-							<button
-								type="button"
-								className="wizard-provider-card"
-								onClick={() => setStep("statsfm")}
-							>
+							<button type="button" className="wizard-provider-card" onClick={() => setStep("statsfm")}>
 								<div className="wizard-provider-name">stats.fm</div>
-								<div className="wizard-provider-desc">
-									Import your listening history from your stats.fm profile.
-								</div>
+								<div className="wizard-provider-desc">Import your listening history from your stats.fm profile.</div>
 								<div className="wizard-provider-cta">Use stats.fm</div>
 							</button>
 						</div>
@@ -90,9 +82,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 				) : (
 					<>
 						<h2 className="wizard-title">Connect stats.fm</h2>
-						<p className="wizard-subtitle">
-							Use your stats.fm customId. Your profile must be public for this to work.
-						</p>
+						<p className="wizard-subtitle">Use your stats.fm customId. Your profile must be public for this to work.</p>
 						<div className="provider-status-card wizard-statsfm-help">
 							<div className="settings-label">How to find your customId</div>
 							<div className="settings-sublabel">

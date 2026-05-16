@@ -23,9 +23,7 @@ interface TrackPlayInfo {
 
 function useNowPlayingCount(): TrackPlayInfo | null {
 	const [info, setInfo] = useState<TrackPlayInfo | null>(null);
-	const [trackUri, setTrackUri] = useState<string | null>(
-		() => Spicetify.Player.data?.item?.uri ?? null,
-	);
+	const [trackUri, setTrackUri] = useState<string | null>(() => Spicetify.Player.data?.item?.uri ?? null);
 	const [reloadKey, setReloadKey] = useState(0);
 
 	const lookupCount = useCallback(async (uri: string) => {
@@ -46,8 +44,7 @@ function useNowPlayingCount(): TrackPlayInfo | null {
 					let periodStreams: number | null = null;
 					let periodLabel: string | null = null;
 					if (prefs.playCountShowPeriodStreams) {
-						const supported =
-							providerRegistry.getActive()?.getSupportedPeriods() ?? STATSFM_PERIODS;
+						const supported = providerRegistry.getActive()?.getSupportedPeriods() ?? STATSFM_PERIODS;
 						if (supported.length > 0) {
 							const period = restorePeriodForProvider("statsfm", supported);
 							periodLabel = period.label;

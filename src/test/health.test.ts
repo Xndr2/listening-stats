@@ -100,8 +100,7 @@ describe("HealthIndicator", () => {
 			health.recordSuccess("Track");
 			const calls = dispatchSpy.mock.calls;
 			const healthEvent = calls.find(
-				(c: [Event]) =>
-					c[0] instanceof CustomEvent && c[0].type === "listening-stats:health-changed",
+				(c: [Event]) => c[0] instanceof CustomEvent && c[0].type === "listening-stats:health-changed",
 			);
 			expect(healthEvent).toBeDefined();
 			const event = healthEvent?.[0] as CustomEvent | undefined;
@@ -112,8 +111,7 @@ describe("HealthIndicator", () => {
 			health.recordFailure("error");
 			const calls = dispatchSpy.mock.calls;
 			const healthEvent = calls.find(
-				(c: [Event]) =>
-					c[0] instanceof CustomEvent && c[0].type === "listening-stats:health-changed",
+				(c: [Event]) => c[0] instanceof CustomEvent && c[0].type === "listening-stats:health-changed",
 			);
 			expect(healthEvent).toBeDefined();
 			const event = healthEvent?.[0] as CustomEvent | undefined;

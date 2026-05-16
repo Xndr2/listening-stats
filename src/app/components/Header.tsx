@@ -28,9 +28,7 @@ export function getLocalHealthColor(health: HealthPayload | null): "green" | "ye
 	return "red";
 }
 
-export function getStatsFmHealthColor(
-	health: StatsFmHealthPayload | null,
-): "green" | "yellow" | "red" {
+export function getStatsFmHealthColor(health: StatsFmHealthPayload | null): "green" | "yellow" | "red" {
 	if (!health || health.lastSuccessAt === null) return "red";
 	if (health.circuitOpen) return "red";
 	if (health.lastError !== null) return "red";
@@ -67,14 +65,12 @@ export function buildStatsFmTooltip(health: StatsFmHealthPayload | null): string
 	if (!health || health.lastFetchAt === null) return "No data fetched yet";
 	if (health.circuitOpen) return "stats.fm unavailable: circuit open";
 	if (health.lastError !== null) {
-		const msg =
-			health.lastError.length > 60 ? `${health.lastError.slice(0, 60)}…` : health.lastError;
+		const msg = health.lastError.length > 60 ? `${health.lastError.slice(0, 60)}…` : health.lastError;
 		return `API error: ${msg}`;
 	}
 	if (health.lastSuccessAt === null) return "No data fetched yet";
 	const refreshIn = Math.max(0, STATSFM_REFRESH_WINDOW_MS - (Date.now() - health.lastSuccessAt));
-	const refreshSuffix =
-		refreshIn > 0 ? ` · refresh in ${formatMsRemaining(refreshIn)}` : " · refresh due now";
+	const refreshSuffix = refreshIn > 0 ? ` · refresh in ${formatMsRemaining(refreshIn)}` : " · refresh due now";
 	const ageMin = (Date.now() - health.lastSuccessAt) / 60_000;
 	if (ageMin < 1) return `API healthy, just refreshed${refreshSuffix}`;
 	if (ageMin < 60) return `API healthy, refreshed ${Math.floor(ageMin)}m ago${refreshSuffix}`;
@@ -168,8 +164,7 @@ export default function Header({
 	}, [activeProviderId]);
 
 	const healthColor = getHealthColor(activeProviderId, health, sfmHealth);
-	const tooltipText =
-		activeProviderId === "statsfm" ? buildStatsFmTooltip(sfmHealth) : buildLocalTooltip(health);
+	const tooltipText = activeProviderId === "statsfm" ? buildStatsFmTooltip(sfmHealth) : buildLocalTooltip(health);
 
 	return (
 		<header className="stats-header">
@@ -183,9 +178,7 @@ export default function Header({
 								aria-label={`Health: ${healthColor} - ${tooltipText}`}
 							/>
 							<span className="header-provider-name">{providerName}</span>
-							{capabilities?.tier === "plus" && (
-								<span className="tier-badge tier-badge--plus">Plus</span>
-							)}
+							{capabilities?.tier === "plus" && <span className="tier-badge tier-badge--plus">Plus</span>}
 						</div>
 					</Spicetify.ReactComponent.TooltipWrapper>
 				</div>
@@ -193,11 +186,7 @@ export default function Header({
 			<div className="stats-header-right">
 				{periods && activePeriod && onPeriodChange && (
 					<div data-tour-target="period">
-						<PeriodTabs
-							periods={periods}
-							activePeriod={activePeriod}
-							onPeriodChange={onPeriodChange}
-						/>
+						<PeriodTabs periods={periods} activePeriod={activePeriod} onPeriodChange={onPeriodChange} />
 					</div>
 				)}
 				{onShareClick && (

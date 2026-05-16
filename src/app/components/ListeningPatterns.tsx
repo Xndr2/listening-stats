@@ -5,15 +5,7 @@ import { getPreferences } from "../preferences";
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAYS = Array.from({ length: 7 }, (_, i) => i);
 const WEEKDAYS_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const WEEKDAYS_FULL = [
-	"Monday",
-	"Tuesday",
-	"Wednesday",
-	"Thursday",
-	"Friday",
-	"Saturday",
-	"Sunday",
-];
+const WEEKDAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 interface ListeningPatternsProps {
 	hourlyDistribution: number[];
@@ -91,10 +83,7 @@ function renderHourlyChart(hourlyDistribution: number[], peakHour: number, use24
 							label={`${formatHour(hr, use24h)}: ${val} plays`}
 							placement="top"
 						>
-							<div
-								className={`activity-bar${isPeak ? " peak" : ""}`}
-								style={{ height: `${heightPct}%` }}
-							/>
+							<div className={`activity-bar${isPeak ? " peak" : ""}`} style={{ height: `${heightPct}%` }} />
 						</Spicetify.ReactComponent.TooltipWrapper>
 					);
 				})}
@@ -125,10 +114,7 @@ function renderWeekdayChart(weekdayDistribution: number[], peakWeekday: number) 
 							label={`${WEEKDAYS_FULL[day]}: ${val} plays`}
 							placement="top"
 						>
-							<div
-								className={`activity-bar${isPeak ? " peak" : ""}`}
-								style={{ height: `${heightPct}%` }}
-							/>
+							<div className={`activity-bar${isPeak ? " peak" : ""}`} style={{ height: `${heightPct}%` }} />
 						</Spicetify.ReactComponent.TooltipWrapper>
 					);
 				})}

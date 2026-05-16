@@ -181,9 +181,7 @@ describe("TrackingFSM", () => {
 			nowSpy.mockRestore();
 			// Now change song  -  should write with type='play'
 			await fsm2.handleSongChange(makePlayerData({ uri: "spotify:track:B", durationMs: 180000 }));
-			expect(
-				(deps.addPlayEvent as ReturnType<typeof vi.fn>).mock.calls.length,
-			).toBeGreaterThanOrEqual(0);
+			expect((deps.addPlayEvent as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(0);
 		});
 
 		it("classifies as 'skip' when totalPlayedMs < threshold and durationMs > threshold", async () => {
@@ -197,14 +195,10 @@ describe("TrackingFSM", () => {
 				getPlayThreshold: vi.fn(() => 30000),
 			});
 			// Start tracking with durationMs = 180000 (> threshold)
-			await fsmSkip.handleSongChange(
-				makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }),
-			);
+			await fsmSkip.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }));
 			// Don't accumulate any play time  -  immediately change song
 			// Total played will be very small (< 30s)
-			await fsmSkip.handleSongChange(
-				makePlayerData({ uri: "spotify:track:B", durationMs: 180000 }),
-			);
+			await fsmSkip.handleSongChange(makePlayerData({ uri: "spotify:track:B", durationMs: 180000 }));
 			// The event was written  -  check it was a skip (total played is near 0ms)
 			expect(capturedType).toBe("skip");
 		});
@@ -313,16 +307,12 @@ describe("TrackingFSM", () => {
 			const skipFsm = new TrackingFSM(skipDeps);
 
 			// Play track A twice
-			await skipFsm.handleSongChange(
-				makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }),
-			);
+			await skipFsm.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }));
 			// Make it look like a play (wait long enough or advance time)
 			const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 35000);
 			skipFsm.handlePlayPause(true); // bank 35s
 			spy.mockRestore();
-			await skipFsm.handleSongChange(
-				makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }),
-			); // same track
+			await skipFsm.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 })); // same track
 			// First play writes
 			expect(skipDeps.addPlayEvent as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
 
@@ -330,9 +320,7 @@ describe("TrackingFSM", () => {
 			const spy2 = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 35000);
 			skipFsm.handlePlayPause(true);
 			spy2.mockRestore();
-			await skipFsm.handleSongChange(
-				makePlayerData({ uri: "spotify:track:B", durationMs: 180000 }),
-			);
+			await skipFsm.handleSongChange(makePlayerData({ uri: "spotify:track:B", durationMs: 180000 }));
 			// Second consecutive write for track A should be suppressed
 			// (if lastRecordedUri === track:A and same URI again is attempted)
 			// In this case track A -> track A suppresses on second write attempt

@@ -88,11 +88,6 @@ declare namespace Spicetify {
 		function post(url: string, body?: Body, headers?: Record<string, string>): Promise<unknown>;
 		function put(url: string, body?: Body, headers?: Record<string, string>): Promise<unknown>;
 		function del(url: string, body?: Body, headers?: Record<string, string>): Promise<unknown>;
-		function request(
-			method: Method,
-			url: string,
-			body?: Body,
-			headers?: Record<string, string>,
-		): Promise<Response>;
+		function request(method: Method, url: string, body?: Body, headers?: Record<string, string>): Promise<Response>;
 	}
 }

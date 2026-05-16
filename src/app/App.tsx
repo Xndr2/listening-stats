@@ -8,13 +8,7 @@ import type { AppError } from "../shared/errors";
 import { classifyStatsFmError, StatsFmError } from "../shared/errors";
 import { initProviders } from "../shared/stats/init-providers";
 import { LOCAL_PERIODS, WORLD_TAB_PERIOD, WORLD_TAB_PERIOD_ID } from "../shared/stats/periods";
-import {
-	allLoading,
-	allResolved,
-	EMPTY_STATS,
-	type SectionSlots,
-	slotKeyForWave,
-} from "../shared/stats/progressive";
+import { allLoading, allResolved, EMPTY_STATS, type SectionSlots, slotKeyForWave } from "../shared/stats/progressive";
 import type { ProviderRegistry } from "../shared/stats/provider";
 import { providerRegistry } from "../shared/stats/provider";
 import {
@@ -103,9 +97,7 @@ function App() {
 	const [tourActive, setTourActive] = useState(() => shouldAutoStartTour(__VERSION__));
 	const [activePage, setActivePage] = useState<string>(() => getPreferences().activePage);
 	const [showShare, setShowShare] = useState(false);
-	const [remoteAnnouncement, setRemoteAnnouncement] = useState<ParsedRemoteAnnouncement | null>(
-		null,
-	);
+	const [remoteAnnouncement, setRemoteAnnouncement] = useState<ParsedRemoteAnnouncement | null>(null);
 	const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult | null>(null);
 	const [showUpdateModal, setShowUpdateModal] = useState(false);
 	// silent=true skips loading skeleton (used for background refresh)
@@ -135,33 +127,30 @@ function App() {
 
 			if (provider.calculateStatsProgressive) {
 				let hasWaveError = false;
-				const result = await provider.calculateStatsProgressive(
-					period,
-					(partial, wave, waveError) => {
-						if (gen !== generationRef.current) return;
-						const slotKey = slotKeyForWave(wave);
-						if ("topTracks" in partial) {
-							setListColumnLoading((prev) => ({ ...prev, tracks: false }));
-						}
-						if ("topArtists" in partial) {
-							setListColumnLoading((prev) => ({ ...prev, artists: false }));
-						}
-						if ("topAlbums" in partial) {
-							setListColumnLoading((prev) => ({ ...prev, albums: false }));
-						}
-						if ("dailyPlayCounts" in partial || "listeningDays" in partial) {
-							setSectionSlots((prev) => ({ ...prev, consistency: "resolved" }));
-						}
-						if (waveError) {
-							hasWaveError = true;
-							setSectionErrors((prev) => ({ ...prev, [slotKey]: waveError }));
-							setSectionSlots((prev) => ({ ...prev, [slotKey]: "error" }));
-						} else {
-							setStats((prev) => (prev ? { ...prev, ...partial } : { ...EMPTY_STATS, ...partial }));
-							setSectionSlots((prev) => ({ ...prev, [slotKey]: "resolved" }));
-						}
-					},
-				);
+				const result = await provider.calculateStatsProgressive(period, (partial, wave, waveError) => {
+					if (gen !== generationRef.current) return;
+					const slotKey = slotKeyForWave(wave);
+					if ("topTracks" in partial) {
+						setListColumnLoading((prev) => ({ ...prev, tracks: false }));
+					}
+					if ("topArtists" in partial) {
+						setListColumnLoading((prev) => ({ ...prev, artists: false }));
+					}
+					if ("topAlbums" in partial) {
+						setListColumnLoading((prev) => ({ ...prev, albums: false }));
+					}
+					if ("dailyPlayCounts" in partial || "listeningDays" in partial) {
+						setSectionSlots((prev) => ({ ...prev, consistency: "resolved" }));
+					}
+					if (waveError) {
+						hasWaveError = true;
+						setSectionErrors((prev) => ({ ...prev, [slotKey]: waveError }));
+						setSectionSlots((prev) => ({ ...prev, [slotKey]: "error" }));
+					} else {
+						setStats((prev) => (prev ? { ...prev, ...partial } : { ...EMPTY_STATS, ...partial }));
+						setSectionSlots((prev) => ({ ...prev, [slotKey]: "resolved" }));
+					}
+				});
 				if (gen !== generationRef.current) return;
 				// Always apply the terminal result to avoid stale/missing section holes.
 				setStats((prev) => ({ ...(prev ?? EMPTY_STATS), ...result }));
@@ -209,10 +198,7 @@ function App() {
 		initProviders().then(() => {
 			const providerPeriods = getProviderPeriods();
 			setPeriods(providerPeriods);
-			const restored = restorePeriodForProvider(
-				providerRegistry.getActiveId() ?? "local",
-				providerPeriods,
-			);
+			const restored = restorePeriodForProvider(providerRegistry.getActiveId() ?? "local", providerPeriods);
 			setActivePeriod(restored);
 			setInitialized(true);
 		});
@@ -331,9 +317,7 @@ function App() {
 		setPreference("activePage", "dashboard");
 		setActivePeriod(period);
 		savePeriodForProvider(providerRegistry.getActiveId() ?? "local", period.id);
-		window.dispatchEvent(
-			new CustomEvent(EVENTS.DASHBOARD_PERIOD_CHANGED, { detail: { periodId: period.id } }),
-		);
+		window.dispatchEvent(new CustomEvent(EVENTS.DASHBOARD_PERIOD_CHANGED, { detail: { periodId: period.id } }));
 	}, []);
 
 	const handleRefresh = useCallback(async () => {
@@ -366,8 +350,7 @@ function App() {
 	const renderSectionById = (id: string): React.ReactNode => {
 		switch (id) {
 			case "overview":
-				if (isSlotLoading("overview"))
-					return <OverviewSection loading activePeriod={activePeriod} />;
+				if (isSlotLoading("overview")) return <OverviewSection loading activePeriod={activePeriod} />;
 				if (sectionErrors.overview)
 					return (
 						<InlineErrorCard
@@ -382,13 +365,7 @@ function App() {
 				if (isSlotLoading("lists") || !stats) return null;
 				if (!capabilities?.hasGenreData) return null;
 				if (stats.topGenres.length === 0) return null;
-				return (
-					<TopGenres
-						topGenres={stats.topGenres}
-						onGenreClick={setActiveGenre}
-						activeGenre={prefs.activeGenre}
-					/>
-				);
+				return <TopGenres topGenres={stats.topGenres} onGenreClick={setActiveGenre} activeGenre={prefs.activeGenre} />;
 			case "top-lists": {
 				const listsLoading = isSlotLoading("lists");
 				if (sectionErrors.lists)
@@ -445,7 +422,7 @@ function App() {
 						peakWeekday={stats.peakWeekday ?? 0}
 						dailyPlayCounts={stats.dailyPlayCounts}
 						streak={stats.streak}
-							showStreak={showStreak}
+						showStreak={showStreak}
 					/>
 				);
 			}
@@ -498,9 +475,7 @@ function App() {
 		}
 
 		const sectionOrder = prefs.sectionOrder;
-		const visibleSections = sectionOrder.filter(
-			(id) => availableSectionIds.has(id) && !isHidden(id),
-		);
+		const visibleSections = sectionOrder.filter((id) => availableSectionIds.has(id) && !isHidden(id));
 		const loadingSections = (
 			Object.entries(sectionSlots) as Array<[keyof SectionSlots, SectionSlots[keyof SectionSlots]]>
 		)
@@ -593,9 +568,7 @@ function App() {
 							titleOnly={activeBanner.actionOpensChangelog === true}
 							actionLabel={activeBanner.actionLabel}
 							actionUrl={activeBanner.actionUrl}
-							onActionClick={
-								activeBanner.actionOpensChangelog ? () => void openUpdatesModal() : undefined
-							}
+							onActionClick={activeBanner.actionOpensChangelog ? () => void openUpdatesModal() : undefined}
 							onDismiss={handleDismissBanner}
 						/>
 					)}

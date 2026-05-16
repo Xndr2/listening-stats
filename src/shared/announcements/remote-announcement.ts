@@ -62,9 +62,7 @@ export function parseAnnouncementMarkdown(raw: string): ParsedRemoteAnnouncement
 		return {
 			dismissId: update.dismissId,
 			title: update.headline,
-			body:
-				rest.trim() ||
-				"Open the changelog in the app, or run the install script from Settings → About to update.",
+			body: rest.trim() || "Open the changelog in the app, or run the install script from Settings → About to update.",
 			actionLabel: "Changelog",
 			actionUrl: `${GITHUB_REPO_WEB_URL}/releases`,
 			actionOpensChangelog: true,
@@ -125,10 +123,7 @@ export async function fetchRemoteAnnouncement(): Promise<ParsedRemoteAnnouncemen
 				text = await res.text();
 			}
 			try {
-				sessionStorage.setItem(
-					SESSION_CACHE_KEY,
-					JSON.stringify({ t: Date.now(), text: text ?? "" }),
-				);
+				sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({ t: Date.now(), text: text ?? "" }));
 			} catch {
 				/* ignore */
 			}

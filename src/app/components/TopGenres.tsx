@@ -31,14 +31,9 @@ export function TopGenres({ topGenres, onGenreClick, activeGenre }: TopGenresPro
 								{genre.genre}
 							</button>
 							<div className="top-genres-bar-track">
-								<div
-									className={`top-genres-bar${i === 0 ? " peak" : ""}`}
-									style={{ width: `${pct}%` }}
-								/>
+								<div className={`top-genres-bar${i === 0 ? " peak" : ""}`} style={{ width: `${pct}%` }} />
 							</div>
-							<span className="top-genres-pct">
-								{Math.round((genre.count / totalCount) * 100)}%
-							</span>
+							<span className="top-genres-pct">{Math.round((genre.count / totalCount) * 100)}%</span>
 						</div>
 					);
 				})}

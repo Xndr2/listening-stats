@@ -48,9 +48,7 @@ describe("Last.fm section in ProvidersTab  -  idle state", () => {
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
 		const btns = container.querySelectorAll("button.btn-primary");
-		const testBtn = Array.from(btns).find((b) =>
-			b.textContent?.includes("Test Connection"),
-		) as HTMLButtonElement;
+		const testBtn = Array.from(btns).find((b) => b.textContent?.includes("Test Connection")) as HTMLButtonElement;
 		expect(testBtn.disabled).toBe(true);
 	});
 });
@@ -60,14 +58,10 @@ describe("Last.fm section in ProvidersTab  -  validation flow", () => {
 		validateMock.mockResolvedValue({ valid: true });
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const input = container.querySelector(
-			"input[aria-label='Last.fm API key']",
-		) as HTMLInputElement;
+		const input = container.querySelector("input[aria-label='Last.fm API key']") as HTMLInputElement;
 		fireEvent.change(input, { target: { value: "good-key-123" } });
 		const btns = container.querySelectorAll("button.btn-primary");
-		const testBtn = Array.from(btns).find((b) =>
-			b.textContent?.includes("Test Connection"),
-		) as HTMLButtonElement;
+		const testBtn = Array.from(btns).find((b) => b.textContent?.includes("Test Connection")) as HTMLButtonElement;
 		fireEvent.click(testBtn);
 		await vi.waitFor(() => {
 			const status = container.querySelector("[role='status']");
@@ -79,14 +73,10 @@ describe("Last.fm section in ProvidersTab  -  validation flow", () => {
 		validateMock.mockResolvedValue({ valid: true });
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const input = container.querySelector(
-			"input[aria-label='Last.fm API key']",
-		) as HTMLInputElement;
+		const input = container.querySelector("input[aria-label='Last.fm API key']") as HTMLInputElement;
 		fireEvent.change(input, { target: { value: "good-key-123" } });
 		const btns = container.querySelectorAll("button.btn-primary");
-		const testBtn = Array.from(btns).find((b) =>
-			b.textContent?.includes("Test Connection"),
-		) as HTMLButtonElement;
+		const testBtn = Array.from(btns).find((b) => b.textContent?.includes("Test Connection")) as HTMLButtonElement;
 		fireEvent.click(testBtn);
 		await vi.waitFor(() => {
 			expect(localStorage.getItem("listening-stats:lastfm-api-key")).toBe("good-key-123");
@@ -97,14 +87,10 @@ describe("Last.fm section in ProvidersTab  -  validation flow", () => {
 		validateMock.mockResolvedValue({ valid: false, reason: "invalid_key" });
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const input = container.querySelector(
-			"input[aria-label='Last.fm API key']",
-		) as HTMLInputElement;
+		const input = container.querySelector("input[aria-label='Last.fm API key']") as HTMLInputElement;
 		fireEvent.change(input, { target: { value: "bad-key" } });
 		const btns = container.querySelectorAll("button.btn-primary");
-		const testBtn = Array.from(btns).find((b) =>
-			b.textContent?.includes("Test Connection"),
-		) as HTMLButtonElement;
+		const testBtn = Array.from(btns).find((b) => b.textContent?.includes("Test Connection")) as HTMLButtonElement;
 		fireEvent.click(testBtn);
 		await vi.waitFor(() => {
 			const error = container.querySelector("[role='alert']");
@@ -137,9 +123,7 @@ describe("Last.fm section in ProvidersTab  -  connected state", () => {
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
 		const btns = container.querySelectorAll("button.btn-destructive");
-		const disconnectBtn = Array.from(btns).find((b) =>
-			b.textContent?.includes("Disconnect"),
-		) as HTMLButtonElement;
+		const disconnectBtn = Array.from(btns).find((b) => b.textContent?.includes("Disconnect")) as HTMLButtonElement;
 		fireEvent.click(disconnectBtn);
 		await vi.waitFor(() => {
 			expect(localStorage.getItem("listening-stats:lastfm-api-key")).toBeNull();
