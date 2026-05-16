@@ -1,19 +1,11 @@
-## [2.0.2] - 2026-05-16
+## What's Changed
 
-Big Thanks for Death_Watcher for these fixes!
+- Add streak tracking with CalendarHeatmap for stats.fm provider by @Death-Watcher in https://github.com/Xndr2/listening-stats/pull/34
+- Bugfix/statsfm null genres export by @Death-Watcher in https://github.com/Xndr2/listening-stats/pull/35
+- Increase heatmap cells, total-time font, genre bars proportional to total by @Death-Watcher in https://github.com/Xndr2/listening-stats/pull/36
 
-### Added
+## New Contributors
 
-- Streak tracking with CalenderHeatmap for statsfm provider
+- @Death-Watcher made their first contribution in https://github.com/Xndr2/listening-stats/pull/34
 
-### Changed
-
-- Heatmap cells are bigger
-- Total time font Color
-- Genre bars are now proportional to total time
-
-### Fixed
-
-- Statsfm null streams
-- Genre 0%
-- Export period issue
+**Full Changelog**: https://github.com/Xndr2/listening-stats/compare/v2.0.1...v2.0.2
