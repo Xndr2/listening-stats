@@ -60,12 +60,7 @@ export function useSettingsSortable(opts: UseSettingsSortableOptions): UseSettin
 					const el = itemElsRef.current.get(ord[i]);
 					if (!el) continue;
 					const rect = el.getBoundingClientRect();
-					if (
-						pointerX >= rect.left &&
-						pointerX <= rect.right &&
-						pointerY >= rect.top &&
-						pointerY <= rect.bottom
-					) {
+					if (pointerX >= rect.left && pointerX <= rect.right && pointerY >= rect.top && pointerY <= rect.bottom) {
 						const midX = (rect.left + rect.right) / 2;
 						return pointerX < midX ? i : i + 1;
 					}

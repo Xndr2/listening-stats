@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	getActivityMode,
-	getOverviewTilesForProvider,
-	getSectionsForProvider,
-} from "../app/capabilities";
+import { getActivityMode, getOverviewTilesForProvider, getSectionsForProvider } from "../app/capabilities";
 import type { ProviderCapabilities } from "../shared/stats/provider";
 
 const localCaps: ProviderCapabilities = {
@@ -16,7 +12,7 @@ const localCaps: ProviderCapabilities = {
 };
 
 const statsfmPlusCaps: ProviderCapabilities = {
-	hasActivityData: false,
+	hasActivityData: true,
 	hasConsistencyData: true,
 	hasGenreData: true,
 	hasStreakData: false,
@@ -25,7 +21,7 @@ const statsfmPlusCaps: ProviderCapabilities = {
 };
 
 const statsfmFreeCaps: ProviderCapabilities = {
-	hasActivityData: false,
+	hasActivityData: true,
 	hasConsistencyData: true,
 	hasGenreData: true,
 	hasStreakData: false,
@@ -37,14 +33,7 @@ describe("Provider-specific layout  -  local provider renders a complete dashboa
 	it("local provider includes all 6 sections", () => {
 		const sections = getSectionsForProvider(localCaps);
 		const ids = sections.map((s) => s.id);
-		expect(ids).toEqual([
-			"overview",
-			"top-genres",
-			"top-lists",
-			"activity",
-			"consistency",
-			"recently-played",
-		]);
+		expect(ids).toEqual(["overview", "top-genres", "top-lists", "activity", "consistency", "recently-played"]);
 		expect(ids.length).toBe(6);
 	});
 
@@ -73,18 +62,18 @@ describe("Provider-specific layout  -  local provider renders a complete dashboa
 });
 
 describe("Provider-specific layout  -  stats.fm free renders a reduced but coherent dashboard", () => {
-	it("stats.fm free excludes activity section (no activity data, not plus)", () => {
+	it("stats.fm free includes activity section (activity data available)", () => {
 		const sections = getSectionsForProvider(statsfmFreeCaps);
 		const ids = sections.map((s) => s.id);
-		expect(ids).not.toContain("activity");
+		expect(ids).toContain("activity");
 		expect(ids).toContain("consistency");
-		expect(ids.length).toBe(5);
+		expect(ids.length).toBe(6);
 	});
 
-	it("stats.fm free keeps overview, top-genres, top-lists, recently-played", () => {
+	it("stats.fm free keeps all sections including activity", () => {
 		const sections = getSectionsForProvider(statsfmFreeCaps);
 		const ids = sections.map((s) => s.id);
-		expect(ids).toEqual(["overview", "top-genres", "top-lists", "consistency", "recently-played"]);
+		expect(ids).toEqual(["overview", "top-genres", "top-lists", "activity", "consistency", "recently-played"]);
 	});
 
 	it("stats.fm free tiles include top-genre instead of peak-hour", () => {
@@ -94,7 +83,7 @@ describe("Provider-specific layout  -  stats.fm free renders a reduced but coher
 		expect(ids).not.toContain("peak-hour");
 	});
 
-	it("stats.fm free layout hides streak and skip-rate tiles", () => {
+	it("stats.fm free layout excludes streak and skip-rate", () => {
 		const tiles = getOverviewTilesForProvider("statsfm", statsfmFreeCaps);
 		const ids = tiles.map((t) => t.id);
 		expect(ids).not.toContain("streak");
@@ -111,21 +100,21 @@ describe("Provider-specific layout  -  stats.fm free renders a reduced but coher
 		expect(available).toContain("est-payout");
 	});
 
-	it("stats.fm free activity mode is 'hidden' (data not available from API)", () => {
-		expect(getActivityMode(statsfmFreeCaps)).toBe("hidden");
+	it("stats.fm free activity mode is 'full' (activity data available)", () => {
+		expect(getActivityMode(statsfmFreeCaps)).toBe("full");
 	});
 });
 
 describe("Provider-specific layout  -  stats.fm Plus renders a full dashboard with provider-specific tiles", () => {
-	it("stats.fm Plus excludes activity section (data not available from API)", () => {
+	it("stats.fm Plus includes activity section (activity data available)", () => {
 		const sections = getSectionsForProvider(statsfmPlusCaps);
 		const ids = sections.map((s) => s.id);
-		expect(ids).toEqual(["overview", "top-genres", "top-lists", "consistency", "recently-played"]);
-		expect(ids).not.toContain("activity");
+		expect(ids).toEqual(["overview", "top-genres", "top-lists", "activity", "consistency", "recently-played"]);
+		expect(ids).toContain("activity");
 	});
 
-	it("stats.fm Plus activity mode is 'hidden'", () => {
-		expect(getActivityMode(statsfmPlusCaps)).toBe("hidden");
+	it("stats.fm Plus activity mode is 'full'", () => {
+		expect(getActivityMode(statsfmPlusCaps)).toBe("full");
 	});
 
 	it("stats.fm Plus tiles include top-genre (not peak-hour)", () => {
@@ -135,7 +124,7 @@ describe("Provider-specific layout  -  stats.fm Plus renders a full dashboard wi
 		expect(ids).not.toContain("peak-hour");
 	});
 
-	it("stats.fm Plus layout hides streak tile", () => {
+	it("stats.fm Plus layout excludes streak and skip-rate", () => {
 		const tiles = getOverviewTilesForProvider("statsfm", statsfmPlusCaps);
 		const ids = tiles.map((t) => t.id);
 		expect(ids).not.toContain("streak");

@@ -38,9 +38,7 @@ export async function initTracker(): Promise<void> {
 		if (integrity.restored) {
 			health.recordSuccess("Restored from backup after external wipe");
 		} else {
-			health.recordFailure(
-				integrity.warning ?? "External data wipe detected  -  play history lost",
-			);
+			health.recordFailure(integrity.warning ?? "External data wipe detected  -  play history lost");
 		}
 	}
 
@@ -71,14 +69,11 @@ export async function initTracker(): Promise<void> {
 	registerListeners();
 
 	// If a track is already playing at init time, capture it
-	const playerData = (globalThis as unknown as { Spicetify?: { Player?: { data?: unknown } } })
-		.Spicetify?.Player?.data;
+	const playerData = (globalThis as unknown as { Spicetify?: { Player?: { data?: unknown } } }).Spicetify?.Player?.data;
 	if (playerData && (playerData as { item?: unknown }).item) {
-		fsm
-			.handleSongChange(playerData as Parameters<TrackingFSM["handleSongChange"]>[0])
-			.catch((err) => {
-				console.warn("[listening-stats] initial song capture error:", err);
-			});
+		fsm.handleSongChange(playerData as Parameters<TrackingFSM["handleSongChange"]>[0]).catch((err) => {
+			console.warn("[listening-stats] initial song capture error:", err);
+		});
 	}
 
 	// Re-register listeners if Spotify drops them
@@ -112,11 +107,9 @@ function registerListeners(): void {
 	if (!player?.addEventListener) return;
 
 	const songChangeHandler = () => {
-		fsm
-			?.handleSongChange(player.data as Parameters<TrackingFSM["handleSongChange"]>[0])
-			.catch((err) => {
-				console.warn("[listening-stats] songchange error:", err);
-			});
+		fsm?.handleSongChange(player.data as Parameters<TrackingFSM["handleSongChange"]>[0]).catch((err) => {
+			console.warn("[listening-stats] songchange error:", err);
+		});
 	};
 
 	const playPauseHandler = () => {
@@ -125,11 +118,7 @@ function registerListeners(): void {
 	};
 
 	const progressHandler = () => {
-		fsm?.handleProgress(
-			player.getProgress?.() ?? 0,
-			player.getDuration?.() ?? 0,
-			player.getRepeat?.() ?? 0,
-		);
+		fsm?.handleProgress(player.getProgress?.() ?? 0, player.getDuration?.() ?? 0, player.getRepeat?.() ?? 0);
 	};
 
 	player.addEventListener("songchange", songChangeHandler);

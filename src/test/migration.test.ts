@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as backup from "../shared/storage/backup";
 import { db, registerVersionChangeHandler } from "../shared/storage/db";
-import {
-	backupIfUpgradeNeeded,
-	initDatabase,
-	MIGRATIONS,
-} from "../shared/storage/migration-manager";
+import { backupIfUpgradeNeeded, initDatabase, MIGRATIONS } from "../shared/storage/migration-manager";
 import type { PlayEvent } from "../shared/types/play-event";
 import type { ArtistRecord } from "../shared/types/stats";
 

@@ -136,12 +136,10 @@ function setupSfmGetDispatcher(isPlus = false) {
 			return Promise.resolve({
 				ok: true,
 				data: {
-					items: {
-						hours: { 14: { count: 38, durationMs: 0 }, 15: { count: 20, durationMs: 0 } },
-						weekDays: { 1: { count: 45, durationMs: 0 }, 6: { count: 112, durationMs: 0 } },
-						months: {},
-						years: {},
-					},
+					hours: { 14: { count: 38, durationMs: 0 }, 15: { count: 20, durationMs: 0 } },
+					weekDays: { 1: { count: 45, durationMs: 0 }, 6: { count: 112, durationMs: 0 } },
+					months: {},
+					years: {},
 				},
 			});
 		}
@@ -306,9 +304,7 @@ describe("StatsFmProvider", () => {
 	describe("calculateStats()", () => {
 		it("throws Error when config is null (provider not configured)", async () => {
 			const period = STATSFM_PERIODS[0];
-			await expect(provider.calculateStats(period)).rejects.toThrow(
-				"StatsFmProvider not configured",
-			);
+			await expect(provider.calculateStats(period)).rejects.toThrow("StatsFmProvider not configured");
 		});
 
 		it("calls sfmGet for /top/tracks, /top/artists, /top/genres, /streams/stats, /streams/recent", async () => {
@@ -336,9 +332,7 @@ describe("StatsFmProvider", () => {
 			await provider.calculateStats(period);
 
 			// All calls should use range param, not after/before
-			const callWithRange = sfmGetMock.mock.calls.find(
-				(c) => c[1] && "range" in (c[1] as Record<string, string>),
-			);
+			const callWithRange = sfmGetMock.mock.calls.find((c) => c[1] && "range" in (c[1] as Record<string, string>));
 			expect(callWithRange).toBeDefined();
 			const params = callWithRange?.[1] as Record<string, string>;
 			expect(params.range).toBe("weeks");
@@ -355,9 +349,7 @@ describe("StatsFmProvider", () => {
 			const allTimePeriod = STATSFM_PERIODS[2]; // sfm-all-time
 			await provider.calculateStats(allTimePeriod);
 
-			const callWithRange = sfmGetMock.mock.calls.find(
-				(c) => c[1] && "range" in (c[1] as Record<string, string>),
-			);
+			const callWithRange = sfmGetMock.mock.calls.find((c) => c[1] && "range" in (c[1] as Record<string, string>));
 			expect(callWithRange).toBeDefined();
 			const params = callWithRange?.[1] as Record<string, string>;
 			expect(params.range).toBe("lifetime");
@@ -392,11 +384,9 @@ describe("StatsFmProvider", () => {
 					t.track.externalIds = { spotify: undefined };
 					return Promise.resolve({ ok: true, data: [t] });
 				}
-				if (path.includes("/top/artists"))
-					return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
+				if (path.includes("/top/artists")) return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
 				if (path.includes("/top/genres")) return Promise.resolve({ ok: true, data: [] });
-				if (path.includes("/streams/stats"))
-					return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
+				if (path.includes("/streams/stats")) return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
 				if (path.includes("/streams/recent")) return Promise.resolve({ ok: true, data: [] });
 				return Promise.resolve({ ok: false, status: 0, message: "skipped" });
 			});
@@ -497,13 +487,10 @@ describe("StatsFmProvider", () => {
 			track3.track.albums[0].name = "Solo Album";
 
 			sfmGetMock.mockImplementation((path: string) => {
-				if (path.includes("/top/tracks"))
-					return Promise.resolve({ ok: true, data: [track1, track2, track3] });
-				if (path.includes("/top/artists"))
-					return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
+				if (path.includes("/top/tracks")) return Promise.resolve({ ok: true, data: [track1, track2, track3] });
+				if (path.includes("/top/artists")) return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
 				if (path.includes("/top/genres")) return Promise.resolve({ ok: true, data: [] });
-				if (path.includes("/streams/stats"))
-					return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
+				if (path.includes("/streams/stats")) return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
 				if (path.includes("/streams/recent")) return Promise.resolve({ ok: true, data: [] });
 				return Promise.resolve({ ok: false, status: 0, message: "skipped" });
 			});
@@ -549,13 +536,10 @@ describe("StatsFmProvider", () => {
 			artist2.artist.genres = ["pop", "jazz"];
 
 			sfmGetMock.mockImplementation((path: string) => {
-				if (path.includes("/top/tracks"))
-					return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
-				if (path.includes("/top/artists"))
-					return Promise.resolve({ ok: true, data: [artist1, artist2] });
+				if (path.includes("/top/tracks")) return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
+				if (path.includes("/top/artists")) return Promise.resolve({ ok: true, data: [artist1, artist2] });
 				if (path.includes("/top/genres")) return Promise.resolve({ ok: true, data: [] });
-				if (path.includes("/streams/stats"))
-					return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
+				if (path.includes("/streams/stats")) return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
 				if (path.includes("/streams/recent")) return Promise.resolve({ ok: true, data: [] });
 				return Promise.resolve({ ok: false, status: 0, message: "skipped" });
 			});
@@ -604,16 +588,11 @@ describe("StatsFmProvider", () => {
 			await provider.init();
 
 			sfmGetMock.mockImplementation((path: string) => {
-				if (path.includes("/top/tracks"))
-					return Promise.resolve({ ok: false, status: 500, message: "error" });
-				if (path.includes("/top/artists"))
-					return Promise.resolve({ ok: false, status: 500, message: "error" });
-				if (path.includes("/top/genres"))
-					return Promise.resolve({ ok: false, status: 500, message: "error" });
-				if (path.includes("/streams/stats"))
-					return Promise.resolve({ ok: false, status: 500, message: "error" });
-				if (path.includes("/streams/recent"))
-					return Promise.resolve({ ok: false, status: 500, message: "error" });
+				if (path.includes("/top/tracks")) return Promise.resolve({ ok: false, status: 500, message: "error" });
+				if (path.includes("/top/artists")) return Promise.resolve({ ok: false, status: 500, message: "error" });
+				if (path.includes("/top/genres")) return Promise.resolve({ ok: false, status: 500, message: "error" });
+				if (path.includes("/streams/stats")) return Promise.resolve({ ok: false, status: 500, message: "error" });
+				if (path.includes("/streams/recent")) return Promise.resolve({ ok: false, status: 500, message: "error" });
 				return Promise.resolve({ ok: false, status: 0, message: "skipped" });
 			});
 
@@ -677,10 +656,8 @@ describe("StatsFmProvider", () => {
 					return Promise.resolve({ ok: false, status: 403, message: "Plus required" });
 				}
 				// Delegate to default dispatcher for other paths
-				if (path.includes("/top/tracks"))
-					return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
-				if (path.includes("/top/artists"))
-					return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
+				if (path.includes("/top/tracks")) return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
+				if (path.includes("/top/artists")) return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
 				if (path.includes("/top/genres"))
 					return Promise.resolve({
 						ok: true,
@@ -694,8 +671,7 @@ describe("StatsFmProvider", () => {
 							days: { "2026-03-28T00:00:00.000Z": { count: 5, durationMs: 900000 } },
 						},
 					});
-				if (path.includes("/streams/stats"))
-					return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
+				if (path.includes("/streams/stats")) return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
 				if (path.includes("/streams/recent"))
 					return Promise.resolve({
 						ok: true,
@@ -707,8 +683,7 @@ describe("StatsFmProvider", () => {
 							},
 						],
 					});
-				if (path.includes("/top/albums"))
-					return Promise.resolve({ ok: false, status: 400, message: "Free tier" });
+				if (path.includes("/top/albums")) return Promise.resolve({ ok: false, status: 400, message: "Free tier" });
 				return Promise.resolve({ ok: false, status: 404, message: "Unknown path" });
 			});
 			const result = await provider.calculateStats(STATSFM_PERIODS[0]);
@@ -718,15 +693,14 @@ describe("StatsFmProvider", () => {
 			expect(result.peakHour).toBe(0);
 		});
 
-		it("calculateStats result does not include streak field (streak is undefined)", async () => {
+		it("calculateStats result includes streak computed from per-day data", async () => {
 			setupConfig({ isPlus: false });
 			await provider.init();
 			setupSfmGetDispatcher(false);
 
 			const result = await provider.calculateStats(STATSFM_PERIODS[0]);
 
-			// stats.fm payload omits streak
-			expect(result.streak).toBeUndefined();
+			expect(result.streak).toBe(2);
 		});
 
 		it("requests prior-window /top/artists and derives newArtistCount from Spotify URI diff", async () => {
@@ -761,12 +735,8 @@ describe("StatsFmProvider", () => {
 			const result = await provider.calculateStats(allTime);
 
 			// No /top/artists call should have been made with after/before params
-			const allCalls = sfmGetMock.mock.calls.filter(([path]) =>
-				String(path).includes("/top/artists"),
-			);
-			const priorCalls = allCalls.filter(
-				([_, params]) => params && "after" in params && "before" in params,
-			);
+			const allCalls = sfmGetMock.mock.calls.filter(([path]) => String(path).includes("/top/artists"));
+			const priorCalls = allCalls.filter(([_, params]) => params && "after" in params && "before" in params);
 			expect(priorCalls.length).toBe(0);
 
 			expect(result.newArtistCount).toBe(0);
@@ -794,7 +764,7 @@ describe("StatsFmProvider", () => {
 			// No config in localStorage  -  init() leaves this.config null
 			await provider.init();
 			const info = provider.getProviderInfo();
-			expect(info.capabilities.hasActivityData).toBe(false);
+			expect(info.capabilities.hasActivityData).toBe(true);
 			expect(info.capabilities.hasGenreData).toBe(true);
 			expect(info.capabilities.hasStreakData).toBe(false);
 			expect(info.capabilities.hasSkipRate).toBe(false);
@@ -813,7 +783,7 @@ describe("StatsFmProvider", () => {
 			);
 			await provider.init();
 			const info = provider.getProviderInfo();
-			expect(info.capabilities.hasActivityData).toBe(false);
+			expect(info.capabilities.hasActivityData).toBe(true);
 			expect(info.capabilities.hasGenreData).toBe(true);
 			expect(info.capabilities.hasStreakData).toBe(false);
 			expect(info.capabilities.hasSkipRate).toBe(false);
@@ -832,7 +802,7 @@ describe("StatsFmProvider", () => {
 			);
 			await provider.init();
 			const info = provider.getProviderInfo();
-			expect(info.capabilities.hasActivityData).toBe(false);
+			expect(info.capabilities.hasActivityData).toBe(true);
 			expect(info.capabilities.hasGenreData).toBe(true);
 			expect(info.capabilities.hasStreakData).toBe(false);
 			expect(info.capabilities.hasSkipRate).toBe(false);
@@ -931,10 +901,8 @@ describe("StatsFmProvider", () => {
 				if (path.includes("/top/genres")) {
 					return Promise.resolve({ ok: false, status: 500, message: "HTTP 500" });
 				}
-				if (path.includes("/top/tracks"))
-					return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
-				if (path.includes("/top/artists"))
-					return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
+				if (path.includes("/top/tracks")) return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
+				if (path.includes("/top/artists")) return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
 				if (path.includes("/streams/stats/per-day"))
 					return Promise.resolve({
 						ok: true,
@@ -943,10 +911,9 @@ describe("StatsFmProvider", () => {
 				if (path.includes("/streams/stats/dates"))
 					return Promise.resolve({
 						ok: true,
-						data: { items: { hours: {}, weekDays: {}, months: {}, years: {} } },
+						data: { hours: {}, weekDays: {}, months: {}, years: {} },
 					});
-				if (path.includes("/streams/stats"))
-					return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
+				if (path.includes("/streams/stats")) return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
 				if (path.includes("/streams/recent")) return Promise.resolve({ ok: true, data: [] });
 				return Promise.resolve({ ok: false, status: 0, message: "skipped" });
 			});

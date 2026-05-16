@@ -15,10 +15,7 @@ describe("GenreChips component", () => {
 
 	it("renders nothing when genres is undefined", async () => {
 		const { GenreChips } = await import("../app/components/GenreChips");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(GenreChips, { genres: undefined }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(GenreChips, { genres: undefined }), container);
 		expect(container.innerHTML).toBe("");
 	});
 
@@ -30,10 +27,7 @@ describe("GenreChips component", () => {
 
 	it("does NOT emit .genre-chips wrapper when genres is undefined", async () => {
 		const { GenreChips } = await import("../app/components/GenreChips");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(GenreChips, { genres: undefined }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(GenreChips, { genres: undefined }), container);
 		expect(container.querySelector(".genre-chips")).toBeNull();
 	});
 
@@ -45,10 +39,7 @@ describe("GenreChips component", () => {
 
 	it("renders exactly 1 .genre-chip for single-genre array", async () => {
 		const { GenreChips } = await import("../app/components/GenreChips");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(GenreChips, { genres: ["pop"] }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(GenreChips, { genres: ["pop"] }), container);
 		const chips = container.querySelectorAll(".genre-chip");
 		expect(chips.length).toBe(1);
 		expect(chips[0]?.textContent).toBe("pop");
@@ -106,10 +97,7 @@ describe("GenreChips component", () => {
 
 	it("renders .genre-chips wrapper as a sibling div when chips exist", async () => {
 		const { GenreChips } = await import("../app/components/GenreChips");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(GenreChips, { genres: ["pop"] }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(GenreChips, { genres: ["pop"] }), container);
 		expect(container.querySelector(".genre-chips")).not.toBeNull();
 	});
 

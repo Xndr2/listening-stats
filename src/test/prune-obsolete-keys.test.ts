@@ -16,9 +16,7 @@ describe("pruneObsoleteKeys", () => {
 		it("no entry in OBSOLETE_KEYS appears in LS_KEYS values", () => {
 			const activeKeys = new Set<string>(Object.values(LS_KEYS));
 			for (const key of OBSOLETE_KEYS) {
-				expect(activeKeys.has(key), `OBSOLETE_KEYS contains active LS_KEY value: ${key}`).toBe(
-					false,
-				);
+				expect(activeKeys.has(key), `OBSOLETE_KEYS contains active LS_KEY value: ${key}`).toBe(false);
 			}
 		});
 
@@ -54,10 +52,7 @@ describe("pruneObsoleteKeys", () => {
 
 		it("does NOT remove active LS_KEYS values when they are set", () => {
 			// Set a sample of active keys with realistic values
-			localStorage.setItem(
-				LS_KEYS.STATSFM_CONFIG,
-				JSON.stringify({ username: "test", isPlus: true }),
-			);
+			localStorage.setItem(LS_KEYS.STATSFM_CONFIG, JSON.stringify({ username: "test", isPlus: true }));
 			localStorage.setItem(LS_KEYS.PREFERENCES, JSON.stringify({ use24HourTime: true }));
 			localStorage.setItem(LS_KEYS.ACTIVE_PROVIDER, "statsfm");
 			localStorage.setItem(LS_KEYS.PROVIDER_PERIODS, JSON.stringify({ statsfm: "sfm-weeks" }));

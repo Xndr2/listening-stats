@@ -181,9 +181,7 @@ describe("WorldChartsPage  -  click-to-search", () => {
 		const { container } = await renderAndWaitForLoad();
 		const items = container.querySelectorAll(".world-chart-item");
 		fireEvent.click(items[0]);
-		expect(Spicetify.Platform.History.push).toHaveBeenCalledWith(
-			expect.stringContaining("/search/"),
-		);
+		expect(Spicetify.Platform.History.push).toHaveBeenCalledWith(expect.stringContaining("/search/"));
 	});
 });
 

@@ -41,14 +41,7 @@ export function computeStyle(rect: TargetRect, popoverHeight: number): React.CSS
 	};
 }
 
-export function TourPopover({
-	step,
-	steps = TOUR_STEPS,
-	onNext,
-	onBack,
-	onSkip,
-	targetRect,
-}: TourPopoverProps) {
+export function TourPopover({ step, steps = TOUR_STEPS, onNext, onBack, onSkip, targetRect }: TourPopoverProps) {
 	const ref = useRef<HTMLDivElement>(null);
 	const [style, setStyle] = useState<React.CSSProperties | undefined>(undefined);
 	const currentStep = steps[step];

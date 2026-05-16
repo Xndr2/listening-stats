@@ -37,9 +37,7 @@ function OverviewHero({
 	periodKey: string;
 }) {
 	const reduce = useMemo(
-		() =>
-			typeof window.matchMedia === "function" &&
-			window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+		() => typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
 		[],
 	);
 	const [val, setVal] = useState<number>(reduce ? totalDuration : 0);
@@ -124,9 +122,7 @@ function OverviewHero({
 				>
 					{h}
 				</span>
-				<span style={{ fontSize: 24, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>
-					h
-				</span>
+				<span style={{ fontSize: 24, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>h</span>
 				<span
 					data-testid="hero-minutes"
 					style={{
@@ -138,9 +134,7 @@ function OverviewHero({
 				>
 					{m.toString().padStart(2, "0")}
 				</span>
-				<span style={{ fontSize: 18, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>
-					m
-				</span>
+				<span style={{ fontSize: 18, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>m</span>
 				{showDelta && deltaPct != null && (
 					<span
 						data-testid="hero-delta"
@@ -195,11 +189,7 @@ function OverviewSectionSkeleton() {
 	);
 }
 
-export default function OverviewSection({
-	stats,
-	activePeriod,
-	loading = false,
-}: OverviewSectionProps) {
+export default function OverviewSection({ stats, activePeriod, loading = false }: OverviewSectionProps) {
 	if (loading || !stats) return <OverviewSectionSkeleton />;
 	const prefs = getPreferences();
 	const activeId = providerRegistry.getActive()?.getProviderInfo().id ?? "local";
@@ -217,13 +207,7 @@ export default function OverviewSection({
 			value: formatNumber(stats.uniqueArtistCount),
 			tooltip: "Number of distinct artists played in the selected period",
 		},
-		streak: isStatsFm
-			? undefined
-			: {
-					value: stats.streak != null && stats.streak > 0 ? `${stats.streak}d` : "-",
-					tooltip: "Consecutive calendar days with at least one play (local timezone)",
-					accent: stats.streak != null && stats.streak > 0 ? "var(--spice-button)" : undefined,
-				},
+		streak: undefined,
 		"new-artists": {
 			value: formatNumber(stats.newArtistCount ?? 0),
 			tooltip:
@@ -251,18 +235,13 @@ export default function OverviewSection({
 			tooltip: "Your most-played genre in this period",
 		},
 		"listening-days": {
-			value:
-				stats.listeningDays != null && stats.listeningDays > 0
-					? formatNumber(stats.listeningDays)
-					: "-",
+			value: stats.listeningDays != null && stats.listeningDays > 0 ? formatNumber(stats.listeningDays) : "-",
 			tooltip: "Number of days with at least one play in the selected period",
 		},
 	};
 
 	const order = prefs.overviewOrder[providerKey];
-	const visible = order.filter(
-		(id) => statCardsById[id] !== undefined && !prefs.hiddenSections.includes(id),
-	);
+	const visible = order.filter((id) => statCardsById[id] !== undefined && !prefs.hiddenSections.includes(id));
 	const top4 = visible.slice(0, 4);
 	const bottom3 = visible.slice(4, 7);
 	const topColumns = Math.max(1, Math.min(2, top4.length));
@@ -277,10 +256,7 @@ export default function OverviewSection({
 				<div className="overview-card" data-card-id={id}>
 					<div className="overview-card-label">{label}</div>
 					<div className="overview-card-row">
-						<span
-							className="overview-card-value"
-							style={card.accent ? { color: card.accent } : undefined}
-						>
+						<span className="overview-card-value" style={card.accent ? { color: card.accent } : undefined}>
 							{card.value}
 						</span>
 						{card.sub && <span className="overview-card-sub">{card.sub}</span>}
@@ -303,10 +279,7 @@ export default function OverviewSection({
 				periodKey={activePeriod.id}
 			/>
 			{top4.length > 0 && (
-				<div
-					className="overview-right-block"
-					style={{ gridTemplateColumns: `repeat(${topColumns}, minmax(0, 1fr))` }}
-				>
+				<div className="overview-right-block" style={{ gridTemplateColumns: `repeat(${topColumns}, minmax(0, 1fr))` }}>
 					{top4.map(renderTile)}
 				</div>
 			)}

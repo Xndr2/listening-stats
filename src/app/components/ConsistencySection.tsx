@@ -12,6 +12,7 @@ interface ConsistencySectionProps {
 	totalDuration: number;
 	listeningDays?: number;
 	dailyPlayCounts?: DailyPoint[];
+	streak?: number;
 	activePeriod: Period;
 	activeProviderId?: string;
 }
@@ -21,6 +22,7 @@ interface MetricCardProps {
 	value: string | number;
 	sub: string;
 	tooltip: string;
+	accent?: boolean;
 }
 
 function ymd(ts: number): string {
@@ -36,20 +38,6 @@ function buildWindow(points: DailyPoint[], period: Period): DailyPoint[] {
 	const startDay = ymd(start);
 	const endDay = ymd(endDayTs);
 	return points.filter((p) => p.date >= startDay && p.date <= endDay);
-}
-
-function computeLongestGap(points: DailyPoint[]): number {
-	let longest = 0;
-	let current = 0;
-	for (const p of points) {
-		if (p.count > 0) {
-			current = 0;
-			continue;
-		}
-		current += 1;
-		longest = Math.max(longest, current);
-	}
-	return longest;
 }
 
 function formatDayLabel(date: string): string {
@@ -72,6 +60,7 @@ export function ConsistencySection({
 	totalDuration,
 	listeningDays,
 	dailyPlayCounts,
+	streak,
 	activePeriod,
 	activeProviderId = "statsfm",
 }: ConsistencySectionProps) {
@@ -96,11 +85,9 @@ export function ConsistencySection({
 	}
 	const points = buildWindow(dailyPlayCounts ?? [], activePeriod);
 	const totalDays = points.length;
-	const activeDays =
-		points.length > 0 ? points.filter((p) => p.count > 0).length : (listeningDays ?? 0);
+	const activeDays = points.length > 0 ? points.filter((p) => p.count > 0).length : (listeningDays ?? 0);
 	const avgPlaysPerActiveDay = activeDays > 0 ? totalPlays / activeDays : 0;
 	const avgMinutesPerActiveDay = activeDays > 0 ? totalDuration / 60000 / activeDays : 0;
-	const longestGap = computeLongestGap(points);
 	const coveragePct = totalDays > 0 ? Math.round((activeDays / totalDays) * 100) : 0;
 	const trend = points.slice(-14);
 	const trendMax = Math.max(...trend.map((p) => p.count), 1);
@@ -108,9 +95,9 @@ export function ConsistencySection({
 	const isLocalProvider = activeProviderId === "local";
 	const Tooltip = Spicetify.ReactComponent.TooltipWrapper;
 
-	const MetricCard = ({ label, value, sub, tooltip }: MetricCardProps) => (
+	const MetricCard = ({ label, value, sub, tooltip, accent }: MetricCardProps) => (
 		<Tooltip label={tooltip}>
-			<div className="consistency-metric">
+			<div className={`consistency-metric${accent ? " consistency-metric--accent" : ""}`}>
 				<div className="consistency-metric-label">{label}</div>
 				<div className="consistency-metric-value">{value}</div>
 				<div className="consistency-metric-sub">{sub}</div>
@@ -144,17 +131,15 @@ export function ConsistencySection({
 					tooltip="Average listening duration in minutes across active days."
 				/>
 				<MetricCard
-					label="Longest gap"
-					value={longestGap}
-					sub="days without plays"
-					tooltip="Longest consecutive run of days in this period without any streams."
+					label="Current streak"
+					value={streak != null && streak > 0 ? `${streak}d` : "-"}
+					sub="consecutive days"
+					tooltip="Consecutive calendar days with at least one play (local timezone)."
 				/>
 			</div>
 			{!isTodayPeriod && (
 				<div className="consistency-footer">
-					<Tooltip
-						label={`You listened on ${activeDays} of ${totalDays || activeDays} days in this period.`}
-					>
+					<Tooltip label={`You listened on ${activeDays} of ${totalDays || activeDays} days in this period.`}>
 						<div className="consistency-coverage">
 							<div className="consistency-coverage-label">Active-day coverage</div>
 							<div className="consistency-coverage-row">
@@ -205,11 +190,7 @@ export function ConsistencySection({
 									{trend.map((p) => {
 										const isPeak = p.count > 0 && p.count === trendMax;
 										return (
-											<Tooltip
-												key={p.date}
-												label={`${formatDayLabel(p.date)}: ${p.count} plays`}
-												placement="top"
-											>
+											<Tooltip key={p.date} label={`${formatDayLabel(p.date)}: ${p.count} plays`} placement="top">
 												<div className="consistency-sparkline-bar-wrap">
 													<div
 														className={`consistency-sparkline-bar${isPeak ? " peak" : ""}`}

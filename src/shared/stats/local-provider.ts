@@ -1,14 +1,6 @@
 import { db } from "../storage/db";
 import type { PlayEvent } from "../types/play-event";
-import type {
-	Period,
-	RecentPlay,
-	StatsResult,
-	TopAlbum,
-	TopArtist,
-	TopGenre,
-	TopTrack,
-} from "../types/stats";
+import type { Period, RecentPlay, StatsResult, TopAlbum, TopArtist, TopGenre, TopTrack } from "../types/stats";
 import { normalizeSpotifyImageUrl } from "../util/spotify-image-url";
 import { enrichArtists, isSpotifyArtistUri } from "./artist-enrichment";
 import { getAdjacentPeriod, getPriorPeriodBoundaries, LOCAL_PERIODS } from "./periods";
@@ -170,10 +162,7 @@ export class LocalProvider implements StatsProvider {
 				durationMs: number;
 			}
 		>();
-		const artistMap = new Map<
-			string,
-			{ name: string; uri: string; count: number; durationMs: number }
-		>();
+		const artistMap = new Map<string, { name: string; uri: string; count: number; durationMs: number }>();
 		const albumMap = new Map<
 			string,
 			{
@@ -278,8 +267,7 @@ export class LocalProvider implements StatsProvider {
 
 		const totalDuration = playEvents.reduce((sum, e) => sum + e.playedMs, 0);
 
-		const listeningDays =
-			playEvents.length > 0 ? new Set(playEvents.map((e) => toLocalDateKey(e.startedAt))).size : 0;
+		const listeningDays = playEvents.length > 0 ? new Set(playEvents.map((e) => toLocalDateKey(e.startedAt))).size : 0;
 
 		// Hourly distribution (24-element array, index = local hour)
 		const hourlyDistribution = new Array(24).fill(0) as number[];
@@ -289,8 +277,7 @@ export class LocalProvider implements StatsProvider {
 		}
 
 		// Peak hour: index of max value, or 0 if no plays
-		const peakHour =
-			playEvents.length > 0 ? hourlyDistribution.indexOf(Math.max(...hourlyDistribution)) : 0;
+		const peakHour = playEvents.length > 0 ? hourlyDistribution.indexOf(Math.max(...hourlyDistribution)) : 0;
 
 		// Weekday distribution (7-element, Mon=0 through Sun=6)
 		const weekdayDistribution = new Array(7).fill(0) as number[];
@@ -299,8 +286,7 @@ export class LocalProvider implements StatsProvider {
 			const idx = jsDay === 0 ? 6 : jsDay - 1; // -> 0=Mon..6=Sun
 			weekdayDistribution[idx]++;
 		}
-		const peakWeekday =
-			playEvents.length > 0 ? weekdayDistribution.indexOf(Math.max(...weekdayDistribution)) : 0;
+		const peakWeekday = playEvents.length > 0 ? weekdayDistribution.indexOf(Math.max(...weekdayDistribution)) : 0;
 
 		// Daily play counts for heatmap (53 weeks lookback)
 		const dailyCountMap = new Map<string, number>();
@@ -336,10 +322,7 @@ export class LocalProvider implements StatsProvider {
 			const enriched = enrichedMap.get(ta.artistUri);
 			if (enriched) {
 				ta.genres = enriched.genres;
-				ta.imageUrl =
-					normalizeSpotifyImageUrl(enriched.imageUrl ?? undefined) ??
-					enriched.imageUrl ??
-					undefined;
+				ta.imageUrl = normalizeSpotifyImageUrl(enriched.imageUrl ?? undefined) ?? enriched.imageUrl ?? undefined;
 			}
 		}
 

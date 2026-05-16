@@ -18,10 +18,7 @@ export function compareVersions(localVersion: string, remoteVersion: string): bo
 	return semver.gt(b, a);
 }
 
-export async function checkForAppUpdate(
-	localVersion: string,
-	receiveBetaUpdates: boolean,
-): Promise<UpdateCheckResult> {
+export async function checkForAppUpdate(localVersion: string, receiveBetaUpdates: boolean): Promise<UpdateCheckResult> {
 	const resolved = await resolvePublishedRelease(receiveBetaUpdates);
 	if (!resolved) {
 		return {

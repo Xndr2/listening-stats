@@ -89,8 +89,6 @@ describe("Header period tabs slot", () => {
 		expect(nonActiveTab).toBeDefined();
 		nonActiveTab?.click();
 		expect(onPeriodChange).toHaveBeenCalledTimes(1);
-		expect(onPeriodChange).toHaveBeenCalledWith(
-			expect.objectContaining({ id: expect.any(String) }),
-		);
+		expect(onPeriodChange).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String) }));
 	});
 });

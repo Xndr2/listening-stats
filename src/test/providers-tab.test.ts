@@ -52,8 +52,7 @@ async function handleConnect(username: string) {
 	const result = await validateUsername(username.trim());
 	if (!result.valid) {
 		return {
-			error:
-				ERROR_MESSAGES[result.reason] ?? "Connection failed \u2014 check the console for details",
+			error: ERROR_MESSAGES[result.reason] ?? "Connection failed \u2014 check the console for details",
 		};
 	}
 

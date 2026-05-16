@@ -564,9 +564,7 @@ describe("tracker/index integrity and versionchange wiring", () => {
 		// Invoke the captured callback  -  verifies it calls health.recordFailure
 		expect(capturedVersionChangeCallback).toBeDefined();
 		capturedVersionChangeCallback?.();
-		expect(recordFailureSpy).toHaveBeenCalledWith(
-			"DB connection closed  -  version upgrade in another tab",
-		);
+		expect(recordFailureSpy).toHaveBeenCalledWith("DB connection closed  -  version upgrade in another tab");
 	});
 
 	it("wrappedAddPlayEvent sets LAST_WRITE in localStorage on successful write", async () => {
@@ -722,8 +720,6 @@ describe("extension/index  -  init timeout (poll timeout at 30s)", () => {
 		vi.advanceTimersByTime(200);
 
 		// No timeout error
-		expect(consoleErrorSpy).not.toHaveBeenCalledWith(
-			expect.stringContaining("Player API not found"),
-		);
+		expect(consoleErrorSpy).not.toHaveBeenCalledWith(expect.stringContaining("Player API not found"));
 	});
 });

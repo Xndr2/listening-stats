@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Imports that will exist after Task 2 (GREEN phase)
-import {
-	buildCacheKey,
-	buildProviderChangedState,
-	markWizardSeen,
-	shouldShowWizard,
-} from "../app/App";
+import { buildCacheKey, buildProviderChangedState, markWizardSeen, shouldShowWizard } from "../app/App";
 import { filterOverviewCards } from "../app/components/OverviewCards";
 import { LS_KEYS } from "../shared/constants/storage-keys";
 import { providerRegistry } from "../shared/stats/provider";

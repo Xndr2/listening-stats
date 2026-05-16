@@ -33,16 +33,9 @@ function setActiveProvider(id: "local" | "statsfm"): void {
 	providerRegistry.setActive(id);
 }
 
-async function renderOverview(
-	container: HTMLElement,
-	stats: StatsResult,
-	period: Period = mockPeriod,
-) {
+async function renderOverview(container: HTMLElement, stats: StatsResult, period: Period = mockPeriod) {
 	const OverviewSection = (await import("../app/components/OverviewSection")).default;
-	Spicetify.ReactDOM.render(
-		Spicetify.React.createElement(OverviewSection, { stats, activePeriod: period }),
-		container,
-	);
+	Spicetify.ReactDOM.render(Spicetify.React.createElement(OverviewSection, { stats, activePeriod: period }), container);
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -121,14 +114,20 @@ describe("Issue 41: card reflow for missing/unavailable cards", () => {
 		localStorage.clear();
 	});
 
-	it("when newArtistCount missing, bottom row still shows three tiles (new artists defaults to 0)", async () => {
+	it("when newArtistCount missing, bottom row still shows tiles (new artists defaults to 0)", async () => {
 		await renderOverview(container, { ...baseStats, streak: 3 });
-		const bottomRow = container.querySelector<HTMLElement>(".overview-bottom-row");
-		expect(bottomRow).not.toBeNull();
-		const cards = bottomRow!.querySelectorAll(".overview-card");
-		expect(cards.length).toBe(3);
-		const cols = bottomRow?.style.gridTemplateColumns;
-		expect(cols).toContain("3");
+		const allCards = container.querySelectorAll(".overview-card");
+		expect(allCards.length).toBe(6);
+		const newArtists = container.querySelector('[data-card-id="new-artists"]');
+		expect(newArtists).not.toBeNull();
+		expect(newArtists?.querySelector(".overview-card-value")?.textContent).toBe("0");
+	});
+
+	it("hiddenSections: 'streak' excluded from rendered cards", async () => {
+		setPreference("hiddenSections", ["streak"]);
+		await renderOverview(container, { ...baseStats, streak: 3, newArtistCount: 5 });
+		const ids = Array.from(container.querySelectorAll("[data-card-id]")).map((c) => c.getAttribute("data-card-id"));
+		expect(ids).not.toContain("streak");
 	});
 
 	it("hiding a card via prefs does not leave an empty slot", async () => {
@@ -176,19 +175,13 @@ describe("Issue 41: onboarding is in-page window", () => {
 
 	it("wizard does not use role=dialog", async () => {
 		const { SetupWizard } = await import("../app/components/SetupWizard");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(SetupWizard, { onComplete: vi.fn() }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(SetupWizard, { onComplete: vi.fn() }), container);
 		expect(container.querySelector('[role="dialog"]')).toBeNull();
 	});
 
 	it("wizard does not use aria-modal", async () => {
 		const { SetupWizard } = await import("../app/components/SetupWizard");
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(SetupWizard, { onComplete: vi.fn() }),
-			container,
-		);
+		Spicetify.ReactDOM.render(Spicetify.React.createElement(SetupWizard, { onComplete: vi.fn() }), container);
 		expect(container.querySelector("[aria-modal]")).toBeNull();
 	});
 });
@@ -273,11 +266,9 @@ describe("Issue 41: no em-dash in UI values", () => {
 		localStorage.clear();
 	});
 
-	it("streak == 0 renders hyphen-minus, not em-dash", async () => {
+	it("streak tile is not rendered in overview", async () => {
 		await renderOverview(container, { ...baseStats, streak: 0, newArtistCount: 3 });
-		const streakCard = container.querySelector('[data-card-id="streak"]');
-		const value = streakCard?.querySelector(".overview-card-value");
-		expect(value?.textContent).toBe("-");
+		expect(container.querySelector('[data-card-id="streak"]')).toBeNull();
 	});
 
 	it("top-genre with empty topGenres renders hyphen-minus, not em-dash", async () => {

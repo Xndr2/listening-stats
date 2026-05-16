@@ -40,10 +40,7 @@ describe("Genre filter pill preferences", () => {
 	});
 
 	it("pre-Phase-36 stored prefs without activeGenre get null default", async () => {
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ use24HourTime: true, itemsPerSection: 10 }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ use24HourTime: true, itemsPerSection: 10 }));
 		const { getPreferences } = await import("../app/preferences");
 		expect(getPreferences().activeGenre).toBe(null);
 	});
@@ -56,17 +53,13 @@ describe("Genre filter FilterPill component", () => {
 
 	it("renders nothing when activeGenre is null", async () => {
 		const { FilterPill } = await import("../app/components/FilterPill");
-		const { container } = render(
-			React.createElement(FilterPill, { activeGenre: null, onClear: () => {} }),
-		);
+		const { container } = render(React.createElement(FilterPill, { activeGenre: null, onClear: () => {} }));
 		expect(container.querySelector(".filter-pill")).toBeNull();
 	});
 
 	it("renders pill with genre name when activeGenre is set", async () => {
 		const { FilterPill } = await import("../app/components/FilterPill");
-		const { container } = render(
-			React.createElement(FilterPill, { activeGenre: "indie folk", onClear: () => {} }),
-		);
+		const { container } = render(React.createElement(FilterPill, { activeGenre: "indie folk", onClear: () => {} }));
 		const pill = container.querySelector(".filter-pill");
 		expect(pill).not.toBeNull();
 		expect(pill?.textContent).toContain("Filtering by");
@@ -75,18 +68,14 @@ describe("Genre filter FilterPill component", () => {
 
 	it("renders filter icon inside pill", async () => {
 		const { FilterPill } = await import("../app/components/FilterPill");
-		const { container } = render(
-			React.createElement(FilterPill, { activeGenre: "rock", onClear: () => {} }),
-		);
+		const { container } = render(React.createElement(FilterPill, { activeGenre: "rock", onClear: () => {} }));
 		const icon = container.querySelector(".filter-pill-icon");
 		expect(icon).not.toBeNull();
 	});
 
 	it("renders dismiss button with × inside pill", async () => {
 		const { FilterPill } = await import("../app/components/FilterPill");
-		const { container } = render(
-			React.createElement(FilterPill, { activeGenre: "rock", onClear: () => {} }),
-		);
+		const { container } = render(React.createElement(FilterPill, { activeGenre: "rock", onClear: () => {} }));
 		const btn = container.querySelector(".filter-pill-close");
 		expect(btn).not.toBeNull();
 		expect(btn?.textContent).toBe("×");
@@ -110,9 +99,7 @@ describe("Genre filter FilterPill component", () => {
 
 	it("replaces displayed genre when activeGenre prop changes", async () => {
 		const { FilterPill } = await import("../app/components/FilterPill");
-		const { container, rerender } = render(
-			React.createElement(FilterPill, { activeGenre: "rock", onClear: () => {} }),
-		);
+		const { container, rerender } = render(React.createElement(FilterPill, { activeGenre: "rock", onClear: () => {} }));
 		expect(container.querySelector(".filter-pill")?.textContent).toContain("rock");
 		rerender(React.createElement(FilterPill, { activeGenre: "jazz", onClear: () => {} }));
 		expect(container.querySelector(".filter-pill")?.textContent).toContain("jazz");

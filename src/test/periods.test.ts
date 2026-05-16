@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	getAdjacentPeriod,
-	getPriorPeriodBoundaries,
-	LOCAL_PERIODS,
-} from "../shared/stats/periods";
+import { getAdjacentPeriod, getPriorPeriodBoundaries, LOCAL_PERIODS } from "../shared/stats/periods";
 import type { Period } from "../shared/types/stats";
 
 describe("Period boundary functions", () => {

@@ -53,10 +53,7 @@ function getDeltaDisplay(delta: number): { direction: string; indicator: string 
 	return { direction: "neutral", indicator: "-" };
 }
 
-function buildSourceLine(
-	trackSource: WorldChartDataSource,
-	artistSource: WorldChartDataSource,
-): string {
+function buildSourceLine(trackSource: WorldChartDataSource, artistSource: WorldChartDataSource): string {
 	if (trackSource === "statsfm" && artistSource === "statsfm") return "Global charts · stats.fm";
 	const bits: string[] = [];
 	bits.push(
@@ -137,8 +134,7 @@ export function WorldChartsPage() {
 		const rank = index + 1;
 		const rankCls = getRankClass(rank);
 		const deltaNum = item.delta;
-		const delta =
-			deltaNum != null ? getDeltaDisplay(deltaNum) : { direction: "neutral", indicator: "" };
+		const delta = deltaNum != null ? getDeltaDisplay(deltaNum) : { direction: "neutral", indicator: "" };
 		const query = isArtist ? item.title : `${item.title} ${item.artist}`;
 
 		const bgStyle = item.artUrl
@@ -161,18 +157,13 @@ export function WorldChartsPage() {
 				}}
 			>
 				<span className={`rank-number ${rankCls}`}>{rank}</span>
-				<div
-					className={`world-chart-tile${isArtist ? " world-chart-tile--round" : ""}`}
-					style={bgStyle}
-				/>
+				<div className={`world-chart-tile${isArtist ? " world-chart-tile--round" : ""}`} style={bgStyle} />
 				<div className="world-chart-info">
 					<div className="world-chart-title">{item.title}</div>
 					<div className="world-chart-artist">{isArtist ? item.plays : item.artist}</div>
 				</div>
 				<div className="world-chart-stats">
-					{!isArtist && item.plays?.trim() ? (
-						<div className="world-chart-plays">{item.plays}</div>
-					) : null}
+					{!isArtist && item.plays?.trim() ? <div className="world-chart-plays">{item.plays}</div> : null}
 					{deltaNum != null && delta.indicator ? (
 						<div className="world-chart-delta" data-direction={delta.direction}>
 							{delta.indicator}
@@ -192,12 +183,7 @@ export function WorldChartsPage() {
 						<h2 className="section-title">What the world is playing</h2>
 					</div>
 					<div className="world-charts-tabs">
-						<div
-							className="world-charts-tab-group"
-							data-tabs="window"
-							role="tablist"
-							aria-label="Time range"
-						>
+						<div className="world-charts-tab-group" data-tabs="window" role="tablist" aria-label="Time range">
 							{WINDOWS.map((w) => (
 								<button
 									type="button"
@@ -216,15 +202,12 @@ export function WorldChartsPage() {
 			</div>
 
 			<div className="world-page-notice" role="status">
-				World charts are new and updated often; what you see here may change as sources and layout
-				improve.
+				World charts are new and updated often; what you see here may change as sources and layout improve.
 			</div>
 
 			{loading && <WorldChartsSkeleton />}
 
-			{!loading && error && (
-				<InlineErrorCard error={error} onRetry={handleRetry} onOpenSettings={() => {}} />
-			)}
+			{!loading && error && <InlineErrorCard error={error} onRetry={handleRetry} onOpenSettings={() => {}} />}
 
 			{!loading && !error && (
 				<>
@@ -234,9 +217,7 @@ export function WorldChartsPage() {
 								<span className="section-kicker">Trending</span>
 								<h3 className="section-title">Top Tracks</h3>
 							</header>
-							<div className="world-charts-grid">
-								{tracks.slice(0, 8).map((t, i) => renderChartItem(t, i, false))}
-							</div>
+							<div className="world-charts-grid">{tracks.slice(0, 8).map((t, i) => renderChartItem(t, i, false))}</div>
 						</section>
 
 						<section className="section-card world-charts-section" data-section="artists">
@@ -244,9 +225,7 @@ export function WorldChartsPage() {
 								<span className="section-kicker">Popular</span>
 								<h3 className="section-title">Top Artists</h3>
 							</header>
-							<div className="world-charts-grid">
-								{artists.slice(0, 8).map((a, i) => renderChartItem(a, i, true))}
-							</div>
+							<div className="world-charts-grid">{artists.slice(0, 8).map((a, i) => renderChartItem(a, i, true))}</div>
 						</section>
 					</div>
 

@@ -103,10 +103,7 @@ describe("preferences", () => {
 		});
 
 		it("backfills playCountVariant default for pre-Phase-39 stored JSON", () => {
-			localStorage.setItem(
-				"listening-stats:preferences",
-				JSON.stringify({ use24HourTime: true, itemsPerSection: 10 }),
-			);
+			localStorage.setItem("listening-stats:preferences", JSON.stringify({ use24HourTime: true, itemsPerSection: 10 }));
 			const prefs = getPreferences();
 			expect(prefs.playCountVariant).toBe("pill");
 		});
@@ -122,12 +119,7 @@ describe("preferences", () => {
 
 	describe("stats.fm overview card ids", () => {
 		it("SFMC-01: OVERVIEW_CARD_IDS.statsfm canonical order (4 IDs  -  no streak/skip-rate)", () => {
-			expect(OVERVIEW_CARD_IDS.statsfm).toEqual([
-				"unique-artists",
-				"new-artists",
-				"top-genre",
-				"est-payout",
-			]);
+			expect(OVERVIEW_CARD_IDS.statsfm).toEqual(["unique-artists", "new-artists", "top-genre", "est-payout"]);
 		});
 
 		it("SFMC-01: OVERVIEW_CARD_IDS.statsfm contains est-payout (locked decision D-SFMC-01: retained)", () => {
@@ -161,12 +153,7 @@ describe("preferences", () => {
 				}),
 			);
 			const prefs = getPreferences();
-			expect(prefs.overviewOrder.statsfm).toEqual([
-				"unique-artists",
-				"est-payout",
-				"new-artists",
-				"top-genre",
-			]);
+			expect(prefs.overviewOrder.statsfm).toEqual(["unique-artists", "est-payout", "new-artists", "top-genre"]);
 			expect(prefs.overviewOrder.statsfm).not.toContain("listening-days");
 			expect(prefs.overviewOrder.statsfm).not.toContain("streak");
 			expect(prefs.overviewOrder.statsfm).not.toContain("skip-rate");
@@ -228,14 +215,7 @@ describe("preferences  -  v2.5 sectionOrder/columnOrder", () => {
 	});
 
 	it("persists sectionOrder via setPreference and round-trips", () => {
-		const custom = [
-			"recently-played",
-			"overview",
-			"top-lists",
-			"activity",
-			"top-genres",
-			"consistency",
-		];
+		const custom = ["recently-played", "overview", "top-lists", "activity", "top-genres", "consistency"];
 		setPreference("sectionOrder", custom);
 		expect(getPreferences().sectionOrder).toEqual(custom);
 	});
@@ -247,14 +227,7 @@ describe("preferences  -  v2.5 sectionOrder/columnOrder", () => {
 	});
 
 	it("preserves sectionOrder when setting an unrelated preference", () => {
-		const custom = [
-			"top-lists",
-			"overview",
-			"top-genres",
-			"activity",
-			"consistency",
-			"recently-played",
-		];
+		const custom = ["top-lists", "overview", "top-genres", "activity", "consistency", "recently-played"];
 		setPreference("sectionOrder", custom);
 		setPreference("use24HourTime", true);
 		const prefs = getPreferences();
@@ -316,26 +289,17 @@ describe("preferences hiddenSections normalization", () => {
 	});
 
 	it("PASSES THROUGH stored hiddenSections ['top-tracks'] unchanged (no collapse to ['top-lists'])", () => {
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ hiddenSections: ["top-tracks"] }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ hiddenSections: ["top-tracks"] }));
 		expect(getPreferences().hiddenSections).toEqual(["top-tracks"]);
 	});
 
 	it("PASSES THROUGH stored hiddenSections ['top-artists'] unchanged", () => {
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ hiddenSections: ["top-artists"] }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ hiddenSections: ["top-artists"] }));
 		expect(getPreferences().hiddenSections).toEqual(["top-artists"]);
 	});
 
 	it("PASSES THROUGH stored hiddenSections ['top-albums'] unchanged", () => {
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ hiddenSections: ["top-albums"] }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ hiddenSections: ["top-albums"] }));
 		expect(getPreferences().hiddenSections).toEqual(["top-albums"]);
 	});
 
@@ -365,16 +329,11 @@ describe("preferences hiddenSections normalization", () => {
 
 	it("is idempotent on already-normalized list", () => {
 		const input = ["top-lists", "top-tracks"];
-		expect(normalizeHiddenSections(normalizeHiddenSections(input))).toEqual(
-			normalizeHiddenSections(input),
-		);
+		expect(normalizeHiddenSections(normalizeHiddenSections(input))).toEqual(normalizeHiddenSections(input));
 	});
 
 	it("does NOT write to localStorage on read", () => {
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ hiddenSections: ["top-tracks"] }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ hiddenSections: ["top-tracks"] }));
 		// Read multiple times
 		getPreferences();
 		getPreferences();
@@ -404,10 +363,7 @@ describe("preferences overviewOrder", () => {
 	});
 
 	it("backfills overviewOrder for v2.4-shape stored JSON lacking the key", () => {
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ use24HourTime: true, itemsPerSection: 10 }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ use24HourTime: true, itemsPerSection: 10 }));
 		const prefs = getPreferences();
 		expect(prefs.overviewOrder.local).toEqual([...OVERVIEW_CARD_IDS.local]);
 		expect(prefs.overviewOrder.statsfm).toEqual([...OVERVIEW_CARD_IDS.statsfm]);
@@ -415,15 +371,7 @@ describe("preferences overviewOrder", () => {
 
 	it("persists overviewOrder via setPreference and round-trips", () => {
 		const custom = {
-			local: [
-				"skip-rate",
-				"tracks",
-				"unique-artists",
-				"streak",
-				"new-artists",
-				"peak-hour",
-				"est-payout",
-			],
+			local: ["skip-rate", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "est-payout"],
 			statsfm: ["est-payout", "unique-artists", "new-artists", "top-genre"],
 		};
 		setPreference("overviewOrder", custom);
@@ -434,15 +382,7 @@ describe("preferences overviewOrder", () => {
 
 	it("setPreference overviewOrder preserves both provider arrays", () => {
 		const next = {
-			local: [
-				"streak",
-				"skip-rate",
-				"tracks",
-				"unique-artists",
-				"new-artists",
-				"peak-hour",
-				"est-payout",
-			],
+			local: ["streak", "skip-rate", "tracks", "unique-artists", "new-artists", "peak-hour", "est-payout"],
 			statsfm: ["top-genre", "est-payout", "unique-artists", "new-artists"],
 		};
 		setPreference("overviewOrder", next);
@@ -475,15 +415,7 @@ describe("preferences overviewOrder", () => {
 	});
 
 	it("reconciles overviewOrder.statsfm independently from local order", () => {
-		const customLocal = [
-			"skip-rate",
-			"tracks",
-			"unique-artists",
-			"streak",
-			"new-artists",
-			"peak-hour",
-			"est-payout",
-		];
+		const customLocal = ["skip-rate", "tracks", "unique-artists", "streak", "new-artists", "peak-hour", "est-payout"];
 		const customStatsfm = ["est-payout", "unique-artists", "new-artists", "top-genre"];
 		setPreference("overviewOrder", { local: customLocal, statsfm: customStatsfm });
 		const prefs = getPreferences();
@@ -513,12 +445,7 @@ describe("preferences overviewOrder", () => {
 	});
 
 	it("OVERVIEW_CARD_IDS.statsfm has four canonical tiles", () => {
-		expect(OVERVIEW_CARD_IDS.statsfm).toEqual([
-			"unique-artists",
-			"new-artists",
-			"top-genre",
-			"est-payout",
-		]);
+		expect(OVERVIEW_CARD_IDS.statsfm).toEqual(["unique-artists", "new-artists", "top-genre", "est-payout"]);
 		expect(OVERVIEW_CARD_IDS.statsfm.length).toBe(4);
 		expect(OVERVIEW_CARD_IDS.statsfm).not.toContain("peak-hour");
 		expect(OVERVIEW_CARD_IDS.statsfm).not.toContain("tracks");
@@ -565,12 +492,7 @@ describe("preferences overviewOrder", () => {
 			}),
 		);
 		const prefs = getPreferences();
-		expect(prefs.overviewOrder.statsfm).toEqual([
-			"unique-artists",
-			"top-genre",
-			"est-payout",
-			"new-artists",
-		]);
+		expect(prefs.overviewOrder.statsfm).toEqual(["unique-artists", "top-genre", "est-payout", "new-artists"]);
 		expect(prefs.overviewOrder.statsfm.length).toBe(4);
 	});
 
@@ -580,24 +502,12 @@ describe("preferences overviewOrder", () => {
 			JSON.stringify({
 				overviewOrder: {
 					local: [...OVERVIEW_CARD_IDS.local],
-					statsfm: [
-						"unique-artists",
-						"new-artists",
-						"top-genre",
-						"est-payout",
-						"streak",
-						"skip-rate",
-					],
+					statsfm: ["unique-artists", "new-artists", "top-genre", "est-payout", "streak", "skip-rate"],
 				},
 			}),
 		);
 		const prefs = getPreferences();
-		expect(prefs.overviewOrder.statsfm).toEqual([
-			"unique-artists",
-			"new-artists",
-			"top-genre",
-			"est-payout",
-		]);
+		expect(prefs.overviewOrder.statsfm).toEqual(["unique-artists", "new-artists", "top-genre", "est-payout"]);
 		expect(prefs.overviewOrder.statsfm).not.toContain("streak");
 		expect(prefs.overviewOrder.statsfm).not.toContain("skip-rate");
 	});
@@ -624,10 +534,7 @@ describe("preferences order reconciliation", () => {
 	});
 
 	it("sectionOrder: appends missing canonical ids at end in canonical order", () => {
-		localStorage.setItem(
-			"listening-stats:preferences",
-			JSON.stringify({ sectionOrder: ["overview", "top-lists"] }),
-		);
+		localStorage.setItem("listening-stats:preferences", JSON.stringify({ sectionOrder: ["overview", "top-lists"] }));
 		const prefs = getPreferences();
 		// stored order preserved for known ids, missing ones appended in canonical order
 		expect(prefs.sectionOrder).toEqual([

@@ -121,12 +121,10 @@ function setupSfmGetDispatcher() {
 			return Promise.resolve({
 				ok: true,
 				data: {
-					items: {
-						hours: { 14: { count: 38, durationMs: 0 }, 15: { count: 20, durationMs: 0 } },
-						weekDays: { 1: { count: 45, durationMs: 0 }, 6: { count: 112, durationMs: 0 } },
-						months: {},
-						years: {},
-					},
+					hours: { 14: { count: 38, durationMs: 0 }, 15: { count: 20, durationMs: 0 } },
+					weekDays: { 1: { count: 45, durationMs: 0 }, 6: { count: 112, durationMs: 0 } },
+					months: {},
+					years: {},
 				},
 			});
 		}
@@ -280,10 +278,7 @@ describe("StatsFmProvider.calculateStatsProgressive", () => {
 		await provider.init();
 		setupSfmGetDispatcher();
 
-		const progressiveResult = await provider.calculateStatsProgressive?.(
-			STATSFM_PERIODS[0],
-			() => {},
-		);
+		const progressiveResult = await provider.calculateStatsProgressive?.(STATSFM_PERIODS[0], () => {});
 
 		statsCache.invalidate();
 		sfmGetMock.mockClear();
@@ -305,18 +300,15 @@ describe("StatsFmProvider.calculateStatsProgressive", () => {
 			if (path.includes("/streams/stats/dates")) {
 				return Promise.resolve({ ok: false, status: 500, message: "Internal Server Error" });
 			}
-			if (path.includes("/top/tracks"))
-				return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
-			if (path.includes("/top/artists"))
-				return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
+			if (path.includes("/top/tracks")) return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
+			if (path.includes("/top/artists")) return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
 			if (path.includes("/top/genres")) return Promise.resolve({ ok: true, data: [] });
 			if (path.includes("/streams/stats/per-day"))
 				return Promise.resolve({
 					ok: true,
 					data: { average: { count: 0, durationMs: 0 }, days: {} },
 				});
-			if (path.includes("/streams/stats"))
-				return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
+			if (path.includes("/streams/stats")) return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
 			if (path.includes("/streams/recent")) return Promise.resolve({ ok: true, data: [] });
 			return Promise.resolve({ ok: false, status: 0, message: "skipped" });
 		});
@@ -388,10 +380,7 @@ describe("LocalProvider.calculateStatsProgressive", () => {
 			waveOrder.push(wave);
 		};
 
-		const result = await provider.calculateStatsProgressive?.(
-			provider.getSupportedPeriods()[0],
-			onWave,
-		);
+		const result = await provider.calculateStatsProgressive?.(provider.getSupportedPeriods()[0], onWave);
 
 		expect(waveOrder).toEqual([1, 2, 3]);
 		expect(result.totalPlays).toBe(0);
@@ -428,10 +417,8 @@ describe("generation counter stale-callback cancellation", () => {
 			if (path.includes("/streams/stats") && !path.includes("per-day") && !path.includes("dates")) {
 				return wave1Blocker.then(() => ({ ok: true, data: makeSfmStreamStats() }));
 			}
-			if (path.includes("/top/tracks"))
-				return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
-			if (path.includes("/top/artists"))
-				return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
+			if (path.includes("/top/tracks")) return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
+			if (path.includes("/top/artists")) return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
 			if (path.includes("/top/genres")) return Promise.resolve({ ok: true, data: [] });
 			if (path.includes("/streams/stats/per-day"))
 				return Promise.resolve({
@@ -441,7 +428,7 @@ describe("generation counter stale-callback cancellation", () => {
 			if (path.includes("/streams/stats/dates"))
 				return Promise.resolve({
 					ok: true,
-					data: { items: { hours: {}, weekDays: {}, months: {}, years: {} } },
+					data: { hours: {}, weekDays: {}, months: {}, years: {} },
 				});
 			if (path.includes("/streams/recent")) return Promise.resolve({ ok: true, data: [] });
 			return Promise.resolve({ ok: false, status: 0, message: "skipped" });
@@ -498,18 +485,15 @@ describe("cache gating", () => {
 			if (path.includes("/streams/stats/dates")) {
 				return Promise.resolve({ ok: false, status: 500, message: "Server Error" });
 			}
-			if (path.includes("/top/tracks"))
-				return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
-			if (path.includes("/top/artists"))
-				return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
+			if (path.includes("/top/tracks")) return Promise.resolve({ ok: true, data: [makeSfmTopTrack()] });
+			if (path.includes("/top/artists")) return Promise.resolve({ ok: true, data: [makeSfmTopArtist()] });
 			if (path.includes("/top/genres")) return Promise.resolve({ ok: true, data: [] });
 			if (path.includes("/streams/stats/per-day"))
 				return Promise.resolve({
 					ok: true,
 					data: { average: { count: 0, durationMs: 0 }, days: {} },
 				});
-			if (path.includes("/streams/stats"))
-				return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
+			if (path.includes("/streams/stats")) return Promise.resolve({ ok: true, data: makeSfmStreamStats() });
 			if (path.includes("/streams/recent")) return Promise.resolve({ ok: true, data: [] });
 			return Promise.resolve({ ok: false, status: 0, message: "skipped" });
 		});
