@@ -4,6 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../shared/api/lastfm-client", () => ({
 	validateLastfmKey: vi.fn(),
+	lastfmGetUserInfo: vi.fn(),
+	lastfmGetRecentTracks: vi.fn(),
+	lastfmGetTopTracks: vi.fn(),
+	lastfmGetTopArtists: vi.fn(),
+	lastfmGetTopAlbums: vi.fn(),
 }));
 
 vi.mock("../shared/api/statsfm-client", () => ({
@@ -12,6 +17,10 @@ vi.mock("../shared/api/statsfm-client", () => ({
 
 vi.mock("../shared/stats/statsfm-provider", () => ({
 	statsfmProvider: { init: vi.fn().mockResolvedValue(undefined) },
+}));
+
+vi.mock("../shared/stats/lastfm-provider", () => ({
+	lastfmProvider: { init: vi.fn().mockResolvedValue(undefined) },
 }));
 
 import { validateLastfmKey } from "../shared/api/lastfm-client";
