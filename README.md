@@ -65,16 +65,6 @@ Feedback and bug reports are welcome. There is an active dev channel on Discord:
 3. Run **`pnpm test`**, **`pnpm lint`**, and a production **`pnpm build`** before opening a PR  
 4. Open a pull request against **`main`**
 
-### Maintainer notes (code hygiene)
-
-Keep shipped source (`src/`, tests, install scripts) readable and free of internal-process cruft:
-
-- **Comments:** short and factual. Avoid long tutorial-style or redundant explanations (“AI slop”). Prefer deleting noise over adding more.
-- **Punctuation:** use normal ASCII in code, comments, and user-visible strings (for example **`,` / `.` / `:`**). Avoid Unicode **em dashes** (`—`) in this repo.
-- **No internal doc leakage:** do not reference private planning folders, design bundles, automation tool names, or log-file paths in code comments or UI copy. Point contributors to **`docs/DEVELOPMENT.md`** when release/process detail is needed.
-
-Deep-dive for releases, announcements, and updates: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
-
 ## License
 
 MIT
