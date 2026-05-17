@@ -368,7 +368,7 @@ export class StatsFmProvider implements StatsProvider {
 				albumUri: prefixUri(tt.track.albums[0]?.externalIds?.spotify?.[0], "album") ?? "",
 				albumArt: tt.track.albums[0]?.image,
 				count: streams,
-				durationMs: tt.track.durationMs * streams,
+				durationMs: tt.playedMs ?? (tt.track.durationMs ?? 0) * streams,
 			};
 		});
 
@@ -432,6 +432,7 @@ export class StatsFmProvider implements StatsProvider {
 			dailyPlayCounts,
 			newArtistCount,
 			priorPeriodTotalDuration,
+			isFreeTier: !isPlus && topTracks.every((t) => t.count === 0),
 		};
 
 		statsCache.set(key, result);
@@ -592,7 +593,7 @@ export class StatsFmProvider implements StatsProvider {
 						albumUri: prefixUri(tt.track.albums[0]?.externalIds?.spotify?.[0], "album") ?? "",
 						albumArt: tt.track.albums[0]?.image,
 						count: streams,
-						durationMs: tt.track.durationMs * streams,
+						durationMs: tt.playedMs ?? (tt.track.durationMs ?? 0) * streams,
 					};
 				});
 				onWave({ topTracks }, 2);
@@ -741,6 +742,7 @@ export class StatsFmProvider implements StatsProvider {
 			dailyPlayCounts,
 			newArtistCount,
 			priorPeriodTotalDuration,
+			isFreeTier: !isPlus && topTracks.every((t) => t.count === 0),
 		};
 	}
 
