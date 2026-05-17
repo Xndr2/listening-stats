@@ -7,7 +7,8 @@ Spicetify custom app: a listening statistics dashboard inside Spotify (stats.fm,
 ![GitHub Downloads](https://img.shields.io/github/downloads/Xndr2/listening-stats/total)
 
 <img src="docs/screenshots/Screenshot01.png" alt="Listening Stats overview" />
-<img src="docs/screenshots/Screenshot02.png" alt="Listening Stats heatmap" />
+<img src="docs/screenshots/Screenshot02.png" alt="Listening Stats heatmap" />  
+
 ## Features
 
 - **Providers:** stats.fm (recommended), Last.fm, or **local** on-device history
