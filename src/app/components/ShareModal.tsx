@@ -72,17 +72,13 @@ export function ShareModal({ stats, activePeriod, onClose, initialVariant }: Sha
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
 
+	const Toggle = Spicetify.ReactComponent.Toggle;
 	const username = getShareCaptionHandle();
 	const periodLabel = activePeriod.label;
 	const periodBoundaries = activePeriod.getBoundaries();
 	const periodDayCount = Math.max(1, Math.round((periodBoundaries.end - periodBoundaries.start) / 86_400_000));
 	const activeProviderId = providerRegistry.getActiveId() ?? "local";
 	const caps = providerRegistry.getActive()?.getProviderInfo().capabilities;
-	const captionParts: string[] = [];
-	if (showUsername && username) captionParts.push(`@${username}`);
-	if (showPeriodLabel) captionParts.push(periodLabel);
-	const captionText = captionParts.length > 0 ? captionParts.join(" · ") : "";
-
 	const availableVariants = useMemo(() => {
 		return VARIANTS.filter((v) => {
 			if (v.id === "genre") {
@@ -128,7 +124,18 @@ export function ShareModal({ stats, activePeriod, onClose, initialVariant }: Sha
 			canceled = true;
 			if (currentUrl) URL.revokeObjectURL(currentUrl);
 		};
-	}, [stats, variant, size, periodLabel, username, followTheme, showUsername, showPeriodLabel, activeProviderId, periodDayCount]);
+	}, [
+		stats,
+		variant,
+		size,
+		periodLabel,
+		username,
+		followTheme,
+		showUsername,
+		showPeriodLabel,
+		activeProviderId,
+		periodDayCount,
+	]);
 
 	const handleVariantChange = (v: ShareVariant) => setVariant(v);
 
@@ -158,7 +165,19 @@ export function ShareModal({ stats, activePeriod, onClose, initialVariant }: Sha
 		} finally {
 			setBusy(false);
 		}
-	}, [stats, variant, size, periodLabel, username, followTheme, showUsername, showPeriodLabel, activeProviderId, periodDayCount, busy]);
+	}, [
+		stats,
+		variant,
+		size,
+		periodLabel,
+		username,
+		followTheme,
+		showUsername,
+		showPeriodLabel,
+		activeProviderId,
+		periodDayCount,
+		busy,
+	]);
 
 	const handleCopy = useCallback(async () => {
 		if (busy) return;
@@ -177,7 +196,19 @@ export function ShareModal({ stats, activePeriod, onClose, initialVariant }: Sha
 		} finally {
 			setBusy(false);
 		}
-	}, [stats, variant, size, periodLabel, username, followTheme, showUsername, showPeriodLabel, activeProviderId, periodDayCount, busy]);
+	}, [
+		stats,
+		variant,
+		size,
+		periodLabel,
+		username,
+		followTheme,
+		showUsername,
+		showPeriodLabel,
+		activeProviderId,
+		periodDayCount,
+		busy,
+	]);
 
 	return Spicetify.ReactDOM.createPortal(
 		<div className="share-overlay" onClick={handleOverlayClick}>
@@ -226,13 +257,8 @@ export function ShareModal({ stats, activePeriod, onClose, initialVariant }: Sha
 				</div>
 
 				<div className="share-control-row">
-					<label className="share-toggle-row">
-						<input type="checkbox" checked={followTheme} onChange={(e) => setFollowTheme(e.currentTarget.checked)} />
-						<span>Follow theme</span>
-					</label>
-					<span className="share-control-help">
-						{followTheme ? "Card uses current Spotify theme colors." : "Card uses default locked green share palette."}
-					</span>
+					<span style={{ fontSize: 12, color: "var(--spice-text)" }}>Follow theme</span>
+					<Toggle value={followTheme} onSelected={setFollowTheme} />
 				</div>
 				<div className="share-preview-container">
 					{previewLoading && <div className="share-preview-status">Rendering preview…</div>}
@@ -269,22 +295,12 @@ export function ShareModal({ stats, activePeriod, onClose, initialVariant }: Sha
 				</div>
 
 				<div className="share-control-row" style={{ marginTop: 8 }}>
-					<label className="share-toggle-row">
-						<input type="checkbox" checked={showUsername} onChange={(e) => setShowUsername(e.currentTarget.checked)} />
-						<span>Show @username</span>
-					</label>
-					<span className="share-control-help">
-						{showUsername ? `Shows @${username} at the bottom.` : "Hide @username."}
-					</span>
+					<span style={{ fontSize: 12, color: "var(--spice-text)" }}>Show @username</span>
+					<Toggle value={showUsername} onSelected={setShowUsername} />
 				</div>
 				<div className="share-control-row">
-					<label className="share-toggle-row">
-						<input type="checkbox" checked={showPeriodLabel} onChange={(e) => setShowPeriodLabel(e.currentTarget.checked)} />
-						<span>Show period label</span>
-					</label>
-					<span className="share-control-help">
-						{showPeriodLabel ? `Shows "${periodLabel}" at the bottom.` : "Hide period label."}
-					</span>
+					<span style={{ fontSize: 12, color: "var(--spice-text)" }}>Show period label</span>
+					<Toggle value={showPeriodLabel} onSelected={setShowPeriodLabel} />
 				</div>
 			</div>
 		</div>,
@@ -1403,9 +1419,7 @@ async function drawTimeContent(
 	ctx.fillStyle = mutedBody;
 	ctx.font = `${26}px ${CV_FONT}`;
 	ctx.fillText(
-		stats.totalPlays > 0
-			? cvTruncate(ctx, `across ${formatNumber(stats.totalPlays)} plays`, colW - 2 * inset)
-			: "",
+		stats.totalPlays > 0 ? cvTruncate(ctx, `across ${formatNumber(stats.totalPlays)} plays`, colW - 2 * inset) : "",
 		rightX,
 		chunkY + 162,
 	);
@@ -1893,9 +1907,10 @@ async function drawWrappedContent(
 	const totalHours = Math.floor(stats.totalDuration / 3_600_000);
 	const peakLbl = formatShareSpecPeakHour(stats.peakHour);
 	const streak = allowStreak ? (stats.streak ?? 0) : 0;
-	let meta = stats.totalPlays > 0
-		? `${formatNumber(stats.totalPlays)} plays · ${stats.uniqueArtistCount} artists · peak ${peakLbl}`
-		: "";
+	let meta =
+		stats.totalPlays > 0
+			? `${formatNumber(stats.totalPlays)} plays · ${stats.uniqueArtistCount} artists · peak ${peakLbl}`
+			: "";
 	if (streak > 0 && stats.totalPlays > 0) meta += ` · ${streak}-day streak`;
 
 	ctx.textAlign = "left";
