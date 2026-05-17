@@ -72,6 +72,8 @@ export interface Preferences {
 	 * Empty string means no snapshot (toggle on, or hidden while no banner). New dismiss key → auto show again.
 	 */
 	announcementBannerHiddenForDismissKey: string;
+	/** Show @username caption on share cards */
+	showShareCaption: boolean;
 }
 
 const VALID_ACTIVITY_TABS = new Set<ActivityTabId>(["hour", "weekday", "day"]);
@@ -95,6 +97,7 @@ const DEFAULTS: Preferences = {
 	receiveBetaUpdates: false,
 	showAnnouncementBanner: true,
 	announcementBannerHiddenForDismissKey: "",
+	showShareCaption: true,
 };
 
 /**

@@ -1,7 +1,7 @@
 import { providerRegistry } from "../../shared/stats/provider";
 import type { Period, StatsResult } from "../../shared/types/stats";
 import { formatEstimatedPayout, formatHour, formatNumber } from "../format";
-import { ClockIcon } from "../icons";
+import { ClockIcon, ShareIcon } from "../icons";
 import type { OverviewProviderKey } from "../preferences";
 import { getPreferences, OVERVIEW_CARD_LABELS } from "../preferences";
 import { SkeletonBlock } from "./SkeletonPrimitives";
@@ -12,6 +12,7 @@ interface OverviewSectionProps {
 	stats?: StatsResult | null;
 	activePeriod: Period;
 	loading?: boolean;
+	onShare?: () => void;
 }
 
 interface StatCardSpec {
@@ -28,6 +29,7 @@ function OverviewHero({
 	uniqueArtistCount,
 	periodLabel,
 	periodKey,
+	onShare,
 }: {
 	totalDuration: number;
 	priorPeriodTotalDuration: number | undefined;
@@ -35,6 +37,7 @@ function OverviewHero({
 	uniqueArtistCount: number;
 	periodLabel: string;
 	periodKey: string;
+	onShare?: () => void;
 }) {
 	const reduce = useMemo(
 		() => typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -100,6 +103,19 @@ function OverviewHero({
 			>
 				<span dangerouslySetInnerHTML={{ __html: ClockIcon }} />
 				<span>Total time - {periodLabel}</span>
+				{onShare && (
+					<button
+						type="button"
+						className="btn-icon share-section-btn"
+						style={{ marginLeft: "auto" }}
+						onClick={(e) => {
+							e.stopPropagation();
+							onShare();
+						}}
+						aria-label="Share total time"
+						dangerouslySetInnerHTML={{ __html: ShareIcon }}
+					/>
+				)}
 			</div>
 
 			<div
@@ -189,7 +205,7 @@ function OverviewSectionSkeleton() {
 	);
 }
 
-export default function OverviewSection({ stats, activePeriod, loading = false }: OverviewSectionProps) {
+export default function OverviewSection({ stats, activePeriod, loading = false, onShare }: OverviewSectionProps) {
 	if (loading || !stats) return <OverviewSectionSkeleton />;
 	const prefs = getPreferences();
 	const activeId = providerRegistry.getActive()?.getProviderInfo().id ?? "local";
@@ -277,6 +293,7 @@ export default function OverviewSection({ stats, activePeriod, loading = false }
 				uniqueArtistCount={stats.uniqueArtistCount}
 				periodLabel={activePeriod.label}
 				periodKey={activePeriod.id}
+				onShare={onShare}
 			/>
 			{top4.length > 0 && (
 				<div className="overview-right-block" style={{ gridTemplateColumns: `repeat(${topColumns}, minmax(0, 1fr))` }}>

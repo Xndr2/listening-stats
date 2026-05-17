@@ -4,7 +4,14 @@ import { LOCAL_PERIODS } from "../../../shared/stats/periods";
 import { providerRegistry } from "../../../shared/stats/provider";
 import { statsCache } from "../../../shared/stats/stats-cache";
 import { db } from "../../../shared/storage/db";
-import { importFileEvents, type ParseResult, parseJsonEvents, parseV1Csv } from "../../../shared/storage/import";
+import {
+	importFileEvents,
+	type ParseResult,
+	parseJsonEvents,
+	parseSpotifyJson,
+	parseSpotifyZip,
+	parseV1Csv,
+} from "../../../shared/storage/import";
 import { downloadFile } from "../../utils";
 
 const { useState, useRef } = Spicetify.React;
@@ -44,14 +51,14 @@ export function DataTab({ onRefresh }: Props) {
 		const file = e.target.files?.[0];
 		if (!file) return;
 
-		// Reset file input so the same file can be re-selected
 		if (fileInputRef.current) fileInputRef.current.value = "";
 
 		const isCSV = file.name.endsWith(".csv");
 		const isJSON = file.name.endsWith(".json");
+		const isZIP = file.name.endsWith(".zip");
 
-		if (!isCSV && !isJSON) {
-			Spicetify.showNotification("Unsupported file type. Use .csv or .json.", true);
+		if (!isCSV && !isJSON && !isZIP) {
+			Spicetify.showNotification("Unsupported file type. Use .csv, .json, or .zip.", true);
 			return;
 		}
 
@@ -59,14 +66,24 @@ export function DataTab({ onRefresh }: Props) {
 		setImportProgress({ current: 0, total: 0 });
 
 		try {
-			const text = await file.text();
-
-			// Parse based on file type
 			let parseResult: ParseResult;
-			if (isCSV) {
-				parseResult = await parseV1Csv(text);
+
+			if (isZIP) {
+				const buffer = await file.arrayBuffer();
+				parseResult = await parseSpotifyZip(buffer);
 			} else {
-				parseResult = await parseJsonEvents(text);
+				const text = await file.text();
+
+				if (isCSV) {
+					parseResult = await parseV1Csv(text);
+				} else {
+					// Try stats.fm v1 JSON format first; fall back to Spotify JSON
+					try {
+						parseResult = await parseJsonEvents(text);
+					} catch {
+						parseResult = await parseSpotifyJson(text);
+					}
+				}
 			}
 
 			if (parseResult.events.length === 0 && parseResult.errors === 0) {
@@ -77,7 +94,6 @@ export function DataTab({ onRefresh }: Props) {
 
 			setImportProgress({ current: 0, total: parseResult.events.length });
 
-			// Yield to UI thread periodically during import for large files
 			const CHUNK_SIZE = 500;
 			let totalImported = 0;
 			let totalSkipped = 0;
@@ -96,7 +112,6 @@ export function DataTab({ onRefresh }: Props) {
 					current: Math.min(i + CHUNK_SIZE, parseResult.events.length),
 					total: parseResult.events.length,
 				});
-				// Yield to UI thread
 				await new Promise((r) => setTimeout(r, 0));
 			}
 
@@ -212,7 +227,7 @@ export function DataTab({ onRefresh }: Props) {
 				<input
 					ref={fileInputRef}
 					type="file"
-					accept=".csv,.json"
+					accept=".csv,.json,.zip"
 					style={{ display: "none" }}
 					onChange={handleFileSelected}
 					aria-label="Import play history file"
@@ -229,7 +244,9 @@ export function DataTab({ onRefresh }: Props) {
 					>
 						<div>
 							<div className="settings-label">Import play history</div>
-							<div className="settings-sublabel">Accepts .csv or .json from a v1 export</div>
+							<div className="settings-sublabel">
+								Accepts .csv / .json from v1, .json / .zip from Spotify data request
+							</div>
 						</div>
 						<button type="button" className="btn-primary" onClick={() => fileInputRef.current?.click()}>
 							Import Data

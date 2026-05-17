@@ -1,4 +1,5 @@
 import { formatHour } from "../format";
+import { ShareIcon } from "../icons";
 import type { ActivityTabId } from "../preferences";
 import { getPreferences, setPreference } from "../preferences";
 import { CalendarHeatmap } from "./CalendarHeatmap";
@@ -26,6 +27,7 @@ interface ActivitySectionProps {
 	dailyPlayCounts?: Array<{ date: string; count: number }>;
 	streak?: number;
 	showStreak: boolean;
+	onShare?: () => void;
 }
 
 export function ActivitySection({
@@ -37,6 +39,7 @@ export function ActivitySection({
 	dailyPlayCounts,
 	streak,
 	showStreak,
+	onShare,
 }: ActivitySectionProps) {
 	const prefs = getPreferences();
 	const [activeTab, setActiveTab] = useState<ActivityTabId>(() => prefs.activityTab);
@@ -75,6 +78,19 @@ export function ActivitySection({
 				<header className="section-heading" style={{ marginBottom: 0 }}>
 					<span className="section-kicker">Patterns</span>
 					<h2 className="section-title">Activity</h2>
+					{onShare && (
+						<button
+							type="button"
+							className="btn-icon share-section-btn"
+							style={{ marginLeft: "auto" }}
+							onClick={(e) => {
+								e.stopPropagation();
+								onShare();
+							}}
+							aria-label="Share activity"
+							dangerouslySetInnerHTML={{ __html: ShareIcon }}
+						/>
+					)}
 				</header>
 				{peakLabel && (
 					<div className="activity-chart-peak">

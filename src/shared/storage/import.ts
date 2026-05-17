@@ -1,11 +1,15 @@
 /**
- * CSV/JSON import: parsing, dedup, bulk insert.
+ * CSV/JSON/ZIP import: parsing, dedup, bulk insert.
+ * Supports v1 CSV export, v1 JSON export, Spotify streaming history JSON,
+ * and Spotify data-request ZIP archives.
+ *
  * Exports `importFileEvents` (distinct from backup.ts `importPlayEvents`).
  *
  * Import bypasses live-play 3s bucket dedup; uses startedAt + trackName keys,
  * Dexie bulkAdd, type "play", skips bad rows, dedups within the batch.
  */
 
+import { unzipSync } from "fflate";
 import type { PlayEvent } from "../types/play-event";
 import { db } from "./db";
 import { generateSyntheticUris } from "./synthetic-uris";
@@ -283,6 +287,309 @@ export async function parseJsonEvents(text: string): Promise<ParseResult> {
 	}
 
 	return { events, errors, errorDetails };
+}
+
+// ──────────────────────────────────────────────────────
+// Spotify Streaming History
+// ──────────────────────────────────────────────────────
+
+interface SpotifyStreamingHistoryItem {
+	endTime: string;
+	artistName: string;
+	trackName: string;
+	msPlayed: number;
+}
+
+interface SpotifyEndsongItem {
+	ts: string;
+	master_metadata_album_artist_name: string | null;
+	master_metadata_track_name: string | null;
+	master_metadata_album_album_name: string | null;
+	ms_played: number;
+	spotify_track_uri: string | null;
+}
+
+/**
+ * Detect whether a parsed JSON array is Spotify streaming history format
+ * (has `endTime`, `msPlayed` fields instead of PlayEvent fields).
+ */
+function isSpotifyStreamingHistory(data: unknown[]): boolean {
+	if (data.length === 0) return false;
+	const first = data[0] as Record<string, unknown>;
+	return "endTime" in first && "msPlayed" in first && !("startedAt" in first);
+}
+
+/**
+ * Detect whether a parsed JSON array is Spotify endsong format
+ * (has `ts`, `ms_played`, `master_metadata_track_name`).
+ */
+function isSpotifyEndsong(data: unknown[]): boolean {
+	if (data.length === 0) return false;
+	const first = data[0] as Record<string, unknown>;
+	return "ts" in first && "ms_played" in first && "master_metadata_track_name" in first;
+}
+
+/**
+ * Parse a Spotify streaming history JSON array (from data-request export)
+ * into PlayEvent-shaped objects.
+ *
+ * Format:
+ *   { endTime: "2024-01-15 14:30", artistName: "...", trackName: "...", msPlayed: 180000 }
+ *
+ * `endTime` is treated as the event end time; startedAt = endTime - msPlayed.
+ * Rows with missing/empty names or non-positive msPlayed are skipped.
+ */
+export async function parseSpotifyStreamingHistory(data: SpotifyStreamingHistoryItem[]): Promise<ParseResult> {
+	const events: Omit<PlayEvent, "id">[] = [];
+	let errors = 0;
+	const errorDetails: string[] = [];
+
+	for (let i = 0; i < data.length; i++) {
+		const rowNum = i + 1;
+		const item = data[i];
+
+		const artistName = (item.artistName ?? "").trim();
+		const trackName = (item.trackName ?? "").trim();
+		const msPlayed =
+			typeof item.msPlayed === "number" ? item.msPlayed : parseInt(item.msPlayed as unknown as string, 10);
+
+		if (!artistName || !trackName) {
+			errors++;
+			if (errorDetails.length < MAX_ERROR_DETAILS) {
+				errorDetails.push(`Row ${rowNum}: missing artist or track name`);
+			}
+			continue;
+		}
+
+		if (!Number.isFinite(msPlayed) || msPlayed <= 0) {
+			errors++;
+			if (errorDetails.length < MAX_ERROR_DETAILS) {
+				errorDetails.push(`Row ${rowNum}: invalid or zero msPlayed (${item.msPlayed})`);
+			}
+			continue;
+		}
+
+		const endedAt = new Date(item.endTime).getTime();
+		if (!Number.isFinite(endedAt) || Number.isNaN(endedAt) || endedAt <= 0) {
+			errors++;
+			if (errorDetails.length < MAX_ERROR_DETAILS) {
+				errorDetails.push(`Row ${rowNum}: invalid endTime ("${item.endTime}")`);
+			}
+			continue;
+		}
+
+		const startedAt = endedAt - msPlayed;
+		const durationMs = msPlayed;
+
+		const uris = await generateSyntheticUris(trackName, artistName, "");
+
+		events.push({
+			trackName,
+			artistName,
+			albumName: "",
+			durationMs,
+			playedMs: msPlayed,
+			startedAt,
+			endedAt,
+			type: "play",
+			...uris,
+		});
+	}
+
+	return { events, errors, errorDetails };
+}
+
+/**
+ * Parse a Spotify endsong JSON array (from desktop-client export)
+ * into PlayEvent-shaped objects.
+ *
+ * Format:
+ *   { ts: "2024-01-15T14:30:00Z", master_metadata_album_artist_name: "...",
+ *     master_metadata_track_name: "...", master_metadata_album_album_name: "...",
+ *     ms_played: 180000, spotify_track_uri: "spotify:track:xxx" }
+ *
+ * Rows with null track/artist (non-music items like podcasts/ads) are skipped.
+ */
+export async function parseSpotifyEndsong(data: SpotifyEndsongItem[]): Promise<ParseResult> {
+	const events: Omit<PlayEvent, "id">[] = [];
+	let errors = 0;
+	const errorDetails: string[] = [];
+
+	for (let i = 0; i < data.length; i++) {
+		const rowNum = i + 1;
+		const item = data[i];
+
+		const artistName = (item.master_metadata_album_artist_name ?? "").trim();
+		const trackName = (item.master_metadata_track_name ?? "").trim();
+		const albumName = (item.master_metadata_album_album_name ?? "").trim();
+		const msPlayed = typeof item.ms_played === "number" ? item.ms_played : 0;
+
+		if (!artistName || !trackName) {
+			errors++;
+			continue;
+		}
+
+		if (!Number.isFinite(msPlayed) || msPlayed <= 0) {
+			errors++;
+			if (errorDetails.length < MAX_ERROR_DETAILS) {
+				errorDetails.push(`Row ${rowNum}: invalid or zero ms_played (${item.ms_played})`);
+			}
+			continue;
+		}
+
+		const endedAt = new Date(item.ts).getTime();
+		if (!Number.isFinite(endedAt) || Number.isNaN(endedAt) || endedAt <= 0) {
+			errors++;
+			if (errorDetails.length < MAX_ERROR_DETAILS) {
+				errorDetails.push(`Row ${rowNum}: invalid timestamp ("${item.ts}")`);
+			}
+			continue;
+		}
+
+		const startedAt = endedAt - msPlayed;
+		const durationMs = msPlayed;
+
+		let trackUri: string;
+		let artistUri: string;
+		let albumUri: string;
+
+		if (typeof item.spotify_track_uri === "string" && item.spotify_track_uri) {
+			trackUri = item.spotify_track_uri;
+			artistUri = "";
+			albumUri = "";
+		} else {
+			const uris = await generateSyntheticUris(trackName, artistName, albumName);
+			trackUri = uris.trackUri;
+			artistUri = uris.artistUri;
+			albumUri = uris.albumUri;
+		}
+
+		events.push({
+			trackName,
+			artistName,
+			albumName,
+			durationMs,
+			playedMs: msPlayed,
+			startedAt,
+			endedAt,
+			trackUri,
+			artistUri,
+			albumUri,
+			type: "play",
+		});
+	}
+
+	return { events, errors, errorDetails };
+}
+
+/**
+ * Parse Spotify JSON text by detecting the format (streaming history or endsong).
+ */
+export async function parseSpotifyJson(text: string): Promise<ParseResult> {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		throw new Error("Import failed: file is not valid JSON");
+	}
+
+	if (!Array.isArray(parsed)) {
+		throw new Error("Import failed: Spotify JSON must be an array");
+	}
+
+	if (isSpotifyEndsong(parsed)) {
+		return parseSpotifyEndsong(parsed as SpotifyEndsongItem[]);
+	}
+
+	if (isSpotifyStreamingHistory(parsed)) {
+		return parseSpotifyStreamingHistory(parsed as SpotifyStreamingHistoryItem[]);
+	}
+
+	throw new Error(
+		"Import failed: unrecognized JSON format. Expected Spotify StreamingHistory, endsong, or stats.fm v1 export.",
+	);
+}
+
+// ──────────────────────────────────────────────────────
+// ZIP extraction
+// ──────────────────────────────────────────────────────
+
+/**
+ * Parse a ZIP buffer containing Spotify data-request files.
+ * Extracts and parses all `StreamingHistory*.json` and `endsong_*.json` files,
+ * merging their events together.
+ */
+export async function parseSpotifyZip(buffer: ArrayBuffer): Promise<ParseResult> {
+	const uint8 = new Uint8Array(buffer);
+	let files: Record<string, Uint8Array>;
+	try {
+		files = unzipSync(uint8);
+	} catch {
+		throw new Error("Import failed: invalid ZIP file");
+	}
+
+	const allEvents: Omit<PlayEvent, "id">[] = [];
+	let totalErrors = 0;
+	const allErrorDetails: string[] = [];
+
+	const pushErrors = (result: ParseResult) => {
+		totalErrors += result.errors;
+		allEvents.push(...result.events);
+		for (const d of result.errorDetails) {
+			if (allErrorDetails.length < MAX_ERROR_DETAILS) {
+				allErrorDetails.push(d);
+			}
+		}
+	};
+
+	for (const [filename, data] of Object.entries(files)) {
+		if (!filename.endsWith(".json")) continue;
+
+		if (!filename.startsWith("StreamingHistory") && !filename.startsWith("endsong_")) {
+			continue;
+		}
+
+		const text = new TextDecoder().decode(data);
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(text);
+		} catch {
+			totalErrors++;
+			if (allErrorDetails.length < MAX_ERROR_DETAILS) {
+				allErrorDetails.push(`ZIP: "${filename}" is not valid JSON`);
+			}
+			continue;
+		}
+
+		if (!Array.isArray(parsed)) {
+			totalErrors++;
+			if (allErrorDetails.length < MAX_ERROR_DETAILS) {
+				allErrorDetails.push(`ZIP: "${filename}" JSON is not an array`);
+			}
+			continue;
+		}
+
+		if (isSpotifyEndsong(parsed)) {
+			const result = await parseSpotifyEndsong(parsed as SpotifyEndsongItem[]);
+			pushErrors(result);
+		} else if (isSpotifyStreamingHistory(parsed)) {
+			const result = await parseSpotifyStreamingHistory(parsed as SpotifyStreamingHistoryItem[]);
+			pushErrors(result);
+		} else {
+			totalErrors++;
+			if (allErrorDetails.length < MAX_ERROR_DETAILS) {
+				allErrorDetails.push(`ZIP: "${filename}" unrecognized format`);
+			}
+		}
+	}
+
+	if (allEvents.length === 0 && totalErrors === 0) {
+		throw new Error(
+			"Import failed: no Spotify data files found in ZIP (expected StreamingHistory*.json or endsong_*.json)",
+		);
+	}
+
+	return { events: allEvents, errors: totalErrors, errorDetails: allErrorDetails };
 }
 
 // ──────────────────────────────────────────────────────

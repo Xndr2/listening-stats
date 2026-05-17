@@ -34,7 +34,7 @@ import { InlineErrorCard } from "./components/InlineErrorCard";
 import OverviewSection from "./components/OverviewSection";
 import { RecentlyPlayed } from "./components/RecentlyPlayed";
 import { SetupWizard } from "./components/SetupWizard";
-import { ShareModal } from "./components/ShareModal";
+import { ShareModal, type ShareVariant } from "./components/ShareModal";
 import type { SettingsTab } from "./components/settings/SettingsModal";
 import { SettingsModal } from "./components/settings/SettingsModal";
 import { TopGenres } from "./components/TopGenres";
@@ -97,6 +97,7 @@ function App() {
 	const [tourActive, setTourActive] = useState(() => shouldAutoStartTour(__VERSION__));
 	const [activePage, setActivePage] = useState<string>(() => getPreferences().activePage);
 	const [showShare, setShowShare] = useState(false);
+	const [shareVariant, setShareVariant] = useState<string>("top5");
 	const [remoteAnnouncement, setRemoteAnnouncement] = useState<ParsedRemoteAnnouncement | null>(null);
 	const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult | null>(null);
 	const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -347,6 +348,11 @@ function App() {
 	const isSlotLoading = (slot: keyof SectionSlots) =>
 		sectionSlots[slot] === "loading" || sectionSlots[slot] === "pending";
 
+	const shareSection = useCallback((variant: string) => {
+		setShareVariant(variant);
+		setShowShare(true);
+	}, []);
+
 	const renderSectionById = (id: string): React.ReactNode => {
 		switch (id) {
 			case "overview":
@@ -360,12 +366,19 @@ function App() {
 						/>
 					);
 				if (!stats) return null;
-				return <OverviewSection stats={stats} activePeriod={activePeriod} />;
+				return <OverviewSection stats={stats} activePeriod={activePeriod} onShare={() => shareSection("time")} />;
 			case "top-genres":
 				if (isSlotLoading("lists") || !stats) return null;
 				if (!capabilities?.hasGenreData) return null;
 				if (stats.topGenres.length === 0) return null;
-				return <TopGenres topGenres={stats.topGenres} onGenreClick={setActiveGenre} activeGenre={prefs.activeGenre} />;
+				return (
+					<TopGenres
+						topGenres={stats.topGenres}
+						onGenreClick={setActiveGenre}
+						activeGenre={prefs.activeGenre}
+						onShare={() => shareSection("genre")}
+					/>
+				);
 			case "top-lists": {
 				const listsLoading = isSlotLoading("lists");
 				if (sectionErrors.lists)
@@ -385,6 +398,11 @@ function App() {
 						hiddenSections={prefs.hiddenSections}
 						onGenreClick={setActiveGenre}
 						activeGenre={prefs.activeGenre}
+						onShare={{
+							tracks: () => shareSection("top5"),
+							artists: () => shareSection("wrapped"),
+							albums: () => shareSection("throwback"),
+						}}
 					/>
 				);
 			}
@@ -423,6 +441,7 @@ function App() {
 						dailyPlayCounts={stats.dailyPlayCounts}
 						streak={stats.streak}
 						showStreak={showStreak}
+						onShare={() => shareSection("streak")}
 					/>
 				);
 			}
@@ -447,13 +466,14 @@ function App() {
 						streak={stats.streak}
 						activePeriod={activePeriod}
 						activeProviderId={activeProviderId}
+						onShare={() => shareSection("streak")}
 					/>
 				);
 			}
 			case "recently-played":
 				if (isSlotLoading("overview")) return <RecentlyPlayed loading />;
 				if (!stats) return null;
-				return <RecentlyPlayed recentPlays={stats.recentPlays} />;
+				return <RecentlyPlayed recentPlays={stats.recentPlays} onShare={() => shareSection("throwback")} />;
 			default:
 				return null;
 		}
@@ -602,7 +622,12 @@ function App() {
 				onComplete={() => setTourActive(false)}
 			/>
 			{showShare && stats && (
-				<ShareModal stats={stats} activePeriod={activePeriod} onClose={() => setShowShare(false)} />
+				<ShareModal
+					stats={stats}
+					activePeriod={activePeriod}
+					initialVariant={shareVariant as ShareVariant}
+					onClose={() => setShowShare(false)}
+				/>
 			)}
 			<UpdateModal
 				open={showUpdateModal}
