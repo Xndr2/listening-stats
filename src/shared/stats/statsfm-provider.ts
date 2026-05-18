@@ -1,6 +1,8 @@
 import { type SfmResult, type StatsFmConfig, sfmCircuitBreaker, sfmGet, validateUsername } from "../api/statsfm-client";
 import { LS_KEYS } from "../constants/storage-keys";
 import { classifyStatsFmError, StatsFmError } from "../errors";
+import { db } from "../storage/db";
+import type { PlayEvent } from "../types/play-event";
 import type { Period, RecentPlay, StatsResult, TopAlbum, TopArtist, TopGenre, TopTrack } from "../types/stats";
 import type {
 	SfmDateStats,
@@ -172,6 +174,75 @@ function deriveAlbumsFromTracks(tracks: SfmTopTrack[]): TopAlbum[] {
 			count: a.streams,
 			durationMs: 0,
 		}));
+}
+
+/**
+ * On stats.fm free tier the API returns stream = 0 for every item.
+ * Query the local DexieDB for actual per-item play counts and merge them in.
+ */
+async function fillFreeTierLocalCounts(
+	period: Period,
+	isPlus: boolean,
+	topTracks: TopTrack[],
+	topArtists: TopArtist[],
+	topAlbums: TopAlbum[],
+): Promise<{ topTracks: TopTrack[]; topArtists: TopArtist[]; topAlbums: TopAlbum[] }> {
+	if (isPlus) return { topTracks, topArtists, topAlbums };
+
+	const { start, end } = period.getBoundaries();
+	const events: PlayEvent[] =
+		end === Number.MAX_SAFE_INTEGER
+			? await db.playEvents.toArray()
+			: await db.playEvents.where("startedAt").between(start, end).toArray();
+
+	const playEvents = events.filter((e) => e.type !== "skip");
+
+	// Aggregate local per-item counts
+	const localTracks = new Map<string, { count: number; durationMs: number }>();
+	const localArtists = new Map<string, { count: number; durationMs: number }>();
+	const localAlbums = new Map<string, { count: number; durationMs: number }>();
+
+	for (const e of playEvents) {
+		const t = localTracks.get(e.trackUri);
+		localTracks.set(e.trackUri, {
+			count: (t?.count ?? 0) + 1,
+			durationMs: (t?.durationMs ?? 0) + e.playedMs,
+		});
+
+		const a = localArtists.get(e.artistUri);
+		localArtists.set(e.artistUri, {
+			count: (a?.count ?? 0) + 1,
+			durationMs: (a?.durationMs ?? 0) + e.playedMs,
+		});
+
+		if (e.albumUri) {
+			const al = localAlbums.get(e.albumUri);
+			localAlbums.set(e.albumUri, {
+				count: (al?.count ?? 0) + 1,
+				durationMs: (al?.durationMs ?? 0) + e.playedMs,
+			});
+		}
+	}
+
+	const merge = <T extends { count: number; durationMs: number }>(
+		items: T[],
+		key: (item: T) => string,
+		map: Map<string, { count: number; durationMs: number }>,
+	): T[] =>
+		items
+			.map((item) => {
+				const local = map.get(key(item));
+				if (!local) return item;
+				return { ...item, count: local.count, durationMs: local.durationMs };
+			})
+			.sort((a, b) => b.count - a.count || b.durationMs - a.durationMs)
+			.map((item, i) => ({ ...item, rank: i + 1 }));
+
+	return {
+		topTracks: merge(topTracks, (t) => t.trackUri, localTracks),
+		topArtists: merge(topArtists, (a) => a.artistUri, localArtists),
+		topAlbums: merge(topAlbums, (a) => a.albumUri, localAlbums),
+	};
 }
 
 export class StatsFmProvider implements StatsProvider {
@@ -352,7 +423,7 @@ export class StatsFmProvider implements StatsProvider {
 		}
 
 		// Map tracks
-		const topTracks: TopTrack[] = tracks.map((tt) => {
+		let topTracks: TopTrack[] = tracks.map((tt) => {
 			const streams = tt.streams ?? 0;
 			return {
 				rank: tt.position,
@@ -373,7 +444,7 @@ export class StatsFmProvider implements StatsProvider {
 		});
 
 		// Genres from stats.fm artist payload (no extra Spotify batch here)
-		const topArtists: TopArtist[] = artists.map((ta) => ({
+		let topArtists: TopArtist[] = artists.map((ta) => ({
 			rank: ta.position,
 			artistUri: prefixUri(ta.artist.externalIds?.spotify?.[0], "artist") ?? `listening-stats:artist:${ta.artist.name}`,
 			artistName: ta.artist.name,
@@ -384,7 +455,7 @@ export class StatsFmProvider implements StatsProvider {
 		}));
 
 		// Albums: Plus uses API response, Free derives from topTracks
-		const topAlbums: TopAlbum[] = isPlus
+		let topAlbums: TopAlbum[] = isPlus
 			? albumsData.map((ab) => ({
 					rank: ab.position,
 					albumUri:
@@ -399,6 +470,12 @@ export class StatsFmProvider implements StatsProvider {
 			: deriveAlbumsFromTracks(tracks);
 
 		const topGenres: TopGenre[] = topGenresFromApiOrArtists(apiGenreRows, artists);
+
+		// Fill zero counts from local tracking for free tier (streams = 0 from API)
+		const filled = await fillFreeTierLocalCounts(period, isPlus, topTracks, topArtists, topAlbums);
+		topTracks = filled.topTracks;
+		topArtists = filled.topArtists;
+		topAlbums = filled.topAlbums;
 
 		// Recent plays
 		const recentPlays: RecentPlay[] = recent.map((s) => ({
@@ -666,6 +743,15 @@ export class StatsFmProvider implements StatsProvider {
 		];
 
 		await Promise.allSettled(wave2Tasks);
+
+		// Fill zero counts from local tracking for free tier, then re-emit wave 2
+		const filled = await fillFreeTierLocalCounts(period, isPlus, topTracks, topArtists, topAlbums);
+		if (!isPlus) {
+			topTracks = filled.topTracks;
+			topArtists = filled.topArtists;
+			topAlbums = filled.topAlbums;
+			onWave({ topTracks, topArtists, topAlbums }, 2);
+		}
 
 		// ── Wave 3: activity (hourly/weekday distributions) ──
 		const [datesRes] = await Promise.allSettled([datesPromise]);
