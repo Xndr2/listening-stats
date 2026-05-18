@@ -25,6 +25,7 @@ import { getActivityMode, getSectionsForProvider } from "./capabilities";
 import { ActivitySection } from "./components/ActivitySection";
 import { AnnouncementBanner } from "./components/AnnouncementBanner";
 import { AppFooter } from "./components/AppFooter";
+import { ConfettiOverlay } from "./components/ConfettiOverlay";
 import { ConsistencySection } from "./components/ConsistencySection";
 import EmptyState from "./components/EmptyState";
 import { clearActiveGenre, FilterPill, setActiveGenre } from "./components/FilterPill";
@@ -41,6 +42,9 @@ import { TopGenres } from "./components/TopGenres";
 import { TopLists } from "./components/TopLists";
 import { UpdateModal } from "./components/UpdateModal";
 import { WorldChartsPage } from "./components/WorldChartsPage";
+import { ChevronGripIcon } from "./icons";
+import { useKonamiCode } from "./hooks/useKonamiCode";
+import { useSettingsSortable } from "./hooks/useSettingsSortable";
 import { getPreferences, setPreference } from "./preferences";
 import { getTourSteps, shouldAutoStartTour } from "./tour";
 
@@ -293,6 +297,18 @@ function App() {
 	void prefsVersion;
 	const isHidden = (id: string) => prefs.hiddenSections.includes(id);
 
+	const sectionSortable = useSettingsSortable({
+		order: prefs.sectionOrder.filter((id) => availableSectionIds.has(id) && !isHidden(id)),
+		orientation: "vertical",
+		onReorder: (next) => {
+			setPreference("sectionOrder", next);
+			window.dispatchEvent(new CustomEvent(EVENTS.PREFS_CHANGED));
+		},
+	});
+
+	const [showConfetti, setShowConfetti] = useState(false);
+	useKonamiCode(() => setShowConfetti(true));
+
 	const handlePrefsChanged = useCallback(() => {
 		setPrefsVersion((v) => v + 1);
 	}, []);
@@ -503,8 +519,10 @@ function App() {
 			.map(([key]) => key);
 		const hasLoading = loadingSections.length > 0;
 
+		const { isDragging, dropSlotIndex } = sectionSortable.dragState;
+
 		return (
-			<div className="stats-page-content">
+			<div className="stats-page-content" data-drag-active={isDragging || undefined}>
 				{hasLoading && (
 					<div className="loading-status-banner" role="status" aria-live="polite">
 						<span className="loading-status-dot" />
@@ -513,14 +531,35 @@ function App() {
 						</span>
 					</div>
 				)}
-				{visibleSections.map((id) => {
+				{visibleSections.map((id, idx) => {
 					const content = renderSectionById(id);
-					return content ? (
-						<div key={id} data-section-id={id}>
-							{content}
-						</div>
-					) : null;
+					const dragStyle = sectionSortable.getItemStyle(id);
+					const dropLineBeforeIdx = idx; // drop slot before this section
+					return (
+						<Spicetify.React.Fragment key={id}>
+							<div className="dashboard-drop-line" data-active={dropSlotIndex === dropLineBeforeIdx || undefined} />
+							{content ? (
+								<div
+									data-section-id={id}
+									ref={(el) => sectionSortable.registerItem(id, el)}
+									style={dragStyle}
+								>
+									<div className="dashboard-section-row">
+										<button
+											type="button"
+											className="dashboard-drag-handle"
+											aria-label="Drag section"
+											onPointerDown={(e) => sectionSortable.onItemPointerDown(id)(e.nativeEvent)}
+											dangerouslySetInnerHTML={{ __html: ChevronGripIcon }}
+										/>
+										<div className="dashboard-section-content">{content}</div>
+									</div>
+								</div>
+							) : null}
+						</Spicetify.React.Fragment>
+					);
 				})}
+				<div className="dashboard-drop-line" data-active={dropSlotIndex === visibleSections.length || undefined} />
 			</div>
 		);
 	};
@@ -637,6 +676,7 @@ function App() {
 				receiveBetaUpdates={prefs.receiveBetaUpdates}
 				onReceiveBetaUpdatesChange={handleReceiveBetaUpdatesChange}
 			/>
+			{showConfetti && <ConfettiOverlay onComplete={() => setShowConfetti(false)} />}
 		</div>
 	);
 }
