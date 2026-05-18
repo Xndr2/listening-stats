@@ -35,6 +35,16 @@ function getAllTimeBoundaries(): PeriodBoundaries {
 	return { start: 0, end: Number.MAX_SAFE_INTEGER };
 }
 
+function getRolling4WeeksBoundaries(): PeriodBoundaries {
+	const now = Date.now();
+	return { start: now - 28 * 86400000, end: now };
+}
+
+function getRolling6MonthsBoundaries(): PeriodBoundaries {
+	const now = Date.now();
+	return { start: now - 180 * 86400000, end: now };
+}
+
 export const LOCAL_PERIODS: Period[] = [
 	{
 		id: "today",
@@ -67,8 +77,8 @@ export const LOCAL_PERIODS: Period[] = [
 // stats.fm API uses named range params (today/weeks/months/lifetime), not timestamps
 
 export const STATSFM_PERIODS: Period[] = [
-	{ id: "sfm-weeks", label: "This Week", getBoundaries: getThisWeekBoundaries },
-	{ id: "sfm-months", label: "This Month", getBoundaries: getThisMonthBoundaries },
+	{ id: "sfm-weeks", label: "Last 4 Weeks", getBoundaries: getRolling4WeeksBoundaries },
+	{ id: "sfm-months", label: "Last 6 Months", getBoundaries: getRolling6MonthsBoundaries },
 	{ id: "sfm-all-time", label: "All Time", getBoundaries: getAllTimeBoundaries },
 ];
 
