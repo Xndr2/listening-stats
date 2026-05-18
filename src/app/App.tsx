@@ -25,6 +25,7 @@ import { getActivityMode, getSectionsForProvider } from "./capabilities";
 import { ActivitySection } from "./components/ActivitySection";
 import { AnnouncementBanner } from "./components/AnnouncementBanner";
 import { AppFooter } from "./components/AppFooter";
+import { ConfettiOverlay } from "./components/ConfettiOverlay";
 import { ConsistencySection } from "./components/ConsistencySection";
 import EmptyState from "./components/EmptyState";
 import { clearActiveGenre, FilterPill, setActiveGenre } from "./components/FilterPill";
@@ -34,13 +35,16 @@ import { InlineErrorCard } from "./components/InlineErrorCard";
 import OverviewSection from "./components/OverviewSection";
 import { RecentlyPlayed } from "./components/RecentlyPlayed";
 import { SetupWizard } from "./components/SetupWizard";
-import { ShareModal } from "./components/ShareModal";
+import { ShareModal, type ShareVariant } from "./components/ShareModal";
 import type { SettingsTab } from "./components/settings/SettingsModal";
 import { SettingsModal } from "./components/settings/SettingsModal";
 import { TopGenres } from "./components/TopGenres";
 import { TopLists } from "./components/TopLists";
 import { UpdateModal } from "./components/UpdateModal";
 import { WorldChartsPage } from "./components/WorldChartsPage";
+import { useKonamiCode } from "./hooks/useKonamiCode";
+import { useSettingsSortable } from "./hooks/useSettingsSortable";
+import { ChevronGripIcon } from "./icons";
 import { getPreferences, setPreference } from "./preferences";
 import { getTourSteps, shouldAutoStartTour } from "./tour";
 
@@ -97,6 +101,7 @@ function App() {
 	const [tourActive, setTourActive] = useState(() => shouldAutoStartTour(__VERSION__));
 	const [activePage, setActivePage] = useState<string>(() => getPreferences().activePage);
 	const [showShare, setShowShare] = useState(false);
+	const [shareVariant, setShareVariant] = useState<string>("top5");
 	const [remoteAnnouncement, setRemoteAnnouncement] = useState<ParsedRemoteAnnouncement | null>(null);
 	const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult | null>(null);
 	const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -292,6 +297,18 @@ function App() {
 	void prefsVersion;
 	const isHidden = (id: string) => prefs.hiddenSections.includes(id);
 
+	const sectionSortable = useSettingsSortable({
+		order: prefs.sectionOrder.filter((id) => availableSectionIds.has(id) && !isHidden(id)),
+		orientation: "vertical",
+		onReorder: (next) => {
+			setPreference("sectionOrder", next);
+			window.dispatchEvent(new CustomEvent(EVENTS.PREFS_CHANGED));
+		},
+	});
+
+	const [showConfetti, setShowConfetti] = useState(false);
+	useKonamiCode(() => setShowConfetti(true));
+
 	const handlePrefsChanged = useCallback(() => {
 		setPrefsVersion((v) => v + 1);
 	}, []);
@@ -347,6 +364,11 @@ function App() {
 	const isSlotLoading = (slot: keyof SectionSlots) =>
 		sectionSlots[slot] === "loading" || sectionSlots[slot] === "pending";
 
+	const shareSection = useCallback((variant: string) => {
+		setShareVariant(variant);
+		setShowShare(true);
+	}, []);
+
 	const renderSectionById = (id: string): React.ReactNode => {
 		switch (id) {
 			case "overview":
@@ -360,12 +382,19 @@ function App() {
 						/>
 					);
 				if (!stats) return null;
-				return <OverviewSection stats={stats} activePeriod={activePeriod} />;
+				return <OverviewSection stats={stats} activePeriod={activePeriod} onShare={() => shareSection("time")} />;
 			case "top-genres":
 				if (isSlotLoading("lists") || !stats) return null;
 				if (!capabilities?.hasGenreData) return null;
 				if (stats.topGenres.length === 0) return null;
-				return <TopGenres topGenres={stats.topGenres} onGenreClick={setActiveGenre} activeGenre={prefs.activeGenre} />;
+				return (
+					<TopGenres
+						topGenres={stats.topGenres}
+						onGenreClick={setActiveGenre}
+						activeGenre={prefs.activeGenre}
+						onShare={() => shareSection("genre")}
+					/>
+				);
 			case "top-lists": {
 				const listsLoading = isSlotLoading("lists");
 				if (sectionErrors.lists)
@@ -385,6 +414,11 @@ function App() {
 						hiddenSections={prefs.hiddenSections}
 						onGenreClick={setActiveGenre}
 						activeGenre={prefs.activeGenre}
+						onShare={{
+							tracks: () => shareSection("top5"),
+							artists: () => shareSection("wrapped"),
+							albums: () => shareSection("throwback"),
+						}}
 					/>
 				);
 			}
@@ -423,6 +457,7 @@ function App() {
 						dailyPlayCounts={stats.dailyPlayCounts}
 						streak={stats.streak}
 						showStreak={showStreak}
+						onShare={() => shareSection("streak")}
 					/>
 				);
 			}
@@ -447,13 +482,14 @@ function App() {
 						streak={stats.streak}
 						activePeriod={activePeriod}
 						activeProviderId={activeProviderId}
+						onShare={() => shareSection("streak")}
 					/>
 				);
 			}
 			case "recently-played":
 				if (isSlotLoading("overview")) return <RecentlyPlayed loading />;
 				if (!stats) return null;
-				return <RecentlyPlayed recentPlays={stats.recentPlays} />;
+				return <RecentlyPlayed recentPlays={stats.recentPlays} onShare={() => shareSection("throwback")} />;
 			default:
 				return null;
 		}
@@ -482,9 +518,10 @@ function App() {
 			.filter(([, status]) => status === "loading" || status === "pending")
 			.map(([key]) => key);
 		const hasLoading = loadingSections.length > 0;
+		const { isDragging, dropSlotIndex } = sectionSortable.dragState;
 
 		return (
-			<div className="stats-page-content">
+			<div className="stats-page-content" data-drag-active={isDragging || undefined}>
 				{hasLoading && (
 					<div className="loading-status-banner" role="status" aria-live="polite">
 						<span className="loading-status-dot" />
@@ -493,14 +530,30 @@ function App() {
 						</span>
 					</div>
 				)}
-				{visibleSections.map((id) => {
+				{visibleSections.map((id, idx) => {
 					const content = renderSectionById(id);
-					return content ? (
-						<div key={id} data-section-id={id}>
-							{content}
-						</div>
-					) : null;
+					const dragStyle = sectionSortable.getItemStyle(id);
+					return (
+						<Spicetify.React.Fragment key={id}>
+							<div className="dashboard-drop-line" data-active={dropSlotIndex === idx || undefined} />
+							{content ? (
+								<div data-section-id={id} ref={(el) => sectionSortable.registerItem(id, el)} style={dragStyle}>
+									<div className="dashboard-section-row">
+										<button
+											type="button"
+											className="dashboard-drag-handle"
+											aria-label="Drag section"
+											onPointerDown={(e) => sectionSortable.onItemPointerDown(id)(e.nativeEvent)}
+											dangerouslySetInnerHTML={{ __html: ChevronGripIcon }}
+										/>
+										<div className="dashboard-section-content">{content}</div>
+									</div>
+								</div>
+							) : null}
+						</Spicetify.React.Fragment>
+					);
 				})}
+				<div className="dashboard-drop-line" data-active={dropSlotIndex === visibleSections.length || undefined} />
 			</div>
 		);
 	};
@@ -602,7 +655,12 @@ function App() {
 				onComplete={() => setTourActive(false)}
 			/>
 			{showShare && stats && (
-				<ShareModal stats={stats} activePeriod={activePeriod} onClose={() => setShowShare(false)} />
+				<ShareModal
+					stats={stats}
+					activePeriod={activePeriod}
+					initialVariant={shareVariant as ShareVariant}
+					onClose={() => setShowShare(false)}
+				/>
 			)}
 			<UpdateModal
 				open={showUpdateModal}
@@ -612,6 +670,7 @@ function App() {
 				receiveBetaUpdates={prefs.receiveBetaUpdates}
 				onReceiveBetaUpdatesChange={handleReceiveBetaUpdatesChange}
 			/>
+			{showConfetti && <ConfettiOverlay onComplete={() => setShowConfetti(false)} />}
 		</div>
 	);
 }

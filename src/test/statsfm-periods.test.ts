@@ -26,16 +26,16 @@ describe("STATSFM_PERIODS array", () => {
 		}
 	});
 
-	it("sfm-weeks has label 'This Week'", () => {
+	it("sfm-weeks has label 'Last 4 Weeks'", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-weeks");
 		expect(period).toBeDefined();
-		expect(period?.label).toBe("This Week");
+		expect(period?.label).toBe("Last 4 Weeks");
 	});
 
-	it("sfm-months has label 'This Month'", () => {
+	it("sfm-months has label 'Last 6 Months'", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-months");
 		expect(period).toBeDefined();
-		expect(period?.label).toBe("This Month");
+		expect(period?.label).toBe("Last 6 Months");
 	});
 
 	it("sfm-all-time has label 'All Time'", () => {
@@ -91,27 +91,20 @@ describe("sfm-weeks boundaries", () => {
 		vi.useRealTimers();
 	});
 
-	it("at 2026-04-01 (Wednesday), start/end match LOCAL_PERIODS 'this-week' boundaries", () => {
-		const sfmWeeks = STATSFM_PERIODS.find((p) => p.id === "sfm-weeks");
-		const localWeek = LOCAL_PERIODS.find((p) => p.id === "this-week");
-		expect(sfmWeeks).toBeDefined();
-		expect(localWeek).toBeDefined();
-		const sfmBounds = sfmWeeks!.getBoundaries();
-		const localBounds = localWeek!.getBoundaries();
-		expect(sfmBounds.start).toBe(localBounds.start);
-		expect(sfmBounds.end).toBe(localBounds.end);
-	});
-
-	it("start is Monday 2026-03-30 midnight", () => {
+	it("at 2026-04-01, boundaries are a 28-day rolling window", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-weeks");
 		expect(period).toBeDefined();
-		const { start } = period!.getBoundaries();
-		const startDate = new Date(start);
-		expect(startDate.getFullYear()).toBe(2026);
-		expect(startDate.getMonth()).toBe(2); // March = 2
-		expect(startDate.getDate()).toBe(30);
-		expect(startDate.getHours()).toBe(0);
-		expect(startDate.getMinutes()).toBe(0);
+		const { start, end } = period!.getBoundaries();
+		expect(end).toBeGreaterThan(start);
+		expect(end - start).toBe(28 * 24 * 60 * 60 * 1000);
+	});
+
+	it("end is now (April 1 2026 15:30)", () => {
+		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-weeks");
+		expect(period).toBeDefined();
+		const { end } = period!.getBoundaries();
+		const now = new Date(2026, 3, 1, 15, 30, 0, 0).getTime();
+		expect(end).toBe(now);
 	});
 });
 
@@ -125,29 +118,20 @@ describe("sfm-months boundaries", () => {
 		vi.useRealTimers();
 	});
 
-	it("start/end match LOCAL_PERIODS 'this-month' boundaries", () => {
-		const sfmMonths = STATSFM_PERIODS.find((p) => p.id === "sfm-months");
-		const localMonth = LOCAL_PERIODS.find((p) => p.id === "this-month");
-		expect(sfmMonths).toBeDefined();
-		expect(localMonth).toBeDefined();
-		const sfmBounds = sfmMonths!.getBoundaries();
-		const localBounds = localMonth!.getBoundaries();
-		expect(sfmBounds.start).toBe(localBounds.start);
-		expect(sfmBounds.end).toBe(localBounds.end);
-	});
-
-	it("at 2026-04-01, start is April 1 midnight, end is May 1 midnight", () => {
+	it("at 2026-04-01, boundaries are a 180-day rolling window", () => {
 		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-months");
 		expect(period).toBeDefined();
 		const { start, end } = period!.getBoundaries();
-		const startDate = new Date(start);
-		const endDate = new Date(end);
-		expect(startDate.getMonth()).toBe(3); // April
-		expect(startDate.getDate()).toBe(1);
-		expect(startDate.getHours()).toBe(0);
-		expect(endDate.getMonth()).toBe(4); // May
-		expect(endDate.getDate()).toBe(1);
-		expect(endDate.getHours()).toBe(0);
+		expect(end).toBeGreaterThan(start);
+		expect(end - start).toBe(180 * 24 * 60 * 60 * 1000);
+	});
+
+	it("end is now (April 1 2026 15:30)", () => {
+		const period = STATSFM_PERIODS.find((p) => p.id === "sfm-months");
+		expect(period).toBeDefined();
+		const { end } = period!.getBoundaries();
+		const now = new Date(2026, 3, 1, 15, 30, 0, 0).getTime();
+		expect(end).toBe(now);
 	});
 });
 

@@ -1,6 +1,7 @@
 import type { StatsResult } from "../../shared/types/stats";
 import { normalizeSpotifyImageUrl } from "../../shared/util/spotify-image-url";
 import { formatDuration, formatNumber } from "../format";
+import { ShareIcon } from "../icons";
 import { getPreferences } from "../preferences";
 import { navigateToUri } from "../utils";
 import { SkeletonBlock, SkeletonCircle } from "./SkeletonPrimitives";
@@ -38,6 +39,11 @@ interface TopListsProps {
 	hiddenSections: string[];
 	onGenreClick?: (genre: string) => void;
 	activeGenre?: string | null;
+	onShare?: {
+		tracks?: () => void;
+		artists?: () => void;
+		albums?: () => void;
+	};
 }
 
 export function TopLists({
@@ -47,6 +53,7 @@ export function TopLists({
 	hiddenSections,
 	onGenreClick,
 	activeGenre,
+	onShare,
 }: TopListsProps) {
 	const prefs = getPreferences();
 
@@ -59,6 +66,19 @@ export function TopLists({
 				<header className="section-heading">
 					<span className="section-kicker">Most played</span>
 					<h2 className="section-title">Tracks</h2>
+					{onShare?.tracks && (
+						<button
+							type="button"
+							className="btn-icon share-section-btn"
+							style={{ marginLeft: "auto" }}
+							onClick={(e) => {
+								e.stopPropagation();
+								onShare.tracks?.();
+							}}
+							aria-label="Share top tracks"
+							dangerouslySetInnerHTML={{ __html: ShareIcon }}
+						/>
+					)}
 				</header>
 				{loading || loadingByColumn?.tracks ? (
 					<TopListColumnSkeleton />
@@ -135,6 +155,19 @@ export function TopLists({
 				<header className="section-heading">
 					<span className="section-kicker">Top</span>
 					<h2 className="section-title">Artists</h2>
+					{onShare?.artists && (
+						<button
+							type="button"
+							className="btn-icon share-section-btn"
+							style={{ marginLeft: "auto" }}
+							onClick={(e) => {
+								e.stopPropagation();
+								onShare.artists?.();
+							}}
+							aria-label="Share top artists"
+							dangerouslySetInnerHTML={{ __html: ShareIcon }}
+						/>
+					)}
 				</header>
 				{loading || loadingByColumn?.artists ? (
 					<TopListColumnSkeleton />
@@ -229,6 +262,19 @@ export function TopLists({
 				<header className="section-heading">
 					<span className="section-kicker">Top</span>
 					<h2 className="section-title">Albums</h2>
+					{onShare?.albums && (
+						<button
+							type="button"
+							className="btn-icon share-section-btn"
+							style={{ marginLeft: "auto" }}
+							onClick={(e) => {
+								e.stopPropagation();
+								onShare.albums?.();
+							}}
+							aria-label="Share top albums"
+							dangerouslySetInnerHTML={{ __html: ShareIcon }}
+						/>
+					)}
 				</header>
 				{loading || loadingByColumn?.albums ? (
 					<TopListColumnSkeleton />

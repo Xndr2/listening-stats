@@ -1,20 +1,35 @@
 import type { RecentPlay } from "../../shared/types/stats";
 import { normalizeSpotifyImageUrl } from "../../shared/util/spotify-image-url";
 import { formatRelativeTime } from "../format";
+import { ShareIcon } from "../icons";
 import { navigateToUri } from "../utils";
 import { SkeletonBlock } from "./SkeletonPrimitives";
 
 interface RecentlyPlayedProps {
 	recentPlays?: RecentPlay[];
 	loading?: boolean;
+	onShare?: () => void;
 }
 
-export function RecentlyPlayed({ recentPlays = [], loading = false }: RecentlyPlayedProps) {
+export function RecentlyPlayed({ recentPlays = [], loading = false, onShare }: RecentlyPlayedProps) {
 	return (
 		<div className="section-card">
 			<header className="section-heading">
 				<span className="section-kicker">Last 24h</span>
 				<h2 className="section-title">Recently Played</h2>
+				{onShare && (
+					<button
+						type="button"
+						className="btn-icon share-section-btn"
+						style={{ marginLeft: "auto" }}
+						onClick={(e) => {
+							e.stopPropagation();
+							onShare();
+						}}
+						aria-label="Share recently played"
+						dangerouslySetInnerHTML={{ __html: ShareIcon }}
+					/>
+				)}
 			</header>
 			<div className="recently-played">
 				{loading

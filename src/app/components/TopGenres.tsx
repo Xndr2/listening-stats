@@ -1,12 +1,14 @@
 import type { TopGenre } from "../../shared/types/stats";
+import { ShareIcon } from "../icons";
 
 interface TopGenresProps {
 	topGenres: TopGenre[];
 	onGenreClick?: (genre: string) => void;
 	activeGenre?: string | null;
+	onShare?: () => void;
 }
 
-export function TopGenres({ topGenres, onGenreClick, activeGenre }: TopGenresProps) {
+export function TopGenres({ topGenres, onGenreClick, activeGenre, onShare }: TopGenresProps) {
 	if (!topGenres || topGenres.length === 0) return null;
 
 	const genres = topGenres.slice(0, 6);
@@ -17,6 +19,19 @@ export function TopGenres({ topGenres, onGenreClick, activeGenre }: TopGenresPro
 			<header className="section-heading">
 				<span className="section-kicker">Composition</span>
 				<h2 className="section-title">Top Genres</h2>
+				{onShare && (
+					<button
+						type="button"
+						className="btn-icon share-section-btn"
+						style={{ marginLeft: "auto" }}
+						onClick={(e) => {
+							e.stopPropagation();
+							onShare();
+						}}
+						aria-label="Share genres"
+						dangerouslySetInnerHTML={{ __html: ShareIcon }}
+					/>
+				)}
 			</header>
 			<div className="top-genres-list">
 				{genres.map((genre, i) => {

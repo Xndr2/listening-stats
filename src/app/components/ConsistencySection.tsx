@@ -1,4 +1,5 @@
 import type { Period } from "../../shared/types/stats";
+import { ShareIcon } from "../icons";
 import { SkeletonBlock, SkeletonTextLine } from "./SkeletonPrimitives";
 
 interface DailyPoint {
@@ -15,6 +16,7 @@ interface ConsistencySectionProps {
 	streak?: number;
 	activePeriod: Period;
 	activeProviderId?: string;
+	onShare?: () => void;
 }
 
 interface MetricCardProps {
@@ -63,6 +65,7 @@ export function ConsistencySection({
 	streak,
 	activePeriod,
 	activeProviderId = "statsfm",
+	onShare,
 }: ConsistencySectionProps) {
 	if (loading) {
 		return (
@@ -110,6 +113,19 @@ export function ConsistencySection({
 			<header className="section-heading">
 				<span className="section-kicker">Patterns</span>
 				<h2 className="section-title">Consistency</h2>
+				{onShare && (
+					<button
+						type="button"
+						className="btn-icon share-section-btn"
+						style={{ marginLeft: "auto" }}
+						onClick={(e) => {
+							e.stopPropagation();
+							onShare();
+						}}
+						aria-label="Share consistency"
+						dangerouslySetInnerHTML={{ __html: ShareIcon }}
+					/>
+				)}
 			</header>
 			<div className="consistency-grid">
 				<MetricCard
