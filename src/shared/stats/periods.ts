@@ -31,6 +31,16 @@ function getLast6MonthsBoundaries(): PeriodBoundaries {
 	return { start: start.getTime(), end: end.getTime() };
 }
 
+function getRolling4WeeksBoundaries(): PeriodBoundaries {
+	const now = Date.now();
+	return { start: now - 28 * 86400000, end: now };
+}
+
+function getRolling6MonthsBoundaries(): PeriodBoundaries {
+	const now = Date.now();
+	return { start: now - 180 * 86400000, end: now };
+}
+
 function getAllTimeBoundaries(): PeriodBoundaries {
 	return { start: 0, end: Number.MAX_SAFE_INTEGER };
 }
@@ -67,8 +77,8 @@ export const LOCAL_PERIODS: Period[] = [
 // stats.fm API uses named range params (today/weeks/months/lifetime), not timestamps
 
 export const STATSFM_PERIODS: Period[] = [
-	{ id: "sfm-weeks", label: "This Week", getBoundaries: getThisWeekBoundaries },
-	{ id: "sfm-months", label: "This Month", getBoundaries: getThisMonthBoundaries },
+	{ id: "sfm-weeks", label: "Last 4 Weeks", getBoundaries: getRolling4WeeksBoundaries },
+	{ id: "sfm-months", label: "Last 6 Months", getBoundaries: getRolling6MonthsBoundaries },
 	{ id: "sfm-all-time", label: "All Time", getBoundaries: getAllTimeBoundaries },
 ];
 
@@ -90,13 +100,25 @@ export function getAdjacentPeriod(currentId: string): Period | null {
  * Feeds new-artist diff and hero vs-prior duration ratio.
  */
 export function getPriorPeriodBoundaries(period: Period): { start: number; end: number } | null {
-	if (period.id === "all-time" || period.id === "sfm-all-time") return null;
+	if (period.id === "all-time" || period.id === "sfm-all-time" || period.id === "overall") return null;
 	const { start, end } = period.getBoundaries();
 	const length = end - start;
 	const priorStart = start - length;
 	if (priorStart < 0) return null;
 	return { start: priorStart, end: start };
 }
+
+// Last.fm periods  -  API uses period param (7day / 1month / 3month / 6month / 12month / overall)
+// Boundaries kept for prior-window diff and local fallback use.
+
+export const LASTFM_PERIODS: Period[] = [
+	{ id: "7day", label: "7 Days", getBoundaries: () => ({ start: Date.now() - 7 * 86400000, end: Date.now() }) },
+	{ id: "1month", label: "1 Month", getBoundaries: () => ({ start: Date.now() - 30 * 86400000, end: Date.now() }) },
+	{ id: "3month", label: "3 Months", getBoundaries: () => ({ start: Date.now() - 90 * 86400000, end: Date.now() }) },
+	{ id: "6month", label: "6 Months", getBoundaries: () => ({ start: Date.now() - 180 * 86400000, end: Date.now() }) },
+	{ id: "12month", label: "12 Months", getBoundaries: () => ({ start: Date.now() - 365 * 86400000, end: Date.now() }) },
+	{ id: "overall", label: "Overall", getBoundaries: getAllTimeBoundaries },
+];
 
 /** Synthetic period tab: opens global charts (not persisted as a time range). */
 export const WORLD_TAB_PERIOD_ID = "world-charts";
