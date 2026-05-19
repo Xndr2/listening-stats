@@ -112,18 +112,20 @@ export function TopLists({
 										{track.artistName}
 									</div>
 								</div>
-								<div
-									style={{
-										display: "flex",
-										alignItems: "center",
-										color: "rgba(var(--spice-rgb-text), 0.55)",
-										flexShrink: 0,
-									}}
-								>
-									<span style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
-										{formatDuration(track.durationMs)}
-									</span>
-								</div>
+								{!stats?.isFreeTier || track.durationMs > 0 ? (
+									<div
+										style={{
+											display: "flex",
+											alignItems: "center",
+											color: "rgba(var(--spice-rgb-text), 0.55)",
+											flexShrink: 0,
+										}}
+									>
+										<span style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
+											{formatDuration(track.durationMs)}
+										</span>
+									</div>
+								) : null}
 							</div>
 						);
 					})
@@ -189,7 +191,9 @@ export function TopLists({
 											textOverflow: "ellipsis",
 										}}
 									>
-										<span style={{ fontVariantNumeric: "tabular-nums" }}>{formatNumber(artist.count)} plays</span>
+										{(!stats?.isFreeTier || artist.count > 0) && (
+											<span style={{ fontVariantNumeric: "tabular-nums" }}>{formatNumber(artist.count)} plays</span>
+										)}
 										{primaryGenre && (
 											<>
 												<span style={{ opacity: 0.4 }}>·</span>
@@ -280,7 +284,12 @@ export function TopLists({
 											fontVariantNumeric: "tabular-nums",
 										}}
 									>
-										{album.artistName} · {formatNumber(album.count)} plays
+										{album.artistName}
+										{(!stats?.isFreeTier || album.count > 0) && (
+											<>
+												{" ·"} {formatNumber(album.count)} plays
+											</>
+										)}
 									</div>
 								</div>
 							</div>

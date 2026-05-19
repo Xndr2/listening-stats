@@ -66,8 +66,7 @@ export async function fetchMytopImageLookups(): Promise<{
 }
 
 function stripSpotifyMeta<T extends WorldTrack & { spotifyTrackId?: string }>(t: T): WorldTrack {
-	const { spotifyTrackId: _omit, ...rest } = t;
-	return rest;
+	return t;
 }
 
 /** Fill missing `artUrl` using mytopspotify (Spotify id first, then title+artist). */
@@ -103,6 +102,7 @@ export async function fetchMytopWorldTracks(): Promise<WorldTrack[]> {
 			country: "GL",
 			plays: "",
 			delta: null,
+			...(row.spotifyId ? { spotifyTrackId: row.spotifyId } : {}),
 			...(row.image ? { artUrl: row.image } : {}),
 		};
 	});
