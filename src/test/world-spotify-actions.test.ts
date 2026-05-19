@@ -5,7 +5,6 @@ vi.mock("../shared/api/cosmos-async", () => ({
 	cosmosGet: vi.fn(),
 }));
 
-import { cosmosGet } from "../shared/api/cosmos-async";
 import {
 	enrichTracksWithSpotifyIds,
 	navigateWorldItem,
@@ -13,6 +12,7 @@ import {
 	playWorldTrack,
 	spotifyTrackUri,
 } from "../app/world-spotify-actions";
+import { cosmosGet } from "../shared/api/cosmos-async";
 
 const cosmosGetMock = vi.mocked(cosmosGet);
 

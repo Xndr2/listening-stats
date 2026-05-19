@@ -31,4 +31,3 @@ export type WorldWindow = "today" | "week" | "month" | "lifetime";
 export type WorldChartDataSource = "statsfm" | "mytopspotify" | "mock";
 
 export type WorldChartKind = "track" | "artist" | "album";
-
