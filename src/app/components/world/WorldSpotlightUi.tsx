@@ -1,7 +1,7 @@
 import type { WorldChartKind, WorldIndicator, WorldTrack, WorldWindow } from "../../../shared/types/world-charts";
 import { formatDuration } from "../../world-charts-service";
-import { getRankClass } from "../TopLists";
 import { navigateWorldItem, playOrOpenWorldTrack, trackPlayTooltip } from "../../world-spotify-actions";
+import { getRankClass } from "../TopLists";
 
 const { useMemo } = Spicetify.React;
 
@@ -183,15 +183,7 @@ function asideCardMeta(item: WorldTrack, kind: WorldChartKind) {
 	return { title: item.title, sub: item.artist ? `${item.artist}${year}` : "", stat: item.plays, art };
 }
 
-function HeroAsideCard({
-	label,
-	item,
-	kind,
-}: {
-	label: string;
-	item: WorldTrack;
-	kind: WorldChartKind;
-}) {
+function HeroAsideCard({ label, item, kind }: { label: string; item: WorldTrack; kind: WorldChartKind }) {
 	const meta = asideCardMeta(item, kind);
 	return (
 		<button type="button" className="world-aside-card" onClick={() => navigateWorldItem(item, kind)}>
@@ -373,7 +365,10 @@ export function ChartCard({
 }) {
 	const all = [...podium, ...rows];
 	return (
-		<section className="section-card" data-section={kind === "track" ? "tracks" : kind === "artist" ? "artists" : "albums"}>
+		<section
+			className="section-card"
+			data-section={kind === "track" ? "tracks" : kind === "artist" ? "artists" : "albums"}
+		>
 			<header className="section-heading">
 				<span className="section-kicker">{kicker}</span>
 				<h2 className="section-title">{title}</h2>

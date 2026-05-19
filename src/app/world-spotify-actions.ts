@@ -130,9 +130,7 @@ function pickSpotifySearchMatch(items: SpotifySearchTrack[], title: string, arti
 
 async function searchSpotifyTrackId(title: string, artist: string): Promise<string | null> {
 	const primary = primaryArtistName(artist);
-	const queries = primary
-		? [`track:${title} artist:${primary}`, `${title} ${primary}`]
-		: [title];
+	const queries = primary ? [`track:${title} artist:${primary}`, `${title} ${primary}`] : [title];
 
 	for (const q of queries) {
 		const result = await cosmosGet<SpotifySearchResponse>(
