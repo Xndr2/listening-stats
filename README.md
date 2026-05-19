@@ -6,9 +6,8 @@ Spicetify custom app: a listening statistics dashboard inside Spotify (stats.fm,
 ![Spicetify](https://img.shields.io/badge/spicetify-2.x-1DB954)
 ![GitHub Downloads](https://img.shields.io/github/downloads/Xndr2/listening-stats/total)
 
-<!-- <img width="600" alt="Listening Stats dashboard preview" src="https://github.com/user-attachments/assets/b66daa0e-4d08-4eb2-b5ff-6b693ce4dbdc" /> -->
-<img width="1734" height="1312" alt="image" src="https://github.com/user-attachments/assets/757403c6-902d-4f69-b2da-0cc98c81c643" />
-
+<img src="docs/screenshots/Screenshot01.png" alt="Listening Stats overview" />
+<img src="docs/screenshots/Screenshot02.png" alt="Listening Stats heatmap" />  
 
 ## Features
 
@@ -65,16 +64,6 @@ Feedback and bug reports are welcome. There is an active dev channel on Discord:
 2. Branch: `git checkout -b feature/your-feature`  
 3. Run **`pnpm test`**, **`pnpm lint`**, and a production **`pnpm build`** before opening a PR  
 4. Open a pull request against **`main`**
-
-### Maintainer notes (code hygiene)
-
-Keep shipped source (`src/`, tests, install scripts) readable and free of internal-process cruft:
-
-- **Comments:** short and factual. Avoid long tutorial-style or redundant explanations (“AI slop”). Prefer deleting noise over adding more.
-- **Punctuation:** use normal ASCII in code, comments, and user-visible strings (for example **`,` / `.` / `:`**). Avoid Unicode **em dashes** (`—`) in this repo.
-- **No internal doc leakage:** do not reference private planning folders, design bundles, automation tool names, or log-file paths in code comments or UI copy. Point contributors to **`docs/DEVELOPMENT.md`** when release/process detail is needed.
-
-Deep-dive for releases, announcements, and updates: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
 
 ## License
 
