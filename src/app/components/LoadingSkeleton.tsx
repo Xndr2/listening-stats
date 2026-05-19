@@ -70,27 +70,17 @@ export function TopListSkeleton() {
 
 export function WorldChartsSkeleton() {
 	return (
-		<div className="world-charts-skeleton" aria-hidden="true">
-			{Array.from({ length: 2 }).map((_, section) => (
-				<div key={section} style={{ marginBottom: "32px" }}>
-					<div
-						className="skeleton-shimmer"
-						style={{ width: "100px", height: "12px", marginBottom: "6px", borderRadius: "4px" }}
-					/>
-					<div
-						className="skeleton-shimmer"
-						style={{ width: "140px", height: "18px", marginBottom: "16px", borderRadius: "4px" }}
-					/>
-					<div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "8px 0" }}>
-						{Array.from({ length: 8 }).map((_, row) => (
-							<div key={row} style={{ display: "flex", gap: "12px", alignItems: "center", padding: "6px 8px" }}>
-								<div
-									className="skeleton-shimmer"
-									style={{ width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0 }}
-								/>
+		<>
+			{Array.from({ length: 3 }).map((_, section) => (
+				<div key={section} className="section-card" style={{ paddingBottom: 12 }}>
+					<div className="skeleton-shimmer" style={{ width: "40%", height: 14, margin: "14px 18px 10px" }} />
+					<div>
+						{Array.from({ length: 6 }).map((_, row) => (
+							<div key={row} style={{ display: "flex", gap: 12, alignItems: "center", padding: "8px 12px" }}>
+								<div className="skeleton-shimmer" style={{ width: 20, height: 20, borderRadius: 4, flexShrink: 0 }} />
 								<div
 									className="skeleton-shimmer skeleton-tile"
-									style={{ width: "36px", height: "36px", borderRadius: "4px", flexShrink: 0 }}
+									style={{ width: 40, height: 40, borderRadius: 4, flexShrink: 0 }}
 								/>
 								<div style={{ flex: 1 }}>
 									<div
@@ -104,16 +94,12 @@ export function WorldChartsSkeleton() {
 									/>
 									<div className="skeleton-shimmer" style={{ width: "50%", height: "10px", borderRadius: "4px" }} />
 								</div>
-								<div
-									className="skeleton-shimmer"
-									style={{ width: "40px", height: "12px", borderRadius: "4px", flexShrink: 0 }}
-								/>
 							</div>
 						))}
 					</div>
 				</div>
 			))}
-		</div>
+		</>
 	);
 }
 

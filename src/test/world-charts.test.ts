@@ -12,9 +12,11 @@ function chartTrackItems(n: number) {
 		streams: 1000 * (n - i),
 		indicator: i === 0 ? "UP" : i === 1 ? "DOWN" : "NONE",
 		track: {
+			id: 1000 + i,
 			name: `Track ${i + 1}`,
 			artists: [{ name: `Artist ${i + 1}` }],
 			albums: [{}],
+			externalIds: i === 0 ? { spotify: ["spotify-track-1"] } : {},
 		},
 	}));
 }
@@ -25,6 +27,15 @@ function chartArtistItems(n: number) {
 		streams: 5000 * (n - i),
 		indicator: "NONE",
 		artist: { name: `Star ${i + 1}` },
+	}));
+}
+
+function chartAlbumItems(n: number) {
+	return Array.from({ length: n }, (_, i) => ({
+		position: i + 1,
+		streams: 3000 * (n - i),
+		indicator: "NONE",
+		album: { name: `Album ${i + 1}`, artists: [{ name: `Artist ${i + 1}` }] },
 	}));
 }
 
@@ -39,13 +50,23 @@ beforeEach(() => {
 	vi.stubGlobal("fetch", (url: string | URL) => {
 		const u = url.toString();
 		if (u.includes("/charts/top/tracks")) {
-			return Promise.resolve(makeResponse(200, { items: chartTrackItems(8) }));
+			return Promise.resolve(makeResponse(200, { items: chartTrackItems(10) }));
 		}
 		if (u.includes("/charts/top/artists")) {
-			return Promise.resolve(makeResponse(200, { items: chartArtistItems(8) }));
+			return Promise.resolve(makeResponse(200, { items: chartArtistItems(10) }));
+		}
+		if (u.includes("/charts/top/albums")) {
+			return Promise.resolve(makeResponse(200, { items: chartAlbumItems(10) }));
 		}
 		if (u.includes("mytopspotify.io")) {
 			return Promise.resolve(makeResponse(200, { data: [] }));
+		}
+		if (u.includes("/tracks/") && !u.includes("/charts/")) {
+			return Promise.resolve(
+				makeResponse(200, {
+					item: { externalIds: { spotify: ["resolved-spotify-id"] } },
+				}),
+			);
 		}
 		return Promise.reject(new Error("unexpected fetch"));
 	});
@@ -55,15 +76,15 @@ async function renderAndWaitForLoad() {
 	const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
 	const result = render(React.createElement(WorldChartsPage));
 	await vi.waitFor(() => {
-		expect(result.container.querySelector(".world-charts-skeleton")).toBeNull();
+		expect(result.container.querySelector("[data-testid='world-hero-title']")).not.toBeNull();
 	});
 	return result;
 }
 
 describe("WorldTrack type and WORLD_TRACKS mock data", () => {
-	it("WORLD_TRACKS has 8 entries", async () => {
+	it("WORLD_TRACKS has 10 entries", async () => {
 		const { WORLD_TRACKS } = await import("../app/world-charts-service");
-		expect(WORLD_TRACKS).toHaveLength(8);
+		expect(WORLD_TRACKS).toHaveLength(10);
 	});
 
 	it("each track has required fields", async () => {
@@ -80,26 +101,27 @@ describe("WorldTrack type and WORLD_TRACKS mock data", () => {
 });
 
 describe("worldChartsService", () => {
-	it("getCharts returns 8 tracks", async () => {
+	it("getCharts returns 10 tracks", async () => {
 		const { getCharts } = await import("../app/world-charts-service");
-		expect(getCharts("world", "today")).toHaveLength(8);
+		expect(getCharts("world", "today")).toHaveLength(10);
 	});
 });
 
-describe("WorldChartsPage  -  rendering", () => {
-	it("renders section heading with kicker 'World Charts'", async () => {
+describe("WorldChartsPage — rendering", () => {
+	it("renders page kicker and World title", async () => {
 		const { container } = await renderAndWaitForLoad();
-		const kickers = container.querySelectorAll(".section-kicker");
-		expect(kickers.length).toBeGreaterThan(0);
-		expect(kickers[0]?.textContent).toBe("World Charts");
+		expect(container.querySelector("[data-testid='world-page-kicker']")?.textContent).toBe(
+			"What the planet is playing",
+		);
+		expect(container.querySelector(".world-page-header .section-title")?.textContent).toBe("World");
 	});
 
-	it("renders window tabs with four range options", async () => {
+	it("renders window tabs with supported ranges", async () => {
 		const { container } = await renderAndWaitForLoad();
-		const windowTabs = container.querySelector("[data-tabs='window']");
+		const windowTabs = container.querySelector("[data-testid='world-window-tabs']");
 		expect(windowTabs).not.toBeNull();
 		const labels = Array.from(windowTabs!.querySelectorAll("button")).map((b) => b.textContent);
-		expect(labels).toEqual(["Today", "This week", "This month", "All-time"]);
+		expect(labels).toEqual(["Today", "This Week"]);
 	});
 
 	it("renders source attribution for stats.fm", async () => {
@@ -108,84 +130,108 @@ describe("WorldChartsPage  -  rendering", () => {
 		expect(source?.textContent).toContain("stats.fm");
 	});
 
-	it("renders world page beta notice", async () => {
+	it("renders three chart section cards", async () => {
 		const { container } = await renderAndWaitForLoad();
-		expect(container.querySelector(".world-page-notice")).not.toBeNull();
+		expect(container.querySelector("[data-section='tracks']")).not.toBeNull();
+		expect(container.querySelector("[data-section='artists']")).not.toBeNull();
+		expect(container.querySelector("[data-section='albums']")).not.toBeNull();
 	});
 
-	it("renders two section cards for tracks and artists", async () => {
+	it("renders hero for #1 track", async () => {
 		const { container } = await renderAndWaitForLoad();
-		const cards = container.querySelectorAll(".world-charts-layout .section-card");
-		expect(cards.length).toBe(2);
+		expect(container.querySelector(".world-hero-section")).not.toBeNull();
+		expect(container.querySelector("[data-testid='world-hero-title']")?.textContent).toBe("Track 1");
 	});
 
-	it("renders 8 ranked track items", async () => {
+	it("renders hero aside highlights on large layout", async () => {
+		const { container } = await renderAndWaitForLoad();
+		const aside = container.querySelector(".world-hero-aside");
+		expect(aside).not.toBeNull();
+		expect(aside!.querySelectorAll(".world-aside-card").length).toBeGreaterThanOrEqual(3);
+	});
+
+	it("renders list rows in tracks section", async () => {
 		const { container } = await renderAndWaitForLoad();
 		const tracksSection = container.querySelector("[data-section='tracks']");
-		const items = tracksSection!.querySelectorAll(".world-chart-item");
-		expect(items).toHaveLength(8);
+		expect(tracksSection!.querySelectorAll(".top-list-row").length).toBe(10);
 	});
 });
 
-describe("WorldChartsPage  -  art tiles", () => {
-	it("track tiles use gradient when no art URL", async () => {
+describe("WorldChartsPage — art tiles", () => {
+	it("row tiles use gradient fallback when no art URL", async () => {
 		const { container } = await renderAndWaitForLoad();
 		const tracksSection = container.querySelector("[data-section='tracks']");
-		const tile = tracksSection!.querySelector(".world-chart-tile") as HTMLElement;
+		const tile = tracksSection!.querySelector(".track-art--fallback") as HTMLElement;
+		expect(tile).not.toBeNull();
 		expect(tile.style.background).toContain("linear-gradient");
 	});
-
-	it("artist tiles are round", async () => {
-		const { container } = await renderAndWaitForLoad();
-		const artistsSection = container.querySelector("[data-section='artists']");
-		const tiles = artistsSection!.querySelectorAll(".world-chart-tile");
-		for (const tile of tiles) {
-			expect(tile.classList.contains("world-chart-tile--round")).toBe(true);
-		}
-	});
 });
 
-describe("WorldChartsPage  -  window interaction", () => {
+describe("WorldChartsPage — window interaction", () => {
 	it("defaults window to 'today'", async () => {
 		const { container } = await renderAndWaitForLoad();
-		const windowTabs = container.querySelector("[data-tabs='window']");
-		const activeBtn = windowTabs?.querySelector("button.active");
+		const activeBtn = container.querySelector("[data-testid='world-window-tabs'] .period-tab.active");
 		expect(activeBtn?.textContent).toBe("Today");
 	});
 
 	it("persists window selection to localStorage", async () => {
 		const { LS_KEYS } = await import("../shared/constants/storage-keys");
 		const { container } = await renderAndWaitForLoad();
-		const windowTabs = container.querySelector("[data-tabs='window']");
-		const weekBtn = windowTabs!.querySelectorAll("button")[1]!;
+		const weekBtn = container.querySelectorAll("[data-testid='world-window-tabs'] button")[1]!;
 		fireEvent.click(weekBtn);
 		expect(localStorage.getItem(LS_KEYS.WORLD_CHARTS_WINDOW)).toBe("week");
 	});
 
 	it("restores window from localStorage on mount", async () => {
 		const { LS_KEYS } = await import("../shared/constants/storage-keys");
-		localStorage.setItem(LS_KEYS.WORLD_CHARTS_WINDOW, "month");
+		localStorage.setItem(LS_KEYS.WORLD_CHARTS_WINDOW, "week");
 		const { container } = await renderAndWaitForLoad();
-		const windowTabs = container.querySelector("[data-tabs='window']");
-		const activeBtn = windowTabs?.querySelector("button.active");
-		expect(activeBtn?.textContent).toBe("This month");
+		const activeBtn = container.querySelector("[data-testid='world-window-tabs'] .period-tab.active");
+		expect(activeBtn?.textContent).toBe("This Week");
 	});
 });
 
-describe("WorldChartsPage  -  click-to-search", () => {
+describe("WorldChartsPage — click navigation", () => {
 	beforeEach(() => {
 		vi.mocked(Spicetify.Platform.History.push).mockClear();
 	});
 
-	it("clicking a track item triggers Spotify search navigation", async () => {
+	it("clicking hero play uses Spotify player when track id exists", async () => {
+		const playUri = vi.fn();
+		(Spicetify.Player as { playUri?: (uri: string) => void }).playUri = playUri;
 		const { container } = await renderAndWaitForLoad();
-		const items = container.querySelectorAll(".world-chart-item");
-		fireEvent.click(items[0]);
-		expect(Spicetify.Platform.History.push).toHaveBeenCalledWith(expect.stringContaining("/search/"));
+		const playBtn = container.querySelector("[data-testid='world-hero-play']") as HTMLButtonElement;
+		fireEvent.click(playBtn);
+		expect(playUri).toHaveBeenCalledWith("spotify:track:spotify-track-1");
+	});
+
+	it("does not expose month or all-time tabs (stats.fm unsupported)", async () => {
+		const { container } = await renderAndWaitForLoad();
+		const labels = Array.from(container.querySelectorAll("[data-testid='world-window-tabs'] button")).map(
+			(b) => b.textContent,
+		);
+		expect(labels).not.toContain("This Month");
+		expect(labels).not.toContain("All Time");
+	});
+
+	it("resets persisted month window to today", async () => {
+		const { LS_KEYS } = await import("../shared/constants/storage-keys");
+		localStorage.setItem(LS_KEYS.WORLD_CHARTS_WINDOW, "month");
+		const { container } = await renderAndWaitForLoad();
+		const active = container.querySelector("[data-testid='world-window-tabs'] .period-tab.active");
+		expect(active?.textContent).toBe("Today");
+	});
+
+	it("clicking a list row opens track page after spotify id enrichment", async () => {
+		const { container } = await renderAndWaitForLoad();
+		const tracksSection = container.querySelector("[data-section='tracks']");
+		const rows = tracksSection!.querySelectorAll(".top-list-row");
+		fireEvent.click(rows[3] as HTMLElement);
+		expect(Spicetify.Platform.History.push).toHaveBeenCalledWith("/track/resolved-spotify-id");
 	});
 });
 
-describe("page navigation  -  PAGE_IDS", () => {
+describe("page navigation — PAGE_IDS", () => {
 	it("PAGE_IDS contains 'dashboard' and 'world'", async () => {
 		const { PAGE_IDS } = await import("../app/preferences");
 		expect(PAGE_IDS).toContain("dashboard");

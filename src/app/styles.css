@@ -2202,6 +2202,329 @@ button.announcement-banner-link-btn:hover {
 	border: 1px solid rgba(var(--spice-rgb-button), 0.28);
 }
 
+/* World tab */
+.world-page-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-md, 16px);
+	align-items: stretch;
+}
+
+.world-hero-main {
+	grid-column: 1 / span 2;
+}
+
+.world-hero-aside {
+	grid-column: 3;
+	align-self: start;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-auto-rows: minmax(0, 1fr);
+	gap: var(--space-md, 16px);
+}
+
+.world-page-header {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: var(--space-md, 16px);
+	flex-wrap: wrap;
+	margin-bottom: 0;
+}
+
+.world-page-header .section-title {
+	font-size: clamp(28px, 3vw, 36px);
+}
+
+.world-hero-section--solo {
+	grid-column: 1 / -1;
+}
+
+.world-hero-main-inner {
+	display: flex;
+	gap: var(--space-md, 16px);
+	align-items: flex-start;
+}
+
+.world-hero-art-btn {
+	appearance: none;
+	border: 0;
+	padding: 0;
+	background: transparent;
+	cursor: pointer;
+	border-radius: 4px;
+	flex-shrink: 0;
+}
+
+.world-hero-art-btn:hover {
+	opacity: 0.92;
+}
+
+.world-hero-art-btn:focus-visible {
+	outline: 2px solid rgba(var(--spice-rgb-button), 0.7);
+	outline-offset: 2px;
+}
+
+.world-hero-copy {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.world-hero-title {
+	margin: 0;
+	font-size: clamp(22px, 2.8vw, 32px);
+}
+
+.world-hero-artist {
+	margin: 0;
+	font-size: 15px;
+	color: rgba(var(--spice-rgb-text), 0.72);
+	font-weight: 500;
+}
+
+.world-hero-stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 8px;
+}
+
+.world-hero-stats .overview-card {
+	flex: 0 1 auto;
+	min-width: 88px;
+	padding: 10px 12px;
+}
+
+.world-hero-play {
+	margin-top: 12px;
+	align-self: flex-start;
+}
+
+.world-aside-card {
+	appearance: none;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+	width: 100%;
+	min-width: 0;
+	min-height: 100%;
+	padding: 12px;
+	box-sizing: border-box;
+	border-radius: 8px;
+	border: 1px solid rgba(var(--spice-rgb-misc, 255, 255, 255), 0.12);
+	background: var(--spice-card);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	cursor: pointer;
+	transition:
+		background 0.15s,
+		border-color 0.15s;
+}
+
+.world-aside-card:hover {
+	background: rgba(var(--spice-rgb-misc, 255, 255, 255), 0.06);
+	border-color: rgba(var(--spice-rgb-misc, 255, 255, 255), 0.18);
+}
+
+.world-aside-card:focus-visible {
+	outline: 2px solid rgba(var(--spice-rgb-button), 0.7);
+	outline-offset: 2px;
+}
+
+.world-aside-card-label {
+	font-size: 10.5px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: rgba(var(--spice-rgb-text), 0.5);
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+.world-aside-card-row {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	min-width: 0;
+	flex: 1;
+}
+
+.world-aside-card-text {
+	min-width: 0;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.world-aside-card-title {
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.25;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.world-aside-card-sub {
+	font-size: 11px;
+	color: rgba(var(--spice-rgb-text), 0.55);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.world-aside-card-stat {
+	font-size: 15px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	color: var(--spice-text);
+	line-height: 1.2;
+	margin-top: 2px;
+}
+
+.world-aside-card-foot {
+	margin-top: auto;
+	padding-top: 2px;
+}
+
+.world-chart-row-title {
+	font-size: 14px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.world-chart-row-sub {
+	font-size: 12px;
+	color: rgba(var(--spice-rgb-text), 0.55);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.world-chart-row-stats {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 2px;
+	font-size: 12px;
+	font-weight: 600;
+	flex-shrink: 0;
+	min-width: 52px;
+}
+
+.world-chart-indicator {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.world-chart-indicator-glyph {
+	font-size: 9px;
+}
+
+.world-chart-indicator[data-dir="up"] {
+	color: oklch(0.78 0.16 145);
+}
+
+.world-chart-indicator[data-dir="down"] {
+	color: oklch(0.72 0.16 28);
+}
+
+.world-chart-indicator[data-dir="new"] {
+	color: oklch(0.85 0.18 92);
+}
+
+.world-chart-playbtn {
+	appearance: none;
+	border: 0;
+	cursor: pointer;
+	font: inherit;
+	background: var(--spice-button);
+	color: var(--spice-button-text, #000);
+	border-radius: 999px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	transition:
+		transform 0.1s,
+		background 0.15s;
+}
+
+.world-chart-playbtn:hover {
+	background: var(--spice-button-active, var(--spice-button));
+	transform: scale(1.06);
+}
+
+.world-genrechips {
+	display: inline-flex;
+	gap: 6px;
+}
+
+.world-genrechip {
+	display: inline-block;
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: rgba(var(--spice-rgb-text), 0.07);
+	color: rgba(var(--spice-rgb-text), 0.75);
+	font-size: 10.5px;
+	font-weight: 500;
+}
+
+@media (max-width: 1200px) {
+	.world-page-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.world-hero-main,
+	.world-hero-section--solo {
+		grid-column: 1;
+	}
+}
+
+@media (max-width: 1100px) {
+	.world-hero-aside {
+		display: none;
+	}
+
+	.world-hero-main,
+	.world-hero-section--solo {
+		grid-column: 1 / -1;
+	}
+
+	.world-hero-main-inner {
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+	}
+
+	.world-hero-stats {
+		justify-content: center;
+	}
+
+	.world-hero-play {
+		align-self: center;
+	}
+}
+
+@media (max-width: 780px) {
+	.world-page-header {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}
+
+/* Legacy world layout (unused components may still reference w-*) */
+
 .world-charts-header {
 	display: flex;
 	justify-content: space-between;
