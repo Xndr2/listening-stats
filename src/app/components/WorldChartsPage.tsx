@@ -10,7 +10,7 @@ import {
 } from "../world-charts-service";
 import { InlineErrorCard } from "./InlineErrorCard";
 import { WorldChartsSkeleton } from "./LoadingSkeleton";
-import { ChartCard, HeroSkeleton, WorldHeroSection, WorldWindowTabs, WORLD_WINDOWS } from "./world/WorldSpotlightUi";
+import { ChartCard, HeroSkeleton, WORLD_WINDOWS, WorldHeroSection, WorldWindowTabs } from "./world/WorldSpotlightUi";
 
 const { useState, useEffect, useCallback } = Spicetify.React;
 

@@ -510,10 +510,7 @@ export function getCharts(_scope: WorldScope, _window: WorldWindow): WorldTrack[
 	return [...WORLD_TRACKS];
 }
 
-export async function getChartsAsync(
-	_scope: WorldScope,
-	window: WorldWindow,
-): Promise<WorldChartResult<WorldTrack[]>> {
+export async function getChartsAsync(_scope: WorldScope, window: WorldWindow): Promise<WorldChartResult<WorldTrack[]>> {
 	if (!isStatsFmWindowSupported(window)) return unsupportedWindowResult(window);
 	const range = RANGE_BY_WINDOW[window] ?? "today";
 	try {
