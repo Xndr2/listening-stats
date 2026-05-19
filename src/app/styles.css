@@ -1664,6 +1664,64 @@ button.announcement-banner-link-btn:hover {
 	border-radius: 3px;
 }
 
+/* Drop-line indicators shown during section reorder drag */
+.dashboard-drop-line {
+	height: 3px;
+	margin: 0;
+	background: var(--spice-button-active);
+	border-radius: 2px;
+	opacity: 0;
+	transition:
+		opacity 120ms ease,
+		box-shadow 120ms ease;
+	pointer-events: none;
+}
+[data-drag-active] .dashboard-drop-line {
+	opacity: 0.2;
+}
+[data-drag-active] .dashboard-drop-line[data-active] {
+	opacity: 1;
+	box-shadow: 0 0 8px var(--spice-button-active);
+}
+
+/* Dashboard drag-handle for section reorder */
+.dashboard-section-row {
+	display: flex;
+	align-items: stretch;
+	gap: 6px;
+}
+
+.dashboard-drag-handle {
+	flex: 0 0 auto;
+	width: 20px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	background: transparent;
+	border: none;
+	cursor: grab;
+	color: rgba(var(--spice-rgb-text), 0.2);
+	border-radius: 4px;
+	margin-top: 20px;
+	transition:
+		color 0.15s,
+		background 0.15s;
+}
+.dashboard-drag-handle:hover {
+	color: rgba(var(--spice-rgb-text), 0.6);
+	background: rgba(var(--spice-rgb-misc, 128, 128, 128), 0.08);
+}
+.dashboard-drag-handle:active {
+	cursor: grabbing;
+	color: var(--spice-text);
+}
+
+.dashboard-section-content {
+	flex: 1;
+	min-width: 0;
+}
+
 /* Streak callout */
 .streak-callout {
 	margin-top: 14px;
