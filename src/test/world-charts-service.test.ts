@@ -12,9 +12,11 @@ const SFM_TRACKS_RESPONSE = {
 			streams: 222,
 			indicator: "NONE",
 			track: {
+				id: 12345,
 				name: "Unit Test Track",
 				artists: [{ name: "Unit Artist" }],
 				albums: [{ image: "https://example.com/cover.jpg" }],
+				externalIds: { spotify: ["unit-test-spotify"] },
 			},
 		},
 	],
@@ -42,18 +44,21 @@ afterEach(() => {
 });
 
 describe("getCharts (sync fallback)", () => {
-	it("returns WORLD_TRACKS", async () => {
+	it("returns WORLD_TRACKS (10 entries)", async () => {
 		const { getCharts, WORLD_TRACKS } = await import("../app/world-charts-service");
 		expect(getCharts("world", "today")).toEqual([...WORLD_TRACKS]);
+		expect(WORLD_TRACKS).toHaveLength(10);
 	});
 });
 
 describe("getChartsAsync", () => {
 	it("maps stats.fm chart payload", async () => {
-		const fetchMock = vi
-			.fn()
-			.mockResolvedValueOnce(makeResponse(200, SFM_TRACKS_RESPONSE))
-			.mockResolvedValueOnce(makeResponse(200, { data: [] }));
+		const fetchMock = vi.fn((url: string | URL) => {
+			const u = url.toString();
+			if (u.includes("/charts/top/tracks")) return Promise.resolve(makeResponse(200, SFM_TRACKS_RESPONSE));
+			if (u.includes("mytopspotify")) return Promise.resolve(makeResponse(200, { data: [] }));
+			return Promise.resolve(makeResponse(200, { item: { externalIds: { spotify: [] } } }));
+		});
 		vi.stubGlobal("fetch", fetchMock);
 
 		const { getChartsAsync } = await import("../app/world-charts-service");

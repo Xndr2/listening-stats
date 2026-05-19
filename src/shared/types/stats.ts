@@ -99,4 +99,6 @@ export interface StatsResult {
 	// Prior-window metrics (undefined for all-time / insufficient history)
 	newArtistCount?: number;
 	priorPeriodTotalDuration?: number;
+	/** True when the provider (stats.fm free) can't supply per-item play counts. UI hides misleading "0 plays". */
+	isFreeTier?: boolean;
 }
