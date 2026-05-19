@@ -1611,14 +1611,18 @@ button.announcement-banner-link-btn:hover {
 
 /* Calendar heatmap */
 .heatmap-container {
-	position: relative;
 	padding-top: 18px;
+}
+
+.heatmap-scroll-wrap {
+	display: flex;
+	justify-content: center;
 	overflow-x: auto;
-	overflow-y: visible;
 }
 
 .heatmap-scroll-inner {
 	min-width: min-content;
+	flex-shrink: 0;
 }
 
 .heatmap-month-labels {
@@ -1650,7 +1654,7 @@ button.announcement-banner-link-btn:hover {
 .heatmap-legend {
 	display: flex;
 	align-items: center;
-	justify-content: flex-end;
+	justify-content: center;
 	gap: 6px;
 	margin-top: 10px;
 	font-size: 11px;

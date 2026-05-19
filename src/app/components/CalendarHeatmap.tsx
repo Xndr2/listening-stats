@@ -91,32 +91,34 @@ export function CalendarHeatmap({ dailyPlayCounts }: CalendarHeatmapProps) {
 
 	return (
 		<div className="heatmap-container">
-			<div className="heatmap-scroll-inner">
-				<div className="heatmap-month-labels" style={{ gridTemplateColumns: gridCols }}>
-					{Array.from({ length: numWeeks }).map((_, wi) => {
-						const m = monthLabels.find((x) => x.col === wi);
-						return <span key={wi}>{m ? m.label : ""}</span>;
-					})}
-				</div>
-				<div className="heatmap-grid" style={{ gridTemplateColumns: gridCols }}>
-					{cells.map((week, wi) => (
-						<div key={wi} className="heatmap-week">
-							{week.map((cell, di) => (
-								<Spicetify.ReactComponent.TooltipWrapper
-									key={di}
-									label={cell ? `${cell.date.toDateString()} - ${cell.count} plays` : ""}
-									placement="top"
-								>
-									<div
-										className="heatmap-cell"
-										style={{
-											background: cell ? cellColor(cell.count, max) : "transparent",
-										}}
-									/>
-								</Spicetify.ReactComponent.TooltipWrapper>
-							))}
-						</div>
-					))}
+			<div className="heatmap-scroll-wrap">
+				<div className="heatmap-scroll-inner">
+					<div className="heatmap-month-labels" style={{ gridTemplateColumns: gridCols }}>
+						{Array.from({ length: numWeeks }).map((_, wi) => {
+							const m = monthLabels.find((x) => x.col === wi);
+							return <span key={wi}>{m ? m.label : ""}</span>;
+						})}
+					</div>
+					<div className="heatmap-grid" style={{ gridTemplateColumns: gridCols }}>
+						{cells.map((week, wi) => (
+							<div key={wi} className="heatmap-week">
+								{week.map((cell, di) => (
+									<Spicetify.ReactComponent.TooltipWrapper
+										key={di}
+										label={cell ? `${cell.date.toDateString()} - ${cell.count} plays` : ""}
+										placement="top"
+									>
+										<div
+											className="heatmap-cell"
+											style={{
+												background: cell ? cellColor(cell.count, max) : "transparent",
+											}}
+										/>
+									</Spicetify.ReactComponent.TooltipWrapper>
+								))}
+							</div>
+						))}
+					</div>
 				</div>
 			</div>
 			<div className="heatmap-legend">
