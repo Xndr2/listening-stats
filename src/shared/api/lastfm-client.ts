@@ -39,6 +39,75 @@ export interface LfmUserInfo {
 	imageUrl?: string;
 }
 
+// ── Last.fm API raw response types (for typed lastfmUserFetch) ──
+
+interface LfmImage {
+	size: string;
+	"#text": string;
+}
+
+interface LfmRecentTrackRaw {
+	name: string;
+	artist: { "#text": string } | { name: string };
+	album: { "#text": string };
+	image: LfmImage[];
+	date?: { uts: string };
+	"@attr"?: { nowplaying: string };
+}
+
+interface LfmTopTrackRaw {
+	name: string;
+	artist: { name: string };
+	playcount: string;
+	image: LfmImage[];
+}
+
+interface LfmTopArtistRaw {
+	name: string;
+	playcount: string;
+	image: LfmImage[];
+}
+
+interface LfmTopAlbumRaw {
+	name: string;
+	artist: { name: string };
+	playcount: string;
+	image: LfmImage[];
+}
+
+interface LfmUserInfoRaw {
+	user: {
+		name: string;
+		playcount: string;
+		registered: { "#text": string };
+		image: LfmImage[];
+	};
+}
+
+interface LfmRecentTracksRaw {
+	recenttracks: {
+		track: LfmRecentTrackRaw[];
+	};
+}
+
+interface LfmTopTracksRaw {
+	toptracks: {
+		track: LfmTopTrackRaw[];
+	};
+}
+
+interface LfmTopArtistsRaw {
+	topartists: {
+		artist: LfmTopArtistRaw[];
+	};
+}
+
+interface LfmTopAlbumsRaw {
+	topalbums: {
+		album: LfmTopAlbumRaw[];
+	};
+}
+
 const BASE = "https://ws.audioscrobbler.com/2.0/";
 
 const COUNTRY_MAP: Record<string, string> = {
@@ -209,7 +278,7 @@ async function lastfmUserFetch<T>(apiKey: string, method: string, params: Record
 }
 
 export async function lastfmGetUserInfo(apiKey: string, username: string): Promise<LfmUserInfo> {
-	const data = await lastfmUserFetch<any>(apiKey, "user.getinfo", { user: username });
+	const data = await lastfmUserFetch<LfmUserInfoRaw>(apiKey, "user.getinfo", { user: username });
 	const user = data.user;
 	return {
 		username: user.name,
@@ -235,17 +304,21 @@ export async function lastfmGetRecentTracks(
 	if (from !== undefined) params.from = String(Math.floor(from / 1000));
 	if (to !== undefined) params.to = String(Math.floor(to / 1000));
 
-	const data = await lastfmUserFetch<any>(apiKey, "user.getrecenttracks", params);
-	const tracks: any[] = data.recenttracks?.track || [];
+	const data = await lastfmUserFetch<LfmRecentTracksRaw>(apiKey, "user.getrecenttracks", params);
+	const tracks = data.recenttracks?.track || [];
 	return tracks
-		.filter((t: any) => t.date || t["@attr"]?.nowplaying)
-		.map((t: any) => ({
-			name: t.name,
-			artist: t.artist?.["#text"] || t.artist?.name || "",
-			album: t.album?.["#text"] || "",
-			albumArt: bestImage(t.image),
-			playedAt: t.date?.uts ? parseInt(t.date.uts, 10) * 1000 : Date.now(),
-		}));
+		.filter((t) => t.date || t["@attr"]?.nowplaying)
+		.map((t) => {
+			const artistName =
+				"#text" in t.artist ? (t.artist as { "#text": string })["#text"] : (t.artist as { name: string }).name;
+			return {
+				name: t.name,
+				artist: artistName,
+				album: t.album?.["#text"] || "",
+				albumArt: bestImage(t.image),
+				playedAt: t.date?.uts ? parseInt(t.date.uts, 10) * 1000 : Date.now(),
+			};
+		});
 }
 
 export async function lastfmGetTopTracks(
@@ -254,13 +327,13 @@ export async function lastfmGetTopTracks(
 	period: string,
 	limit = 200,
 ): Promise<LfmTopTrack[]> {
-	const data = await lastfmUserFetch<any>(apiKey, "user.gettoptracks", {
+	const data = await lastfmUserFetch<LfmTopTracksRaw>(apiKey, "user.gettoptracks", {
 		user: username,
 		period,
 		limit: String(limit),
 	});
-	const tracks: any[] = data.toptracks?.track || [];
-	return tracks.map((t: any) => ({
+	const tracks = data.toptracks?.track || [];
+	return tracks.map((t) => ({
 		name: t.name,
 		artist: t.artist?.name || "",
 		playCount: parseInt(t.playcount, 10) || 0,
@@ -274,13 +347,13 @@ export async function lastfmGetTopArtists(
 	period: string,
 	limit = 100,
 ): Promise<LfmTopArtist[]> {
-	const data = await lastfmUserFetch<any>(apiKey, "user.gettopartists", {
+	const data = await lastfmUserFetch<LfmTopArtistsRaw>(apiKey, "user.gettopartists", {
 		user: username,
 		period,
 		limit: String(limit),
 	});
-	const artists: any[] = data.topartists?.artist || [];
-	return artists.map((a: any) => ({
+	const artists = data.topartists?.artist || [];
+	return artists.map((a) => ({
 		name: a.name,
 		playCount: parseInt(a.playcount, 10) || 0,
 		imageUrl: bestImage(a.image),
@@ -293,13 +366,13 @@ export async function lastfmGetTopAlbums(
 	period: string,
 	limit = 100,
 ): Promise<LfmTopAlbum[]> {
-	const data = await lastfmUserFetch<any>(apiKey, "user.gettopalbums", {
+	const data = await lastfmUserFetch<LfmTopAlbumsRaw>(apiKey, "user.gettopalbums", {
 		user: username,
 		period,
 		limit: String(limit),
 	});
-	const albums: any[] = data.topalbums?.album || [];
-	return albums.map((a: any) => ({
+	const albums = data.topalbums?.album || [];
+	return albums.map((a) => ({
 		name: a.name,
 		artist: a.artist?.name || "",
 		playCount: parseInt(a.playcount, 10) || 0,
