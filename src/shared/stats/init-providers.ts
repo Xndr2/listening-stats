@@ -1,3 +1,4 @@
+import { lastfmProvider } from "./lastfm-provider";
 import { localProvider } from "./local-provider";
 import { providerRegistry } from "./provider";
 import { statsfmProvider } from "./statsfm-provider";
@@ -46,6 +47,7 @@ export async function initProviders(): Promise<void> {
 
 	providerRegistry.register(localProvider);
 	providerRegistry.register(statsfmProvider);
+	providerRegistry.register(lastfmProvider);
 	providerRegistry.restoreActive();
 
 	// Default to local if nothing saved or saved provider not found
@@ -56,6 +58,7 @@ export async function initProviders(): Promise<void> {
 	// Init all providers so switching doesn't hit uninitialized state
 	await localProvider.init();
 	await statsfmProvider.init();
+	await lastfmProvider.init();
 }
 
 /** Reset initialization guard for testing only */

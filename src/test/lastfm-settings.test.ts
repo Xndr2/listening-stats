@@ -3,8 +3,36 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../shared/api/lastfm-client", () => ({
+	lastfmGetUserInfo: vi.fn(),
 	validateLastfmKey: vi.fn(),
+	lastfmGetCharts: vi.fn(),
 }));
+
+vi.mock("../shared/api/lastfm-cache", () => ({
+	lastfmCache: { invalidate: vi.fn().mockResolvedValue(undefined) },
+}));
+
+vi.mock("../shared/stats/lastfm-provider", () => {
+	const mockProvider = {
+		init: vi.fn().mockResolvedValue(undefined),
+		getProviderInfo: () => ({
+			id: "lastfm",
+			name: "Last.fm",
+			description: "Use your Last.fm account",
+			capabilities: {
+				hasActivityData: true,
+				hasGenreData: true,
+				hasStreakData: true,
+				hasSkipRate: false,
+				tier: "free" as const,
+			},
+		}),
+		getSupportedPeriods: () => [],
+		calculateStats: vi.fn(),
+		destroy: vi.fn(),
+	};
+	return { lastfmProvider: mockProvider };
+});
 
 vi.mock("../shared/api/statsfm-client", () => ({
 	validateUsername: vi.fn(),
@@ -14,13 +42,20 @@ vi.mock("../shared/stats/statsfm-provider", () => ({
 	statsfmProvider: { init: vi.fn().mockResolvedValue(undefined) },
 }));
 
-import { validateLastfmKey } from "../shared/api/lastfm-client";
+import { lastfmGetUserInfo } from "../shared/api/lastfm-client";
+import { LS_KEYS } from "../shared/constants/storage-keys";
+import { lastfmProvider } from "../shared/stats/lastfm-provider";
+import { localProvider } from "../shared/stats/local-provider";
+import { providerRegistry } from "../shared/stats/provider";
 
-const validateMock = vi.mocked(validateLastfmKey);
+const getInfoMock = vi.mocked(lastfmGetUserInfo);
 
 beforeEach(() => {
 	localStorage.clear();
-	validateMock.mockReset();
+	getInfoMock.mockReset();
+	providerRegistry._resetForTesting();
+	providerRegistry.register(localProvider);
+	providerRegistry.register(lastfmProvider);
 });
 
 afterEach(() => {
@@ -28,107 +63,146 @@ afterEach(() => {
 	localStorage.clear();
 });
 
+function getLastfmSection(container: HTMLElement): HTMLElement | null {
+	const headings = container.querySelectorAll("h3");
+	for (const h of headings) {
+		if (h.textContent === "Last.fm Account") {
+			const el = h.nextElementSibling;
+			if (el instanceof HTMLElement) return el;
+		}
+	}
+	return null;
+}
+
 describe("Last.fm section in ProvidersTab  -  idle state", () => {
-	it("renders API key input field", async () => {
+	it("renders username input field", async () => {
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const input = container.querySelector("input[aria-label='Last.fm API key']");
+		const input = container.querySelector("input[aria-label='Last.fm username']");
 		expect(input).not.toBeNull();
 	});
 
-	it("renders Test Connection button", async () => {
+	it("renders API key input field", async () => {
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const btns = container.querySelectorAll("button");
-		const testBtn = Array.from(btns).find((b) => b.textContent?.includes("Test Connection"));
-		expect(testBtn).toBeDefined();
+		const input = container.querySelector("input[aria-label='Last.fm provider API key']");
+		expect(input).not.toBeNull();
 	});
 
-	it("disables Test Connection when input is empty", async () => {
+	it("renders Connect Account button in idle Last.fm section", async () => {
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const btns = container.querySelectorAll("button.btn-primary");
-		const testBtn = Array.from(btns).find((b) => b.textContent?.includes("Test Connection")) as HTMLButtonElement;
-		expect(testBtn.disabled).toBe(true);
+		const lfmSection = getLastfmSection(container);
+		expect(lfmSection).not.toBeNull();
+		const connectBtn = lfmSection!.querySelector("button.btn-primary");
+		expect(connectBtn).not.toBeNull();
+		expect(connectBtn?.textContent).toBe("Connect Account");
+	});
+
+	it("disables Connect Account when inputs are empty", async () => {
+		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
+		const { container } = render(React.createElement(ProvidersTab));
+		const lfmSection = getLastfmSection(container);
+		const connectBtn = lfmSection!.querySelector("button.btn-primary") as HTMLButtonElement;
+		expect(connectBtn.disabled).toBe(true);
 	});
 });
 
-describe("Last.fm section in ProvidersTab  -  validation flow", () => {
-	it("shows success state on valid API key", async () => {
-		validateMock.mockResolvedValue({ valid: true });
+describe("Last.fm section in ProvidersTab  -  connection flow", () => {
+	it("shows connected state on valid connection", async () => {
+		getInfoMock.mockResolvedValue({ username: "testuser", totalScrobbles: 1000, registered: "2020-01-01" });
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const input = container.querySelector("input[aria-label='Last.fm API key']") as HTMLInputElement;
-		fireEvent.change(input, { target: { value: "good-key-123" } });
-		const btns = container.querySelectorAll("button.btn-primary");
-		const testBtn = Array.from(btns).find((b) => b.textContent?.includes("Test Connection")) as HTMLButtonElement;
-		fireEvent.click(testBtn);
+		const lfmSection = getLastfmSection(container)!;
+		fireEvent.change(lfmSection.querySelector("input[aria-label='Last.fm username']")!, {
+			target: { value: "testuser" },
+		});
+		fireEvent.change(lfmSection.querySelector("input[aria-label='Last.fm provider API key']")!, {
+			target: { value: "valid-key" },
+		});
+		fireEvent.click(lfmSection.querySelector("button.btn-primary")!);
 		await vi.waitFor(() => {
-			const status = container.querySelector("[role='status']");
-			expect(status?.textContent).toContain("Connected");
+			const config = localStorage.getItem(LS_KEYS.LASTFM_CONFIG);
+			expect(config).not.toBeNull();
+			expect(JSON.parse(config!).username).toBe("testuser");
 		});
 	});
 
-	it("saves API key to localStorage on success", async () => {
-		validateMock.mockResolvedValue({ valid: true });
+	it("saves config to localStorage on success", async () => {
+		getInfoMock.mockResolvedValue({ username: "testuser", totalScrobbles: 1000, registered: "2020-01-01" });
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const input = container.querySelector("input[aria-label='Last.fm API key']") as HTMLInputElement;
-		fireEvent.change(input, { target: { value: "good-key-123" } });
-		const btns = container.querySelectorAll("button.btn-primary");
-		const testBtn = Array.from(btns).find((b) => b.textContent?.includes("Test Connection")) as HTMLButtonElement;
-		fireEvent.click(testBtn);
+		const lfmSection = getLastfmSection(container)!;
+		fireEvent.change(lfmSection.querySelector("input[aria-label='Last.fm username']")!, {
+			target: { value: "testuser" },
+		});
+		fireEvent.change(lfmSection.querySelector("input[aria-label='Last.fm provider API key']")!, {
+			target: { value: "valid-key" },
+		});
+		fireEvent.click(lfmSection.querySelector("button.btn-primary")!);
 		await vi.waitFor(() => {
-			expect(localStorage.getItem("listening-stats:lastfm-api-key")).toBe("good-key-123");
+			const configStr = localStorage.getItem(LS_KEYS.LASTFM_CONFIG);
+			expect(configStr).not.toBeNull();
+			const config = JSON.parse(configStr!);
+			expect(config.apiKey).toBe("valid-key");
+			expect(config.username).toBe("testuser");
 		});
 	});
 
-	it("shows error on invalid API key", async () => {
-		validateMock.mockResolvedValue({ valid: false, reason: "invalid_key" });
+	it("shows error on failed connection", async () => {
+		getInfoMock.mockRejectedValue(new Error("Invalid Last.fm API key"));
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const input = container.querySelector("input[aria-label='Last.fm API key']") as HTMLInputElement;
-		fireEvent.change(input, { target: { value: "bad-key" } });
-		const btns = container.querySelectorAll("button.btn-primary");
-		const testBtn = Array.from(btns).find((b) => b.textContent?.includes("Test Connection")) as HTMLButtonElement;
-		fireEvent.click(testBtn);
+		const lfmSection = getLastfmSection(container)!;
+		fireEvent.change(lfmSection.querySelector("input[aria-label='Last.fm username']")!, {
+			target: { value: "testuser" },
+		});
+		fireEvent.change(lfmSection.querySelector("input[aria-label='Last.fm provider API key']")!, {
+			target: { value: "bad-key" },
+		});
+		fireEvent.click(lfmSection.querySelector("button.btn-primary")!);
 		await vi.waitFor(() => {
 			const error = container.querySelector("[role='alert']");
 			expect(error).not.toBeNull();
-			expect(error?.textContent).toContain("Invalid");
 		});
 	});
 });
 
 describe("Last.fm section in ProvidersTab  -  connected state", () => {
-	it("renders connected state when API key exists in localStorage", async () => {
-		localStorage.setItem("listening-stats:lastfm-api-key", "existing-key");
+	function renderConnected() {
+		localStorage.setItem(LS_KEYS.LASTFM_CONFIG, JSON.stringify({ apiKey: "existing-key", username: "testuser" }));
+	}
+
+	it("renders connected state when config exists in localStorage", async () => {
+		renderConnected();
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const status = container.querySelector("[role='status']");
-		expect(status?.textContent).toContain("Connected");
+		const lfmSection = getLastfmSection(container)!;
+		const sublabel = lfmSection.querySelector(".settings-sublabel");
+		expect(sublabel?.textContent).toContain("Last.fm API key is configured");
 	});
 
 	it("has a Disconnect button in connected state", async () => {
-		localStorage.setItem("listening-stats:lastfm-api-key", "existing-key");
+		renderConnected();
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const btns = container.querySelectorAll("button.btn-destructive");
-		const disconnectBtn = Array.from(btns).find((b) => b.textContent?.includes("Disconnect"));
-		expect(disconnectBtn).toBeDefined();
+		const lfmSection = getLastfmSection(container)!;
+		const disconnectBtn = lfmSection.querySelector("button.btn-destructive");
+		expect(disconnectBtn).not.toBeNull();
+		expect(disconnectBtn?.textContent).toBe("Disconnect");
 	});
 
-	it("removes API key and returns to idle on disconnect", async () => {
-		localStorage.setItem("listening-stats:lastfm-api-key", "existing-key");
+	it("removes config and returns to idle on disconnect", async () => {
+		renderConnected();
 		const { ProvidersTab } = await import("../app/components/settings/ProvidersTab");
 		const { container } = render(React.createElement(ProvidersTab));
-		const btns = container.querySelectorAll("button.btn-destructive");
-		const disconnectBtn = Array.from(btns).find((b) => b.textContent?.includes("Disconnect")) as HTMLButtonElement;
+		const lfmSection = getLastfmSection(container)!;
+		const disconnectBtn = lfmSection.querySelector("button.btn-destructive") as HTMLButtonElement;
 		fireEvent.click(disconnectBtn);
 		await vi.waitFor(() => {
-			expect(localStorage.getItem("listening-stats:lastfm-api-key")).toBeNull();
-			const input = container.querySelector("input[aria-label='Last.fm API key']");
-			expect(input).not.toBeNull();
+			expect(localStorage.getItem(LS_KEYS.LASTFM_CONFIG)).toBeNull();
+			const usernameInput = container.querySelector("input[aria-label='Last.fm username']");
+			expect(usernameInput).not.toBeNull();
 		});
 	});
 });

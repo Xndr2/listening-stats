@@ -125,8 +125,8 @@ describe("initProviders", () => {
 	it("calling initProviders twice does not duplicate registration", async () => {
 		await initProviders();
 		await initProviders();
-		// localProvider + statsfmProvider = 2 registered; calling twice must not add duplicates
-		expect(providerRegistry.getAll().length).toBe(2);
+		// localProvider + statsfmProvider + lastfmProvider = 3 registered; calling twice must not add duplicates
+		expect(providerRegistry.getAll().length).toBe(3);
 	});
 
 	it("calling initProviders twice does not call init twice", async () => {

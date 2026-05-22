@@ -19,8 +19,9 @@ export const LS_KEYS = {
 	STATSFM_HEALTH: "listening-stats:statsfm-health",
 	// Announcement banner (v2.6)
 	DISMISSED_BANNER_VERSION: "listening-stats:dismissed-banner-version",
-	// World Charts (v2.6)
+	// Last.fm provider + World Charts (v2.6)
 	LASTFM_API_KEY: "listening-stats:lastfm-api-key",
+	LASTFM_CONFIG: "listening-stats:lastfm-provider",
 	WORLD_CHARTS_SCOPE: "listening-stats:world-charts-scope",
 	WORLD_CHARTS_WINDOW: "listening-stats:world-charts-window",
 	// Guided tour (v2.6)
