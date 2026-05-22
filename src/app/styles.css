@@ -1615,14 +1615,23 @@ button.announcement-banner-link-btn:hover {
 }
 
 .heatmap-scroll-wrap {
-	display: flex;
-	justify-content: center;
 	overflow-x: auto;
 }
 
 .heatmap-scroll-inner {
 	min-width: min-content;
-	flex-shrink: 0;
+	width: fit-content;
+	margin: 0 auto;
+}
+
+.heatmap-shrink .heatmap-scroll-wrap {
+	overflow: hidden;
+}
+
+.heatmap-shrink .heatmap-scroll-inner {
+	min-width: 0;
+	width: fit-content;
+	margin: 0 auto;
 }
 
 .heatmap-month-labels {

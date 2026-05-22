@@ -74,6 +74,8 @@ export interface Preferences {
 	announcementBannerHiddenForDismissKey: string;
 	/** Show @username caption on share cards */
 	showShareCaption: boolean;
+	/** Shrink the calendar heatmap to fit instead of scrolling */
+	heatmapShrink: boolean;
 }
 
 const VALID_ACTIVITY_TABS = new Set<ActivityTabId>(["hour", "weekday", "day"]);
@@ -98,6 +100,7 @@ const DEFAULTS: Preferences = {
 	showAnnouncementBanner: true,
 	announcementBannerHiddenForDismissKey: "",
 	showShareCaption: true,
+	heatmapShrink: true,
 };
 
 /**
@@ -194,6 +197,7 @@ export function getPreferences(): Preferences {
 					typeof parsed.announcementBannerHiddenForDismissKey === "string"
 						? parsed.announcementBannerHiddenForDismissKey
 						: DEFAULTS.announcementBannerHiddenForDismissKey,
+				heatmapShrink: typeof parsed.heatmapShrink === "boolean" ? parsed.heatmapShrink : DEFAULTS.heatmapShrink,
 			};
 			return merged;
 		}

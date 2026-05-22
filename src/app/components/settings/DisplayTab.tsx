@@ -84,6 +84,12 @@ export function DisplayTab({ onPrefsChanged, onRestartTour, announcementDismissK
 		dispatchPrefsChanged();
 	};
 
+	const handleHeatmapShrink = (val: boolean) => {
+		setPreference("heatmapShrink", val);
+		setPrefs({ ...prefs, heatmapShrink: val });
+		dispatchPrefsChanged();
+	};
+
 	const handleShowAnnouncementBanner = (val: boolean) => {
 		if (!val) {
 			setPreference("showAnnouncementBanner", false);
@@ -341,6 +347,24 @@ export function DisplayTab({ onPrefsChanged, onRestartTour, announcementDismissK
 						type="checkbox"
 						checked={prefs.use24HourTime}
 						onChange={(e) => handle24HourTime(e.currentTarget.checked)}
+					/>
+				)}
+			</div>
+
+			<div className="settings-row">
+				<div>
+					<div className="settings-label">Compact heatmap</div>
+					<div className="settings-sublabel">
+						Shrink the calendar heatmap to fit the card width instead of scrolling horizontally
+					</div>
+				</div>
+				{Toggle ? (
+					<Toggle value={prefs.heatmapShrink} onSelected={handleHeatmapShrink} />
+				) : (
+					<input
+						type="checkbox"
+						checked={prefs.heatmapShrink}
+						onChange={(e) => handleHeatmapShrink(e.currentTarget.checked)}
 					/>
 				)}
 			</div>
