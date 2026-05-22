@@ -1,8 +1,10 @@
 import { lastfmCache } from "../../../shared/api/lastfm-cache";
-import { validateLastfmKey } from "../../../shared/api/lastfm-client";
+import { lastfmGetUserInfo } from "../../../shared/api/lastfm-client";
 import { type StatsFmConfig, validateUsername } from "../../../shared/api/statsfm-client";
 import { EVENTS } from "../../../shared/constants/events";
 import { LS_KEYS } from "../../../shared/constants/storage-keys";
+import type { LastfmProviderConfig } from "../../../shared/stats/lastfm-provider";
+import { lastfmProvider } from "../../../shared/stats/lastfm-provider";
 import type { ProviderRegistry } from "../../../shared/stats/provider";
 import { providerRegistry } from "../../../shared/stats/provider";
 import { statsCache } from "../../../shared/stats/stats-cache";
@@ -25,6 +27,16 @@ export function readStatsFmConfig(): StatsFmConfig | null {
 	return JSON.parse(raw) as StatsFmConfig;
 }
 
+export function readLastfmConfig(): LastfmProviderConfig | null {
+	const raw = localStorage.getItem(LS_KEYS.LASTFM_CONFIG);
+	if (!raw) return null;
+	try {
+		return JSON.parse(raw) as LastfmProviderConfig;
+	} catch {
+		return null;
+	}
+}
+
 export function deriveTierBadge(registry: ProviderRegistry): {
 	tier: "plus" | "free";
 	tierClass: string;
@@ -37,13 +49,6 @@ export function deriveTierBadge(registry: ProviderRegistry): {
 	return { tier, tierClass, tierLabel };
 }
 
-type LastfmPhase = "idle" | "testing" | "connected" | "error";
-
-const LASTFM_ERROR_MESSAGES: Record<string, string> = {
-	invalid_key: "Invalid API key. Double-check the key and try again.",
-	network: "Could not reach Last.fm. Check your connection and try again.",
-};
-
 export function ProvidersTab() {
 	const [username, setUsername] = useState("");
 	const [phase, setPhase] = useState<ConnectPhase>(() => (readStatsFmConfig() ? "connected" : "idle"));
@@ -51,12 +56,12 @@ export function ProvidersTab() {
 	const [connectError, setConnectError] = useState<string | null>(null);
 	const [revalidating, setRevalidating] = useState(false);
 	const [revalidateError, setRevalidateError] = useState<string | null>(null);
-
-	const [lastfmKey, setLastfmKey] = useState("");
-	const [lastfmPhase, setLastfmPhase] = useState<LastfmPhase>(() =>
-		localStorage.getItem(LS_KEYS.LASTFM_API_KEY) ? "connected" : "idle",
-	);
-	const [lastfmError, setLastfmError] = useState<string | null>(null);
+	// Last.fm provider state
+	const [lfmProvConfig, setLfmProvConfig] = useState<LastfmProviderConfig | null>(() => readLastfmConfig());
+	const [lfmConnecting, setLfmConnecting] = useState(false);
+	const [lfmUsername, setLfmUsername] = useState("");
+	const [lfmApiKeyInput, setLfmApiKeyInput] = useState("");
+	const [lfmConnectError, setLfmConnectError] = useState<string | null>(null);
 
 	const handleConnect = async () => {
 		if (!username.trim()) return;
@@ -122,36 +127,48 @@ export function ProvidersTab() {
 		setRevalidating(false);
 		window.dispatchEvent(new CustomEvent(EVENTS.STATSFM_PROFILE_REFRESHED));
 
-		// Tier changes need fresh stats + provider listeners
 		if (prevIsPlus !== result.isPlus) {
 			statsCache.invalidate();
 			window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));
 		}
 	};
 
-	const handleLastfmTest = async () => {
-		const trimmed = lastfmKey.trim();
-		if (!trimmed) return;
-		setLastfmPhase("testing");
-		setLastfmError(null);
+	const handleLastfmProviderConnect = async () => {
+		const apiKey = lfmApiKeyInput.trim() || localStorage.getItem(LS_KEYS.LASTFM_API_KEY) || "";
+		if (!apiKey || !lfmUsername.trim()) return;
+		setLfmConnecting(true);
+		setLfmConnectError(null);
 
-		const result = await validateLastfmKey(trimmed);
-		if (result.valid) {
-			localStorage.setItem(LS_KEYS.LASTFM_API_KEY, trimmed);
+		try {
+			const info = await lastfmGetUserInfo(apiKey, lfmUsername.trim());
+			const newConfig: LastfmProviderConfig = {
+				apiKey,
+				username: info.username,
+			};
+			localStorage.setItem(LS_KEYS.LASTFM_CONFIG, JSON.stringify(newConfig));
+			localStorage.setItem(LS_KEYS.LASTFM_API_KEY, apiKey);
+			await lastfmProvider.init();
 			await lastfmCache.invalidate();
-			setLastfmPhase("connected");
-		} else {
-			setLastfmError(LASTFM_ERROR_MESSAGES[result.reason] ?? "Connection failed");
-			setLastfmPhase("error");
+			statsCache.invalidate();
+			providerRegistry.setActive("lastfm");
+			window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));
+			setLfmProvConfig(newConfig);
+			setLfmConnecting(false);
+		} catch (e) {
+			setLfmConnectError(String(e));
+			setLfmConnecting(false);
 		}
 	};
 
-	const handleLastfmDisconnect = async () => {
-		localStorage.removeItem(LS_KEYS.LASTFM_API_KEY);
-		await lastfmCache.invalidate();
-		setLastfmPhase("idle");
-		setLastfmKey("");
-		setLastfmError(null);
+	const handleLastfmProviderDisconnect = () => {
+		localStorage.removeItem(LS_KEYS.LASTFM_CONFIG);
+		statsCache.invalidate();
+		providerRegistry.setActive("local");
+		window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));
+		setLfmProvConfig(null);
+		setLfmUsername("");
+		setLfmApiKeyInput("");
+		setLfmConnectError(null);
 	};
 
 	const handleProviderSwitch = (newId: string) => {
@@ -163,6 +180,7 @@ export function ProvidersTab() {
 	const providers = providerRegistry.getAll();
 	const activeProviderId = providerRegistry.getActiveId();
 	const hasStatsFmConfig = config !== null;
+	const hasLastfmConfig = lfmProvConfig !== null;
 	const { tierClass, tierLabel } = deriveTierBadge(providerRegistry);
 
 	return (
@@ -173,29 +191,28 @@ export function ProvidersTab() {
 				Select the data source for your listening statistics
 			</div>
 			<div role="radiogroup" aria-label="Active provider">
-				{providers.map((p) => (
-					<div
-						key={p.id}
-						className={`provider-radio-row ${activeProviderId === p.id ? "active" : ""}`}
-						role="radio"
-						aria-checked={activeProviderId === p.id}
-						aria-label={p.name}
-						onClick={() => {
-							if (p.id === "statsfm" && !hasStatsFmConfig) return;
-							if (activeProviderId !== p.id) handleProviderSwitch(p.id);
-						}}
-						style={
-							p.id === "statsfm" && !hasStatsFmConfig ? { opacity: 0.5, pointerEvents: "none" as const } : undefined
-						}
-					>
-						<div>
-							<div className="settings-label">{p.id === "local" ? "Local Tracking" : "stats.fm"}</div>
-							<div className="settings-sublabel">
-								{p.id === "local" ? "Stats tracked directly on this device" : "Import stats from your stats.fm account"}
+				{providers.map((p) => {
+					const unconfigured = (p.id === "statsfm" && !hasStatsFmConfig) || (p.id === "lastfm" && !hasLastfmConfig);
+					return (
+						<div
+							key={p.id}
+							className={`provider-radio-row ${activeProviderId === p.id ? "active" : ""}`}
+							role="radio"
+							aria-checked={activeProviderId === p.id}
+							aria-label={p.name}
+							onClick={() => {
+								if (unconfigured) return;
+								if (activeProviderId !== p.id) handleProviderSwitch(p.id);
+							}}
+							style={unconfigured ? { opacity: 0.5, pointerEvents: "none" as const } : undefined}
+						>
+							<div>
+								<div className="settings-label">{p.name}</div>
+								<div className="settings-sublabel">{p.description}</div>
 							</div>
 						</div>
-					</div>
-				))}
+					);
+				})}
 			</div>
 
 			{/* stats.fm Account section */}
@@ -292,42 +309,47 @@ export function ProvidersTab() {
 				</div>
 			)}
 
-			{/* Last.fm Integration section */}
+			{/* Last.fm Account section */}
 			<h3 className="section-header" style={{ marginTop: "16px" }}>
-				Last.fm Integration
+				Last.fm Account
 			</h3>
-			<div className="settings-sublabel" style={{ marginBottom: "8px" }}>
-				Provide a Last.fm API key to power the World Charts page with real data.
-			</div>
 
-			{lastfmPhase === "connected" ? (
-				<div className="provider-status-card">
-					<div role="status" style={{ color: "var(--spice-text)", fontWeight: 700 }}>
-						Connected
-					</div>
-					<div className="settings-sublabel">Last.fm API key is configured and active.</div>
-					<button
-						type="button"
-						className="btn-destructive"
-						onClick={handleLastfmDisconnect}
-						style={{ marginTop: "8px", alignSelf: "flex-start" }}
-					>
-						Disconnect
-					</button>
-				</div>
-			) : (
+			{!lfmProvConfig ? (
 				<div>
+					<div className="settings-sublabel" style={{ marginBottom: "8px" }}>
+						Connect your Last.fm account to use it as a stats provider (also enables World Charts data).
+					</div>
 					<div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
 						<input
 							type="text"
-							value={lastfmKey}
-							onChange={(e) => setLastfmKey(e.target.value)}
+							value={lfmUsername}
+							onChange={(e) => setLfmUsername(e.target.value)}
 							onKeyDown={(e) => {
-								if (e.key === "Enter" && lastfmPhase !== "testing") handleLastfmTest();
+								if (e.key === "Enter" && !lfmConnecting) handleLastfmProviderConnect();
+							}}
+							placeholder="Enter your Last.fm username"
+							disabled={lfmConnecting}
+							aria-label="Last.fm username"
+							style={{
+								flex: 1,
+								padding: "8px 12px",
+								borderRadius: "4px",
+								border: "1px solid var(--spice-misc)",
+								background: "var(--spice-main)",
+								color: "var(--spice-text)",
+								fontSize: "var(--font-size-sm, 14px)",
+							}}
+						/>
+						<input
+							type="text"
+							value={lfmApiKeyInput}
+							onChange={(e) => setLfmApiKeyInput(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && !lfmConnecting) handleLastfmProviderConnect();
 							}}
 							placeholder="Enter your Last.fm API key"
-							disabled={lastfmPhase === "testing"}
-							aria-label="Last.fm API key"
+							disabled={lfmConnecting}
+							aria-label="Last.fm provider API key"
 							style={{
 								flex: 1,
 								padding: "8px 12px",
@@ -341,18 +363,38 @@ export function ProvidersTab() {
 						<button
 							type="button"
 							className="btn-primary"
-							onClick={handleLastfmTest}
-							disabled={lastfmPhase === "testing" || !lastfmKey.trim()}
-							style={lastfmPhase === "testing" ? { opacity: 0.6 } : undefined}
+							onClick={handleLastfmProviderConnect}
+							disabled={
+								lfmConnecting ||
+								!lfmUsername.trim() ||
+								!(lfmApiKeyInput.trim() || localStorage.getItem(LS_KEYS.LASTFM_API_KEY))
+							}
+							aria-busy={lfmConnecting}
+							style={lfmConnecting ? { opacity: 0.6 } : undefined}
 						>
-							{lastfmPhase === "testing" ? "Testing..." : "Test Connection"}
+							{lfmConnecting ? "Connecting..." : "Connect Account"}
 						</button>
 					</div>
-					{lastfmPhase === "error" && lastfmError && (
+					{lfmConnectError && (
 						<div className="provider-connect-error" role="alert">
-							{lastfmError}
+							{lfmConnectError}
 						</div>
 					)}
+				</div>
+			) : (
+				<div className="provider-status-card">
+					<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+						<span style={{ color: "var(--spice-text)", fontWeight: 700 }}>{lfmProvConfig.username}</span>
+					</div>
+					<div className="settings-sublabel">Last.fm API key is configured and active.</div>
+					<button
+						type="button"
+						className="btn-destructive"
+						onClick={handleLastfmProviderDisconnect}
+						style={{ marginTop: "8px", alignSelf: "flex-start" }}
+					>
+						Disconnect
+					</button>
 				</div>
 			)}
 		</div>
