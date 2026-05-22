@@ -130,11 +130,11 @@ describe("ShareModal", () => {
 
 	it("shows follow theme toggle", async () => {
 		const { container } = await renderShareModal();
-		const toggle = document.querySelector<HTMLInputElement>(".share-toggle-row input[type='checkbox']");
+		const toggle = document.querySelector<HTMLButtonElement>(".share-control-row button[data-checked]");
 		expect(toggle).toBeTruthy();
-		expect(toggle?.checked).toBe(false);
+		expect(toggle?.getAttribute("data-checked")).toBe("false");
 		toggle?.click();
-		expect(toggle?.checked).toBe(true);
+		expect(toggle?.getAttribute("data-checked")).toBe("true");
 		Spicetify.ReactDOM.unmountComponentAtNode(container);
 		container.remove();
 	});

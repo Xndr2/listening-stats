@@ -2894,8 +2894,8 @@ button.announcement-banner-link-btn:hover {
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	min-height: 260px;
-	max-height: min(58vh, 640px);
+	height: min(58vh, 640px);
+	min-height: 320px;
 	overflow: auto;
 	padding: 16px;
 	border: 1px solid rgba(var(--spice-rgb-misc, 255, 255, 255), 0.1);

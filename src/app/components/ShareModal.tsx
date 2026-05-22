@@ -8,17 +8,20 @@ import { CloseIcon } from "../icons";
 
 const { useState, useCallback, useEffect, useMemo } = Spicetify.React;
 
-type ShareVariant = "top5" | "time" | "genre" | "streak" | "throwback" | "wrapped";
+export type ShareVariant = "top5" | "time" | "genre" | "streak" | "throwback" | "wrapped";
 type ShareSize = "square" | "story";
 
 interface ShareModalProps {
 	stats: StatsResult;
 	activePeriod: Period;
 	onClose: () => void;
+	initialVariant?: ShareVariant;
 }
 
 interface ShareRenderOptions {
 	followTheme?: boolean;
+	showUsername?: boolean;
+	showPeriodLabel?: boolean;
 	activeProviderId?: string;
 	periodDayCount?: number;
 }
@@ -58,22 +61,24 @@ function getShareCaptionHandle(): string {
 	return "";
 }
 
-export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
-	const [variant, setVariant] = useState<ShareVariant>("top5");
+export function ShareModal({ stats, activePeriod, onClose, initialVariant }: ShareModalProps) {
+	const [variant, setVariant] = useState<ShareVariant>(initialVariant ?? "top5");
 	const [size, setSize] = useState<ShareSize>("square");
 	const [followTheme, setFollowTheme] = useState(false);
+	const [showUsername, setShowUsername] = useState(true);
+	const [showPeriodLabel, setShowPeriodLabel] = useState(true);
 	const [busy, setBusy] = useState(false);
 	const [previewUrl, setPreviewUrl] = useState<string>("");
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
 
+	const Toggle = Spicetify.ReactComponent.Toggle;
 	const username = getShareCaptionHandle();
 	const periodLabel = activePeriod.label;
 	const periodBoundaries = activePeriod.getBoundaries();
 	const periodDayCount = Math.max(1, Math.round((periodBoundaries.end - periodBoundaries.start) / 86_400_000));
 	const activeProviderId = providerRegistry.getActiveId() ?? "local";
 	const caps = providerRegistry.getActive()?.getProviderInfo().capabilities;
-
 	const availableVariants = useMemo(() => {
 		return VARIANTS.filter((v) => {
 			if (v.id === "genre") {
@@ -100,6 +105,8 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 			try {
 				const blob = await renderShareCardBlob(stats, variant, size, periodLabel, username, {
 					followTheme,
+					showUsername,
+					showPeriodLabel,
 					activeProviderId,
 					periodDayCount,
 				});
@@ -117,7 +124,18 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 			canceled = true;
 			if (currentUrl) URL.revokeObjectURL(currentUrl);
 		};
-	}, [stats, variant, size, periodLabel, username, followTheme, activeProviderId, periodDayCount]);
+	}, [
+		stats,
+		variant,
+		size,
+		periodLabel,
+		username,
+		followTheme,
+		showUsername,
+		showPeriodLabel,
+		activeProviderId,
+		periodDayCount,
+	]);
 
 	const handleVariantChange = (v: ShareVariant) => setVariant(v);
 
@@ -136,6 +154,8 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 		try {
 			await exportShareCardPng(stats, variant, size, periodLabel, username, {
 				followTheme,
+				showUsername,
+				showPeriodLabel,
 				activeProviderId,
 				periodDayCount,
 			});
@@ -145,7 +165,19 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 		} finally {
 			setBusy(false);
 		}
-	}, [stats, variant, size, periodLabel, username, followTheme, activeProviderId, periodDayCount, busy]);
+	}, [
+		stats,
+		variant,
+		size,
+		periodLabel,
+		username,
+		followTheme,
+		showUsername,
+		showPeriodLabel,
+		activeProviderId,
+		periodDayCount,
+		busy,
+	]);
 
 	const handleCopy = useCallback(async () => {
 		if (busy) return;
@@ -153,6 +185,8 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 		try {
 			await copyShareCardToClipboard(stats, variant, size, periodLabel, username, {
 				followTheme,
+				showUsername,
+				showPeriodLabel,
 				activeProviderId,
 				periodDayCount,
 			});
@@ -162,7 +196,19 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 		} finally {
 			setBusy(false);
 		}
-	}, [stats, variant, size, periodLabel, username, followTheme, activeProviderId, periodDayCount, busy]);
+	}, [
+		stats,
+		variant,
+		size,
+		periodLabel,
+		username,
+		followTheme,
+		showUsername,
+		showPeriodLabel,
+		activeProviderId,
+		periodDayCount,
+		busy,
+	]);
 
 	return Spicetify.ReactDOM.createPortal(
 		<div className="share-overlay" onClick={handleOverlayClick}>
@@ -211,13 +257,8 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 				</div>
 
 				<div className="share-control-row">
-					<label className="share-toggle-row">
-						<input type="checkbox" checked={followTheme} onChange={(e) => setFollowTheme(e.currentTarget.checked)} />
-						<span>Follow theme</span>
-					</label>
-					<span className="share-control-help">
-						{followTheme ? "Card uses current Spotify theme colors." : "Card uses default locked green share palette."}
-					</span>
+					<span style={{ fontSize: 12, color: "var(--spice-text)" }}>Follow theme</span>
+					<Toggle value={followTheme} onSelected={setFollowTheme} />
 				</div>
 
 				<div className="share-preview-container">
@@ -252,6 +293,15 @@ export function ShareModal({ stats, activePeriod, onClose }: ShareModalProps) {
 					>
 						{busy ? "Working…" : "Save PNG"}
 					</button>
+				</div>
+
+				<div className="share-control-row" style={{ marginTop: 8 }}>
+					<span style={{ fontSize: 12, color: "var(--spice-text)" }}>Show @username</span>
+					<Toggle value={showUsername} onSelected={setShowUsername} />
+				</div>
+				<div className="share-control-row">
+					<span style={{ fontSize: 12, color: "var(--spice-text)" }}>Show period label</span>
+					<Toggle value={showPeriodLabel} onSelected={setShowPeriodLabel} />
 				</div>
 			</div>
 		</div>,
@@ -414,7 +464,7 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 	const tracks = stats.topTracks.slice(0, isStory ? 4 : 3);
 	const artists = stats.topArtists.slice(0, isStory ? 4 : 3);
 	const genres = stats.topGenres.slice(0, isStory ? 3 : 2);
-	const genreMaxCount = genres[0]?.count ?? 1;
+	const genreMaxCount = genres[0]?.count || 1;
 	const genreTotal = genres.reduce((s, x) => s + x.count, 0);
 	const head = periodLabel.trim().length > 0 ? `${periodLabel} · Wrapped` : "Wrapped";
 
@@ -443,7 +493,9 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 					lineHeight: 1.35,
 				}}
 			>
-				{formatNumber(stats.totalPlays)} plays · {stats.uniqueArtistCount} artists · peak {peakLabel}
+				{stats.totalPlays > 0
+					? `${formatNumber(stats.totalPlays)} plays · ${stats.uniqueArtistCount} artists · peak ${peakLabel}`
+					: ""}
 				{streak > 0 ? ` · ${streak}-day streak` : ""}
 			</div>
 
@@ -554,7 +606,7 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 										{a.artistName}
 									</div>
 									<div style={{ fontSize: isStory ? 9 : 8, color: "rgba(255,255,255,.55)" }}>
-										{a.count === 1 ? "1 play" : `${a.count} plays`}
+										{a.count > 0 ? (a.count === 1 ? "1 play" : `${a.count} plays`) : ""}
 									</div>
 								</div>
 							</li>
@@ -717,9 +769,11 @@ function ShareTime({ stats, periodLabel }: { stats: StatsResult; periodLabel: st
 function ShareGenre({ stats }: { stats: StatsResult }) {
 	const top = stats.topGenres.slice(0, 4);
 	if (top.length === 0) return null;
-	const maxCount = top[0].count;
+	const maxCount = top[0].count || 1;
 	const totalCount = top.reduce((s, g) => s + g.count, 0);
 	const topPct = totalCount > 0 ? Math.round((maxCount / totalCount) * 100) : 0;
+
+	if (totalCount === 0) return null;
 
 	return (
 		<div>
@@ -779,6 +833,7 @@ function ShareGenre({ stats }: { stats: StatsResult }) {
 
 function ShareStreak({ stats }: { stats: StatsResult }) {
 	const streak = stats.streak ?? 0;
+	if (streak === 0) return null;
 	const data = (stats.dailyPlayCounts ?? []).slice(-56);
 	const max = Math.max(1, ...data.map((d) => d.count));
 
@@ -828,7 +883,7 @@ function ShareStreak({ stats }: { stats: StatsResult }) {
 
 function ShareThrowback({ stats }: { stats: StatsResult }) {
 	const track = stats.topTracks[0];
-	if (!track) return null;
+	if (!track || track.count === 0) return null;
 
 	return (
 		<div data-testid="share-throwback-body">
@@ -1197,14 +1252,15 @@ async function drawTop5Content(
 	const cntPx = isStory ? (storyTight ? 28 : 32) : tightSq ? 22 : 28;
 	const playsLblPx = storyTight ? 16 : tightSq ? 15 : 18;
 
+	const allZeroPlays = tracks.every((t) => t.count === 0);
 	ctx.font = `700 ${cntPx}px ${CV_FONT}`;
 	let playNumMax = 0;
-	for (const t of tracks) playNumMax = Math.max(playNumMax, ctx.measureText(`${t.count}`).width);
+	for (const t of tracks) if (t.count > 0) playNumMax = Math.max(playNumMax, ctx.measureText(`${t.count}`).width);
 
 	ctx.font = `600 ${playsLblPx}px ${CV_FONT}`;
 	const defaultLetterSpacing = ctx.letterSpacing;
 	ctx.letterSpacing = "0.06em";
-	const playsLblW = ctx.measureText("PLAYS").width;
+	const playsLblW = allZeroPlays ? 0 : ctx.measureText("PLAYS").width;
 	ctx.letterSpacing = defaultLetterSpacing;
 
 	const playsReserve = Math.ceil(playNumMax + 14 + playsLblW + CV_PAD / 2);
@@ -1242,11 +1298,11 @@ async function drawTop5Content(
 		ctx.fillStyle = palette.text;
 		ctx.font = `700 ${cntPx}px ${CV_FONT}`;
 		ctx.textAlign = "right";
-		ctx.fillText(`${t.count}`, playsEdge, titleBase(ry));
+		ctx.fillText(t.count > 0 ? `${t.count}` : "", playsEdge, titleBase(ry));
 		ctx.fillStyle = palette.dimText;
 		ctx.font = `600 ${playsLblPx}px ${CV_FONT}`;
 		ctx.letterSpacing = "0.06em";
-		ctx.fillText("PLAYS", playsEdge, artistBase(ry));
+		if (t.count > 0) ctx.fillText("PLAYS", playsEdge, artistBase(ry));
 		ctx.letterSpacing = defaultLetterSpacing;
 		ctx.textAlign = "left";
 	}
@@ -1364,7 +1420,7 @@ async function drawTimeContent(
 	ctx.fillStyle = mutedBody;
 	ctx.font = `${26}px ${CV_FONT}`;
 	ctx.fillText(
-		cvTruncate(ctx, `across ${formatNumber(stats.totalPlays)} plays`, colW - 2 * inset),
+		stats.totalPlays > 0 ? cvTruncate(ctx, `across ${formatNumber(stats.totalPlays)} plays`, colW - 2 * inset) : "",
 		rightX,
 		chunkY + 162,
 	);
@@ -1394,7 +1450,7 @@ async function drawTimeContent(
 		if (!(await cvDrawArt(ctx, a.imageUrl ?? undefined, avatarX, ry, avatar, avatar / 2)))
 			cvPlaceholder(ctx, avatarX, ry, avatar, avatar / 2);
 		const nameX = avatarX + avatar + 22;
-		const playsLbl = `${formatNumber(a.count)} ${a.count === 1 ? "play" : "plays"}`;
+		const playsLbl = a.count > 0 ? `${formatNumber(a.count)} ${a.count === 1 ? "play" : "plays"}` : "";
 		ctx.font = `${28}px ${CV_FONT}`;
 		ctx.textAlign = "right";
 		ctx.fillStyle = palette.dimText;
@@ -1426,10 +1482,11 @@ async function drawGenreContent(
 	const top = stats.topGenres.slice(0, limit);
 	if (top.length === 0) return;
 
-	const maxCount = top[0].count;
+	const maxCount = top[0].count || 1;
 	const totalCount = top.reduce((s, g) => s + g.count, 0);
 	const topPct = totalCount > 0 ? Math.round((maxCount / totalCount) * 100) : 0;
 
+	if (totalCount === 0) return;
 	y = cvKicker(ctx, `I was ${topPct}% ${top[0].genre}`, x, y, palette);
 	const isStory = size === "story";
 	y += isStory ? 54 : 40;
@@ -1520,6 +1577,7 @@ async function drawStreakContent(
 	w: number,
 ) {
 	const streak = stats.streak ?? 0;
+	if (streak === 0) return;
 	const isStory = size === "story";
 	y = cvKicker(ctx, `${streak}-day streak`, x, y, palette, false, isStory ? 40 : 36);
 	y += isStory ? 54 : 32;
@@ -1633,8 +1691,8 @@ async function drawThrowbackContent(
 	y += isStory ? 110 : 70;
 	ctx.fillStyle = palette.mutedText;
 	ctx.font = `${isStory ? 44 : 32}px ${CV_FONT}`;
-	const playPhrase = track.count === 1 ? "1 play" : `${track.count} plays`;
-	ctx.fillText(cvTruncate(ctx, `${track.artistName} · ${playPhrase}`, w), x, y);
+	const playPhrase = track.count > 0 ? (track.count === 1 ? "1 play" : `${track.count} plays`) : "";
+	ctx.fillText(cvTruncate(ctx, playPhrase ? `${track.artistName} · ${playPhrase}` : track.artistName, w), x, y);
 
 	if (!isStory || stats.totalPlays <= 0) return;
 
@@ -1707,7 +1765,7 @@ async function drawWrappedCompactTrackRows(
 	const gapArt = 10;
 	ctx.font = `700 ${cntPx}px ${CV_FONT}`;
 	let playNumMax = 0;
-	for (const t of tracks) playNumMax = Math.max(playNumMax, ctx.measureText(`${t.count}`).width);
+	for (const t of tracks) if (t.count > 0) playNumMax = Math.max(playNumMax, ctx.measureText(`${t.count}`).width);
 	ctx.font = `600 ${playsLblPx}px ${CV_FONT}`;
 	const defaultLetterSpacing = ctx.letterSpacing;
 	ctx.letterSpacing = "0.06em";
@@ -1740,11 +1798,11 @@ async function drawWrappedCompactTrackRows(
 		ctx.fillStyle = palette.text;
 		ctx.font = `700 ${cntPx}px ${CV_FONT}`;
 		ctx.textAlign = "right";
-		ctx.fillText(`${t.count}`, playsEdge, titleBase(ry));
+		if (t.count > 0) ctx.fillText(`${t.count}`, playsEdge, titleBase(ry));
 		ctx.fillStyle = palette.dimText;
 		ctx.font = `600 ${playsLblPx}px ${CV_FONT}`;
 		ctx.letterSpacing = "0.06em";
-		ctx.fillText("PLAYS", playsEdge, artistBase(ry));
+		if (t.count > 0) ctx.fillText("PLAYS", playsEdge, artistBase(ry));
 		ctx.letterSpacing = defaultLetterSpacing;
 		ctx.textAlign = "left";
 	}
@@ -1786,7 +1844,7 @@ async function drawWrappedCompactArtistRows(
 		ctx.fillText(cvTruncate(ctx, a.artistName, textAvail), textX, titleBase(ry));
 		ctx.fillStyle = palette.dimText;
 		ctx.font = `${subPx}px ${CV_FONT}`;
-		const sub = a.count === 1 ? "1 play" : `${formatNumber(a.count)} plays`;
+		const sub = a.count > 0 ? (a.count === 1 ? "1 play" : `${formatNumber(a.count)} plays`) : "";
 		ctx.fillText(cvTruncate(ctx, sub, textAvail), textX, subBase(ry));
 	}
 	return y + artists.length * (tileSz + rowGap);
@@ -1802,8 +1860,9 @@ async function drawWrappedCompactGenreRows(
 	opts: { barH: number; rowGap: number; labelMax: number; labelPx: number; pctPx: number },
 ): Promise<number> {
 	if (top.length === 0) return y;
-	const maxCount = top[0].count;
+	const maxCount = top[0].count || 1;
 	const totalCount = top.reduce((s, g) => s + g.count, 0);
+	if (totalCount === 0) return y;
 	y = cvKicker(ctx, "Top genres", x, y, palette, false, opts.labelPx + 4);
 	y += opts.rowGap > 12 ? 16 : 12;
 	const { barH, rowGap, labelMax, labelPx, pctPx } = opts;
@@ -1849,8 +1908,11 @@ async function drawWrappedContent(
 	const totalHours = Math.floor(stats.totalDuration / 3_600_000);
 	const peakLbl = formatShareSpecPeakHour(stats.peakHour);
 	const streak = allowStreak ? (stats.streak ?? 0) : 0;
-	let meta = `${formatNumber(stats.totalPlays)} plays · ${stats.uniqueArtistCount} artists · peak ${peakLbl}`;
-	if (streak > 0) meta += ` · ${streak}-day streak`;
+	let meta =
+		stats.totalPlays > 0
+			? `${formatNumber(stats.totalPlays)} plays · ${stats.uniqueArtistCount} artists · peak ${peakLbl}`
+			: "";
+	if (streak > 0 && stats.totalPlays > 0) meta += ` · ${streak}-day streak`;
 
 	ctx.textAlign = "left";
 	ctx.textBaseline = "alphabetic";
@@ -1975,7 +2037,10 @@ export async function renderShareCardCanvas(
 	const allowStreak = providerId === "local";
 	const safeVariant = !allowStreak && variant === "streak" ? "top5" : variant;
 
-	const captionText = username ? `@${username} · ${periodLabel}` : periodLabel;
+	const captionParts: string[] = [];
+	if (options?.showUsername !== false && username) captionParts.push(`@${username}`);
+	if (options?.showPeriodLabel !== false) captionParts.push(periodLabel);
+	const captionText = captionParts.length > 0 ? captionParts.join(" · ") : "";
 
 	drawBackground(ctx, w, h, palette);
 	drawWatermarkBar(ctx, w, captionText, palette);
