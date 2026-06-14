@@ -7,7 +7,13 @@ import { LS_KEYS } from "../shared/constants/storage-keys";
 import type { AppError } from "../shared/errors";
 import { classifyStatsFmError, StatsFmError } from "../shared/errors";
 import { initProviders } from "../shared/stats/init-providers";
-import { LOCAL_PERIODS, WORLD_TAB_PERIOD, WORLD_TAB_PERIOD_ID } from "../shared/stats/periods";
+import {
+	GENRE_MAP_TAB_PERIOD,
+	GENRE_MAP_TAB_PERIOD_ID,
+	LOCAL_PERIODS,
+	WORLD_TAB_PERIOD,
+	WORLD_TAB_PERIOD_ID,
+} from "../shared/stats/periods";
 import { allLoading, allResolved, EMPTY_STATS, type SectionSlots, slotKeyForWave } from "../shared/stats/progressive";
 import type { ProviderRegistry } from "../shared/stats/provider";
 import { providerRegistry } from "../shared/stats/provider";
@@ -28,6 +34,7 @@ import { AppFooter } from "./components/AppFooter";
 import { ConsistencySection } from "./components/ConsistencySection";
 import EmptyState from "./components/EmptyState";
 import { clearActiveGenre, FilterPill, setActiveGenre } from "./components/FilterPill";
+import { GenreMapPage } from "./components/GenreMapPage";
 import { GuidedTour } from "./components/GuidedTour";
 import Header from "./components/Header";
 import { InlineErrorCard } from "./components/InlineErrorCard";
@@ -188,9 +195,9 @@ function App() {
 		}
 	}, []);
 
-	const periodTabsPeriods = useMemo(() => [...periods, WORLD_TAB_PERIOD], [periods]);
+	const periodTabsPeriods = useMemo(() => [...periods, WORLD_TAB_PERIOD, GENRE_MAP_TAB_PERIOD], [periods]);
 	const activePeriodForTabs = useMemo(
-		() => (activePage === "world" ? WORLD_TAB_PERIOD : activePeriod),
+		() => (activePage === "world" ? WORLD_TAB_PERIOD : activePage === "genremap" ? GENRE_MAP_TAB_PERIOD : activePeriod),
 		[activePage, activePeriod],
 	);
 
@@ -205,7 +212,7 @@ function App() {
 	}, []);
 
 	useEffect(() => {
-		if (!initialized || activePage === "world") return;
+		if (!initialized || activePage === "world" || activePage === "genremap") return;
 		loadStats(activePeriod);
 	}, [activePeriod, initialized, loadStats, activePage]);
 
@@ -226,7 +233,7 @@ function App() {
 
 	useEffect(() => {
 		const handler = () => {
-			if (activePage === "world") return;
+			if (activePage === "world" || activePage === "genremap") return;
 			statsCache.invalidate();
 			loadStats(activePeriod, true);
 		};
@@ -311,6 +318,12 @@ function App() {
 			setShowShare(false);
 			setActivePage("world");
 			setPreference("activePage", "world");
+			return;
+		}
+		if (period.id === GENRE_MAP_TAB_PERIOD_ID) {
+			setShowShare(false);
+			setActivePage("genremap");
+			setPreference("activePage", "genremap");
 			return;
 		}
 		setActivePage("dashboard");
@@ -537,6 +550,9 @@ function App() {
 	const renderContent = () => {
 		if (activePage === "world") {
 			return <WorldChartsPage />;
+		}
+		if (activePage === "genremap") {
+			return <GenreMapPage stats={stats} />;
 		}
 		return renderDashboard();
 	};

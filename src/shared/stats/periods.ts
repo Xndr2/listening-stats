@@ -128,3 +128,11 @@ export const WORLD_TAB_PERIOD: Period = {
 	label: "World",
 	getBoundaries: getAllTimeBoundaries,
 };
+
+export const GENRE_MAP_TAB_PERIOD_ID = "genre-map";
+
+export const GENRE_MAP_TAB_PERIOD: Period = {
+	id: GENRE_MAP_TAB_PERIOD_ID,
+	label: "Genre Map",
+	getBoundaries: getAllTimeBoundaries,
+};
