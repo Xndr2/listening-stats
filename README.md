@@ -4,7 +4,7 @@ Spicetify custom app: a listening statistics dashboard inside Spotify (stats.fm,
 
 ![GitHub release](https://img.shields.io/github/v/release/Xndr2/listening-stats)
 ![Spicetify](https://img.shields.io/badge/spicetify-2.x-1DB954)
-![GitHub Downloads](https://img.shields.io/github/downloads/Xndr2/listening-stats/total)
+[![downloads](https://img.shields.io/github/downloads/Xndr2/listening-stats/total?style=flat&color=00b894&label=downloads)](https://github.com/Xndr2/listening-stats/releases)
 
 <img src="docs/screenshots/Screenshot01.png" alt="Listening Stats overview" />
 <img src="docs/screenshots/Screenshot02.png" alt="Listening Stats heatmap" />  
