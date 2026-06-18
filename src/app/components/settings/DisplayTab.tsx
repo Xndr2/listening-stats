@@ -411,10 +411,10 @@ export function DisplayTab({ onPrefsChanged, onRestartTour, announcementDismissK
 			{prefs.playCountVariant !== "off" && (
 				<div className="settings-row" data-testid="play-count-extra-context">
 					<div>
-						<div className="settings-label">Extra play context</div>
+						<div className="settings-label">Show new streams</div>
 						<div className="settings-sublabel">
 							{providerKey === "statsfm" ? (
-								<>Also show streams for your current dashboard period (stats.fm top tracks).</>
+								<>Also show a label for new streams.</>
 							) : (
 								<>
 									When this track has <strong>no qualifying plays</strong> in your database yet, show a{" "}
@@ -474,7 +474,9 @@ export function DisplayTab({ onPrefsChanged, onRestartTour, announcementDismissK
 								<SortableRow
 									id={id}
 									label={label}
-									dragHandleProps={{ onPointerDown: sortable.onItemPointerDown(id) }}
+									dragHandleProps={{
+										onPointerDown: sortable.onItemPointerDown(id),
+									}}
 									style={sortable.getItemStyle(id)}
 								>
 									{Toggle ? (
