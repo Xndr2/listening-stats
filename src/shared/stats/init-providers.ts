@@ -9,59 +9,68 @@ import { statsfmProvider } from "./statsfm-provider";
  * Construct from raw string literals only; do NOT reference LS_KEYS values here.
  */
 export const OBSOLETE_KEYS = [
-	"listening-stats:card-order",
-	"listening-stats:period",
-	"listening-stats:sfm-promo-dismissed",
-	"listening-stats:tour-seen",
-	"listening-stats:tour-version",
-	"listening-stats:lastUpdateCheck",
-	"listening-stats:searchCache",
-	"listening-stats:dedup-v2-done",
-	"listening-stats:rateLimitedUntil",
-	"listening-stats:lastfm",
-	"listening-stats:pollingData",
+  "listening-stats:card-order",
+  "listening-stats:period",
+  "listening-stats:sfm-promo-dismissed",
+  "listening-stats:tour-seen",
+  "listening-stats:tour-version",
+  "listening-stats:lastUpdateCheck",
+  "listening-stats:searchCache",
+  "listening-stats:dedup-v2-done",
+  "listening-stats:rateLimitedUntil",
+  "listening-stats:lastfm",
+  "listening-stats:pollingData",
 ] as const;
 
 /** Internal flag  -  runs-once guard. Intentionally NOT in LS_KEYS (self-referential to prune). */
 export const PRUN_DONE_KEY = "listening-stats:prun-v1-done";
 
 export function pruneObsoleteKeys(): void {
-	try {
-		if (localStorage.getItem(PRUN_DONE_KEY) === "1") return; // already ran
-		for (const key of OBSOLETE_KEYS) {
-			localStorage.removeItem(key);
-		}
-		localStorage.setItem(PRUN_DONE_KEY, "1");
-	} catch {
-		// localStorage unavailable  -  silent failure, prune retried on next init
-	}
+  try {
+    if (localStorage.getItem(PRUN_DONE_KEY) === "1") return; // already ran
+    for (const key of OBSOLETE_KEYS) {
+      localStorage.removeItem(key);
+    }
+    localStorage.setItem(PRUN_DONE_KEY, "1");
+  } catch {
+    // localStorage unavailable  -  silent failure, prune retried on next init
+  }
 }
 
 let initialized = false;
 
 export async function initProviders(): Promise<void> {
-	if (initialized) return;
-	initialized = true;
+  if (initialized) return;
+  initialized = true;
 
-	pruneObsoleteKeys(); // once per install, before providers read localStorage
+  pruneObsoleteKeys(); // once per install, before providers read localStorage
 
-	providerRegistry.register(localProvider);
-	providerRegistry.register(statsfmProvider);
-	providerRegistry.register(lastfmProvider);
-	providerRegistry.restoreActive();
+  providerRegistry.register(localProvider);
+  providerRegistry.register(statsfmProvider);
+  providerRegistry.register(lastfmProvider);
+  providerRegistry.restoreActive();
 
-	// Default to local if nothing saved or saved provider not found
-	if (!providerRegistry.getActive()) {
-		providerRegistry.setActive("local");
-	}
+  // Default to local if nothing saved or saved provider not found
+  if (!providerRegistry.getActive()) {
+    providerRegistry.setActive("local");
+  }
 
-	// Init all providers so switching doesn't hit uninitialized state
-	await localProvider.init();
-	await statsfmProvider.init();
-	await lastfmProvider.init();
+  // Init all providers so switching doesn't hit uninitialized state.
+  // One provider failing (network, corrupt config) must not block the
+  // others or leave the app stuck on the loading screen.
+  for (const provider of [localProvider, statsfmProvider, lastfmProvider]) {
+    try {
+      await provider.init();
+    } catch (err) {
+      console.warn(
+        `[listening-stats] Provider "${provider.getProviderInfo().id}" failed to init:`,
+        err,
+      );
+    }
+  }
 }
 
 /** Reset initialization guard for testing only */
 export function _resetInitGuard(): void {
-	initialized = false;
+  initialized = false;
 }
