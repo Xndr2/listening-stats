@@ -9,6 +9,7 @@ interface CacheEntry<T> {
 
 export class StatsCache {
 	private store = new Map<string, CacheEntry<unknown>>();
+	private invalidationListenerAttached = false;
 
 	get<T>(key: string): T | null {
 		const entry = this.store.get(key);
@@ -33,6 +34,9 @@ export class StatsCache {
 	}
 
 	setupInvalidationListeners(): void {
+		// Provider init() can run multiple times (provider switches) — attach once.
+		if (this.invalidationListenerAttached) return;
+		this.invalidationListenerAttached = true;
 		// Invalidate cached aggregates after a recorded play
 		window.addEventListener(EVENTS.PLAY_RECORDED, () => {
 			this.invalidate();

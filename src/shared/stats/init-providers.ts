@@ -55,10 +55,16 @@ export async function initProviders(): Promise<void> {
 		providerRegistry.setActive("local");
 	}
 
-	// Init all providers so switching doesn't hit uninitialized state
-	await localProvider.init();
-	await statsfmProvider.init();
-	await lastfmProvider.init();
+	// Init all providers so switching doesn't hit uninitialized state.
+	// One provider failing (network, corrupt config) must not block the
+	// others or leave the app stuck on the loading screen.
+	for (const provider of [localProvider, statsfmProvider, lastfmProvider]) {
+		try {
+			await provider.init();
+		} catch (err) {
+			console.warn(`[listening-stats] Provider "${provider.getProviderInfo().id}" failed to init:`, err);
+		}
+	}
 }
 
 /** Reset initialization guard for testing only */

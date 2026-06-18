@@ -24,7 +24,11 @@ export const ERROR_MESSAGES: Record<string, string> = {
 export function readStatsFmConfig(): StatsFmConfig | null {
 	const raw = localStorage.getItem(LS_KEYS.STATSFM_CONFIG);
 	if (!raw) return null;
-	return JSON.parse(raw) as StatsFmConfig;
+	try {
+		return JSON.parse(raw) as StatsFmConfig;
+	} catch {
+		return null;
+	}
 }
 
 export function readLastfmConfig(): LastfmProviderConfig | null {

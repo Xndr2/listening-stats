@@ -235,6 +235,25 @@ export async function parseJsonEvents(text: string): Promise<ParseResult> {
 			continue;
 		}
 
+		// Reject NaN/Infinity/negative values — they pass the typeof check but
+		// would corrupt period queries and duration totals once stored.
+		if (
+			!Number.isFinite(item.startedAt) ||
+			item.startedAt <= 0 ||
+			!Number.isFinite(item.endedAt) ||
+			item.endedAt <= 0 ||
+			!Number.isFinite(item.durationMs) ||
+			item.durationMs < 0 ||
+			!Number.isFinite(item.playedMs) ||
+			item.playedMs < 0
+		) {
+			errors++;
+			if (errorDetails.length < MAX_ERROR_DETAILS) {
+				errorDetails.push(`Row ${rowNum}: invalid numeric field (timestamp or duration)`);
+			}
+			continue;
+		}
+
 		const trackName = item.trackName;
 		const artistName = item.artistName;
 		const albumName = typeof item.albumName === "string" ? item.albumName : "";

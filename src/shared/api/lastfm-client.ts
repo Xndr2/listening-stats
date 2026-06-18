@@ -201,8 +201,8 @@ async function fetchChart(
 
 export async function lastfmGetCharts(scope: WorldScope, _window: WorldWindow, apiKey: string): Promise<LastfmResult> {
 	return fetchChart(scope, apiKey, "chart.gettoptracks", "geo.gettoptracks", (json) => {
-		const raw = json?.tracks as { track?: unknown } | undefined;
-		return mapTracks(Array.isArray(raw?.track) ? raw.track : []);
+		const raw = json?.tracks as { track?: LastfmRawTrack[] | LastfmRawTrack } | undefined;
+		return mapTracks(asArray(raw?.track));
 	});
 }
 
@@ -212,8 +212,8 @@ export async function lastfmGetArtistCharts(
 	apiKey: string,
 ): Promise<LastfmResult> {
 	return fetchChart(scope, apiKey, "chart.gettopartists", "geo.gettopartists", (json) => {
-		const raw = json?.topartists as { artist?: unknown } | undefined;
-		return mapArtists(Array.isArray(raw?.artist) ? raw.artist : []);
+		const raw = json?.topartists as { artist?: LastfmRawArtist[] | LastfmRawArtist } | undefined;
+		return mapArtists(asArray(raw?.artist));
 	});
 }
 
@@ -245,6 +245,12 @@ export async function validateLastfmKey(apiKey: string): Promise<LastfmValidatio
 // ── User data API (for Last.fm stats provider) ──
 
 const LASTFM_PLACEHOLDER_HASHES = ["2a96cbd8b46e442fc41c2b86b821562f", "c6f59c1e5e7240a4c0d427abd71f3dbb"];
+
+/** Last.fm returns a bare object (not a one-element array) when a list has exactly one item. */
+function asArray<T>(value: T[] | T | undefined | null): T[] {
+	if (Array.isArray(value)) return value;
+	return value == null ? [] : [value];
+}
 
 function isPlaceholderImage(url: string): boolean {
 	return LASTFM_PLACEHOLDER_HASHES.some((h) => url.includes(h));
@@ -278,7 +284,9 @@ async function lastfmUserFetch<T>(apiKey: string, method: string, params: Record
 }
 
 export async function lastfmGetUserInfo(apiKey: string, username: string): Promise<LfmUserInfo> {
-	const data = await lastfmUserFetch<LfmUserInfoRaw>(apiKey, "user.getinfo", { user: username });
+	const data = await lastfmUserFetch<LfmUserInfoRaw>(apiKey, "user.getinfo", {
+		user: username,
+	});
 	const user = data.user;
 	return {
 		username: user.name,
@@ -305,7 +313,7 @@ export async function lastfmGetRecentTracks(
 	if (to !== undefined) params.to = String(Math.floor(to / 1000));
 
 	const data = await lastfmUserFetch<LfmRecentTracksRaw>(apiKey, "user.getrecenttracks", params);
-	const tracks = data.recenttracks?.track || [];
+	const tracks = asArray(data.recenttracks?.track);
 	return tracks
 		.filter((t) => t.date || t["@attr"]?.nowplaying)
 		.map((t) => {
@@ -332,7 +340,7 @@ export async function lastfmGetTopTracks(
 		period,
 		limit: String(limit),
 	});
-	const tracks = data.toptracks?.track || [];
+	const tracks = asArray(data.toptracks?.track);
 	return tracks.map((t) => ({
 		name: t.name,
 		artist: t.artist?.name || "",
@@ -352,7 +360,7 @@ export async function lastfmGetTopArtists(
 		period,
 		limit: String(limit),
 	});
-	const artists = data.topartists?.artist || [];
+	const artists = asArray(data.topartists?.artist);
 	return artists.map((a) => ({
 		name: a.name,
 		playCount: parseInt(a.playcount, 10) || 0,
@@ -371,7 +379,7 @@ export async function lastfmGetTopAlbums(
 		period,
 		limit: String(limit),
 	});
-	const albums = data.topalbums?.album || [];
+	const albums = asArray(data.topalbums?.album);
 	return albums.map((a) => ({
 		name: a.name,
 		artist: a.artist?.name || "",

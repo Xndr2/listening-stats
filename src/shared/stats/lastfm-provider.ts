@@ -179,12 +179,18 @@ export class LastfmProvider implements StatsProvider {
 		}
 		const peakWeekday = playEvents.length > 0 ? weekdayDistribution.indexOf(Math.max(...weekdayDistribution)) : 0;
 
-		// Streak: paginate through recent tracks
+		// Streak: paginate through recent tracks. A failure mid-pagination
+		// (e.g. rate limit) must not discard the stats fetched above — use
+		// whatever pages we managed to get.
 		const allStreakTracks = [...recentAll];
-		for (let page = 2; page <= STREAK_LOOKBACK_PAGES; page++) {
-			const pageTracks = await lastfmGetRecentTracks(apiKey, username, RECENT_PAGE_SIZE, page);
-			if (pageTracks.length === 0) break;
-			allStreakTracks.push(...pageTracks);
+		try {
+			for (let page = 2; page <= STREAK_LOOKBACK_PAGES; page++) {
+				const pageTracks = await lastfmGetRecentTracks(apiKey, username, RECENT_PAGE_SIZE, page);
+				if (pageTracks.length === 0) break;
+				allStreakTracks.push(...pageTracks);
+			}
+		} catch (err) {
+			console.warn("[listening-stats] Last.fm streak pagination stopped early:", err);
 		}
 		const streak = computeStreakFromRecent(allStreakTracks);
 
@@ -240,7 +246,13 @@ export class LastfmProvider implements StatsProvider {
 		const raw = localStorage.getItem(LS_KEYS.LASTFM_CONFIG);
 		if (raw) {
 			try {
-				this.config = JSON.parse(raw) as LastfmProviderConfig;
+				const parsed = JSON.parse(raw) as LastfmProviderConfig;
+				// Reject malformed shapes so calculateStats never calls the API
+				// with an undefined key/username.
+				this.config =
+					typeof parsed?.apiKey === "string" && parsed.apiKey && typeof parsed?.username === "string" && parsed.username
+						? parsed
+						: null;
 			} catch {
 				this.config = null;
 			}

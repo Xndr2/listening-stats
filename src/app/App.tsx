@@ -118,7 +118,11 @@ function App() {
 				if (cached) {
 					setStats(cached);
 					setSectionSlots(allResolved());
-					setListColumnLoading({ tracks: false, artists: false, albums: false });
+					setListColumnLoading({
+						tracks: false,
+						artists: false,
+						albums: false,
+					});
 					return;
 				}
 			}
@@ -178,7 +182,11 @@ function App() {
 				e instanceof StatsFmError
 					? e.appError
 					: classifyStatsFmError(0, e instanceof Error ? e.message : "Failed to load stats");
-			setSectionErrors({ overview: appError, lists: appError, activity: appError });
+			setSectionErrors({
+				overview: appError,
+				lists: appError,
+				activity: appError,
+			});
 			setSectionSlots({
 				overview: "error",
 				lists: "error",
@@ -195,13 +203,19 @@ function App() {
 	);
 
 	useEffect(() => {
-		initProviders().then(() => {
-			const providerPeriods = getProviderPeriods();
-			setPeriods(providerPeriods);
-			const restored = restorePeriodForProvider(providerRegistry.getActiveId() ?? "local", providerPeriods);
-			setActivePeriod(restored);
-			setInitialized(true);
-		});
+		initProviders()
+			.catch((err) => {
+				console.error("[listening-stats] Provider Init failed: ", err);
+			})
+			.then(() => {
+				// always leave the loading state
+				// as per-section errors instead of an app stuck on skeletons
+				const providerPeriods = getProviderPeriods();
+				setPeriods(providerPeriods);
+				const restored = restorePeriodForProvider(providerRegistry.getActiveId() ?? "local", providerPeriods);
+				setActivePeriod(restored);
+				setInitialized(true);
+			});
 	}, []);
 
 	useEffect(() => {
@@ -317,7 +331,11 @@ function App() {
 		setPreference("activePage", "dashboard");
 		setActivePeriod(period);
 		savePeriodForProvider(providerRegistry.getActiveId() ?? "local", period.id);
-		window.dispatchEvent(new CustomEvent(EVENTS.DASHBOARD_PERIOD_CHANGED, { detail: { periodId: period.id } }));
+		window.dispatchEvent(
+			new CustomEvent(EVENTS.DASHBOARD_PERIOD_CHANGED, {
+				detail: { periodId: period.id },
+			}),
+		);
 	}, []);
 
 	const handleRefresh = useCallback(async () => {

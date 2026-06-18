@@ -238,7 +238,11 @@ export class StatsFmProvider implements StatsProvider {
 					before: String(priorBoundaries.end),
 					limit: "200",
 				})
-			: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopArtist[]>);
+			: Promise.resolve({
+					ok: false,
+					status: 0,
+					message: "skipped",
+				} as SfmResult<SfmTopArtist[]>);
 
 		const [tracksRes, artistsRes, genresRes, statsRes, recentRes, albumsRes, perDayRes, datesRes, priorArtistsRes] =
 			await Promise.allSettled([
@@ -246,10 +250,16 @@ export class StatsFmProvider implements StatsProvider {
 				sfmGet<SfmTopArtist[]>(`/users/${username}/top/artists`, rangeParams),
 				sfmGet<SfmTopGenre[]>(`/users/${username}/top/genres`, rangeParams),
 				sfmGet<SfmStreamStats>(`/users/${username}/streams/stats`, rangeParams),
-				sfmGet<SfmRecentStream[]>(`/users/${username}/streams/recent`, { limit: "12" }),
+				sfmGet<SfmRecentStream[]>(`/users/${username}/streams/recent`, {
+					limit: "12",
+				}),
 				isPlus
 					? sfmGet<SfmTopAlbum[]>(`/users/${username}/top/albums`, rangeParams)
-					: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopAlbum[]>),
+					: Promise.resolve({
+							ok: false,
+							status: 0,
+							message: "skipped",
+						} as SfmResult<SfmTopAlbum[]>),
 				sfmGet<SfmPerDayStats>(`/users/${username}/streams/stats/per-day`, {
 					range: "lifetime",
 					timeZone,
@@ -477,7 +487,11 @@ export class StatsFmProvider implements StatsProvider {
 					before: String(priorBoundaries.end),
 					limit: "200",
 				})
-			: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopArtist[]>);
+			: Promise.resolve({
+					ok: false,
+					status: 0,
+					message: "skipped",
+				} as SfmResult<SfmTopArtist[]>);
 
 		// Fire ALL API calls concurrently for max parallelism
 		const statsPromise = sfmGet<SfmStreamStats>(`/users/${username}/streams/stats`, rangeParams);
@@ -489,7 +503,11 @@ export class StatsFmProvider implements StatsProvider {
 		const genresPromise = sfmGet<SfmTopGenre[]>(`/users/${username}/top/genres`, rangeParams);
 		const albumsPromise = isPlus
 			? sfmGet<SfmTopAlbum[]>(`/users/${username}/top/albums`, rangeParams)
-			: Promise.resolve({ ok: false, status: 0, message: "skipped" } as SfmResult<SfmTopAlbum[]>);
+			: Promise.resolve({
+					ok: false,
+					status: 0,
+					message: "skipped",
+				} as SfmResult<SfmTopAlbum[]>);
 		const perDayPromise = sfmGet<SfmPerDayStats>(`/users/${username}/streams/stats/per-day`, {
 			range: "lifetime",
 			timeZone,
@@ -750,7 +768,21 @@ export class StatsFmProvider implements StatsProvider {
 		const raw = localStorage.getItem(LS_KEYS.STATSFM_CONFIG);
 		if (!raw) return;
 
-		this.config = JSON.parse(raw) as StatsFmConfig;
+		// Corrupt/foreign localStorage must not throw out of init() — that
+		// would abort initProviders() and leave the whole app stuck loading.
+		try {
+			const parsed = JSON.parse(raw) as StatsFmConfig;
+			if (typeof parsed?.username !== "string" || !parsed.username) {
+				throw new Error("invalid stats.fm config shape");
+			}
+			if (typeof parsed.lastValidated !== "number") parsed.lastValidated = 0; // force revalidation
+			this.config = parsed;
+		} catch (err) {
+			console.warn("[listening-stats] Discarding invalid stats.fm config:", err);
+			localStorage.removeItem(LS_KEYS.STATSFM_CONFIG);
+			this.config = null;
+			return;
+		}
 
 		const isStale = Date.now() - this.config.lastValidated > TWENTY_FOUR_HOURS;
 		if (isStale) {

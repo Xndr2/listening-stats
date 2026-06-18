@@ -30,7 +30,10 @@ interface ImportSummary {
 export function DataTab({ onRefresh }: Props) {
 	const [confirmWipe, setConfirmWipe] = useState(false);
 	const [importPhase, setImportPhase] = useState<ImportPhase>("idle");
-	const [importProgress, setImportProgress] = useState<ImportProgress>({ current: 0, total: 0 });
+	const [importProgress, setImportProgress] = useState<ImportProgress>({
+		current: 0,
+		total: 0,
+	});
 	const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -190,13 +193,22 @@ export function DataTab({ onRefresh }: Props) {
 		}
 	};
 
+	// Only remove this app's keys — clear() would wipe storage for the whole
+	// Spotify origin, including Spotify's own settings and other extensions.
+	const removePrefixedKeys = (storage: Storage) => {
+		for (let i = storage.length - 1; i >= 0; i--) {
+			const key = storage.key(i);
+			if (key?.startsWith("listening-stats:")) storage.removeItem(key);
+		}
+	};
+
 	const handleWipeConfirm = async () => {
 		try {
 			await db.delete();
 			statsCache.invalidate();
 			await lastfmCache.deleteDatabase();
-			localStorage.clear();
-			sessionStorage.clear();
+			removePrefixedKeys(localStorage);
+			removePrefixedKeys(sessionStorage);
 			Spicetify.showNotification("All data wiped");
 			setConfirmWipe(false);
 			window.location.reload();
@@ -208,7 +220,14 @@ export function DataTab({ onRefresh }: Props) {
 
 	return (
 		<div>
-			<div className="settings-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "12px" }}>
+			<div
+				className="settings-row"
+				style={{
+					flexDirection: "column",
+					alignItems: "flex-start",
+					gap: "12px",
+				}}
+			>
 				<input
 					ref={fileInputRef}
 					type="file"
@@ -324,7 +343,14 @@ export function DataTab({ onRefresh }: Props) {
 			</div>
 
 			{/* Wipe All Data */}
-			<div className="settings-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "12px" }}>
+			<div
+				className="settings-row"
+				style={{
+					flexDirection: "column",
+					alignItems: "flex-start",
+					gap: "12px",
+				}}
+			>
 				{!confirmWipe ? (
 					<button type="button" className="btn-destructive" onClick={() => setConfirmWipe(true)}>
 						Wipe All Data

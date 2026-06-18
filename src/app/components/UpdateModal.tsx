@@ -69,11 +69,15 @@ export function UpdateModal({
 		setChangelogMd(null);
 		setChangelogErr(null);
 		setCopiedWhich(null);
-		fetchChangelogMarkdown().then((md) => {
-			if (cancelled) return;
-			if (md === null) setChangelogErr("Could not load changelog.");
-			else setChangelogMd(md);
-		});
+		fetchChangelogMarkdown()
+			.then((md) => {
+				if (cancelled) return;
+				if (md === null) setChangelogErr("Could not load changelog.");
+				else setChangelogMd(md);
+			})
+			.catch(() => {
+				if (!cancelled) setChangelogErr("Could not load changelog.");
+			});
 		return () => {
 			cancelled = true;
 		};

@@ -95,6 +95,7 @@ function registerListeners(): void {
 			Spicetify?: {
 				Player?: {
 					addEventListener?: (event: string, handler: () => void) => void;
+					removeEventListener?: (event: string, handler: () => void) => void;
 					data?: unknown;
 					getProgress?: () => number;
 					getDuration?: () => number;
@@ -105,6 +106,17 @@ function registerListeners(): void {
 	).Spicetify?.Player;
 
 	if (!player?.addEventListener) return;
+
+	// Watchdog can call this again; detach previous handlers first so the
+	// player never accumulates duplicates (which would double-record plays).
+	if (player.removeEventListener) {
+		const prevSong = win.__lsSongHandler as (() => void) | undefined;
+		const prevPause = win.__lsPauseHandler as (() => void) | undefined;
+		const prevProgress = win.__lsProgressHandler as (() => void) | undefined;
+		if (prevSong) player.removeEventListener("songchange", prevSong);
+		if (prevPause) player.removeEventListener("onplaypause", prevPause);
+		if (prevProgress) player.removeEventListener("onprogress", prevProgress);
+	}
 
 	const songChangeHandler = () => {
 		fsm?.handleSongChange(player.data as Parameters<TrackingFSM["handleSongChange"]>[0]).catch((err) => {
