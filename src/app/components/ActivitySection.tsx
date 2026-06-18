@@ -98,7 +98,7 @@ export function ActivitySection({
 			{activeTab === "weekday" && renderWeekdayChart(weekdayDistribution, peakWeekday)}
 			{activeTab === "day" && (
 				<>
-					<CalendarHeatmap dailyPlayCounts={dailyPlayCounts ?? []} />
+					<CalendarHeatmap dailyPlayCounts={dailyPlayCounts ?? []} shrink={prefs.heatmapShrink} />
 					{showStreak && streak != null && streak > 0 && (
 						<div className="streak-callout">
 							You've listened on <strong>{streak} days</strong> in a row &middot; longest stretch this year.

@@ -60,6 +60,14 @@ function installTestGlobals(): void {
 		},
 	});
 
+	// jsdom lacks ResizeObserver
+	class ResizeObserverMock {
+		observe = vi.fn();
+		unobserve = vi.fn();
+		disconnect = vi.fn();
+	}
+	vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+
 	// jsdom lacks matchMedia; default matches: false (motion on). Override per test when needed.
 	vi.stubGlobal(
 		"matchMedia",
