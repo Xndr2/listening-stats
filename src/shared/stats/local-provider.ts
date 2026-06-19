@@ -25,7 +25,30 @@ async function mergeArtistImagesFromDb(stats: StatsResult): Promise<void> {
 }
 
 function isQualifyingPlay(e: PlayEvent): boolean {
-	return e.type !== "skip";
+	if (e.type === "skip") return false;
+	// Spotify DJ voice clips / ads recorded by older versions are not music
+	const uri = e.trackUri ?? "";
+	if (
+		uri.startsWith("spotify:narration:") ||
+		uri.startsWith("spotify:ad:") ||
+		uri.startsWith("spotify:interruption:")
+	) {
+		return false;
+	}
+	return true;
+}
+
+/**
+ * Aggregation keys with a name-based fallback: local files (and some legacy
+ * events) have empty artist/album URIs, and keying on "" would merge every
+ * such artist/album into a single bucket.
+ */
+function artistKeyOf(e: PlayEvent): string {
+	return e.artistUri || `local:artist:${e.artistName.toLowerCase()}`;
+}
+
+function albumKeyOf(e: PlayEvent): string {
+	return e.albumUri || `local:album:${e.artistName.toLowerCase()}:${e.albumName.toLowerCase()}`;
 }
 
 function cacheKey(periodId: string): string {
@@ -125,9 +148,9 @@ export class LocalProvider implements StatsProvider {
 				.toArray();
 			const priorEvents = priorEventsRaw.filter(isQualifyingPlay);
 
-			const currentArtistIds = new Set(playEvents.map((e) => e.artistUri));
+			const currentArtistIds = new Set(playEvents.map(artistKeyOf));
 			if (priorEvents.length > 0) {
-				const priorArtistIds = new Set(priorEvents.map((e) => e.artistUri));
+				const priorArtistIds = new Set(priorEvents.map(artistKeyOf));
 				let newCount = 0;
 				for (const id of currentArtistIds) {
 					if (!priorArtistIds.has(id)) newCount++;
@@ -196,12 +219,13 @@ export class LocalProvider implements StatsProvider {
 			}
 
 			// Artist aggregation
-			const a = artistMap.get(event.artistUri);
+			const artistKey = artistKeyOf(event);
+			const a = artistMap.get(artistKey);
 			if (a) {
 				a.count++;
 				a.durationMs += event.playedMs;
 			} else {
-				artistMap.set(event.artistUri, {
+				artistMap.set(artistKey, {
 					name: event.artistName,
 					uri: event.artistUri,
 					count: 1,
@@ -210,12 +234,13 @@ export class LocalProvider implements StatsProvider {
 			}
 
 			// Album aggregation
-			const al = albumMap.get(event.albumUri);
+			const albumKey = albumKeyOf(event);
+			const al = albumMap.get(albumKey);
 			if (al) {
 				al.count++;
 				al.durationMs += event.playedMs;
 			} else {
-				albumMap.set(event.albumUri, {
+				albumMap.set(albumKey, {
 					name: event.albumName,
 					uri: event.albumUri,
 					artistName: event.artistName,

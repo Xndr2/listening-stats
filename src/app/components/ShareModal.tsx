@@ -5,6 +5,7 @@ import type { Period, StatsResult, TopArtist, TopGenre, TopTrack } from "../../s
 import { normalizeSpotifyImageUrl } from "../../shared/util/spotify-image-url";
 import { formatHour, formatNumber } from "../format";
 import { CloseIcon } from "../icons";
+import { Toggle } from "./spicetify-ui";
 
 const { useState, useCallback, useEffect, useMemo } = Spicetify.React;
 
@@ -72,7 +73,6 @@ export function ShareModal({ stats, activePeriod, onClose, initialVariant }: Sha
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
 
-	const Toggle = Spicetify.ReactComponent.Toggle;
 	const username = getShareCaptionHandle();
 	const periodLabel = activePeriod.label;
 	const periodBoundaries = activePeriod.getBoundaries();
@@ -471,7 +471,14 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 	return (
 		<div>
 			<div style={KICKER_STYLE}>{head}</div>
-			<div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+			<div
+				style={{
+					display: "flex",
+					alignItems: "baseline",
+					gap: 8,
+					flexWrap: "wrap",
+				}}
+			>
 				<span
 					style={{
 						fontSize: isStory ? 48 : 36,
@@ -501,7 +508,15 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 
 			{tracks.length > 0 && (
 				<div style={{ marginTop: isStory ? 12 : 8 }}>
-					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>Top tracks</div>
+					<div
+						style={{
+							...KICKER_STYLE,
+							fontSize: isStory ? 11 : 9,
+							marginBottom: 6,
+						}}
+					>
+						Top tracks
+					</div>
 					<ol
 						style={{
 							listStyle: "none",
@@ -516,7 +531,11 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 							<li
 								key={t.trackUri}
 								data-testid="share-wrapped-track"
-								style={{ display: "flex", alignItems: "center", gap: isStory ? 8 : 6 }}
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: isStory ? 8 : 6,
+								}}
 							>
 								<span
 									style={{
@@ -563,7 +582,15 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 
 			{artists.length > 0 && (
 				<div style={{ marginTop: isStory ? 12 : 8 }}>
-					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>Top artists</div>
+					<div
+						style={{
+							...KICKER_STYLE,
+							fontSize: isStory ? 11 : 9,
+							marginBottom: 6,
+						}}
+					>
+						Top artists
+					</div>
 					<ol
 						style={{
 							listStyle: "none",
@@ -578,7 +605,11 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 							<li
 								key={a.artistUri || `artist-${i}`}
 								data-testid="share-wrapped-artist"
-								style={{ display: "flex", alignItems: "center", gap: isStory ? 8 : 6 }}
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: isStory ? 8 : 6,
+								}}
 							>
 								<span
 									style={{
@@ -605,7 +636,12 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 									>
 										{a.artistName}
 									</div>
-									<div style={{ fontSize: isStory ? 9 : 8, color: "rgba(255,255,255,.55)" }}>
+									<div
+										style={{
+											fontSize: isStory ? 9 : 8,
+											color: "rgba(255,255,255,.55)",
+										}}
+									>
 										{a.count > 0 ? (a.count === 1 ? "1 play" : `${a.count} plays`) : ""}
 									</div>
 								</div>
@@ -617,8 +653,22 @@ function ShareWrapped({ stats, size, periodLabel }: { stats: StatsResult; size: 
 
 			{genres.length > 0 && (
 				<div style={{ marginTop: isStory ? 12 : 8 }}>
-					<div style={{ ...KICKER_STYLE, fontSize: isStory ? 11 : 9, marginBottom: 6 }}>Top genres</div>
-					<div style={{ display: "flex", flexDirection: "column", gap: isStory ? 6 : 4 }}>
+					<div
+						style={{
+							...KICKER_STYLE,
+							fontSize: isStory ? 11 : 9,
+							marginBottom: 6,
+						}}
+					>
+						Top genres
+					</div>
+					<div
+						style={{
+							display: "flex",
+							flexDirection: "column",
+							gap: isStory ? 6 : 4,
+						}}
+					>
 						{genres.map((g, i) => {
 							const pct = genreTotal > 0 ? g.count / genreTotal : 0;
 							return (
@@ -758,7 +808,14 @@ function ShareTime({ stats, periodLabel }: { stats: StatsResult; periodLabel: st
 				<span style={{ fontSize: 32, fontWeight: 700 }}>hours</span>
 			</div>
 			{topArtist && (
-				<div style={{ marginTop: 14, fontSize: 13, color: "rgba(255,255,255,.7)", lineHeight: 1.5 }}>
+				<div
+					style={{
+						marginTop: 14,
+						fontSize: 13,
+						color: "rgba(255,255,255,.7)",
+						lineHeight: 1.5,
+					}}
+				>
 					Mostly to <strong style={{ color: "var(--spice-button, #1ed760)" }}>{topArtist}</strong>.
 				</div>
 			)}
@@ -780,7 +837,14 @@ function ShareGenre({ stats }: { stats: StatsResult }) {
 			<div style={KICKER_STYLE}>
 				I was {topPct}% {top[0].genre}
 			</div>
-			<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+			<div
+				style={{
+					display: "flex",
+					flexDirection: "column",
+					gap: 8,
+					marginBottom: 14,
+				}}
+			>
 				{top.map((g, i) => {
 					const pct = totalCount > 0 ? g.count / totalCount : 0;
 					return (
@@ -873,7 +937,14 @@ function ShareStreak({ stats }: { stats: StatsResult }) {
 				))}
 			</div>
 			{streak > 0 && (
-				<div style={{ fontSize: 12, color: "rgba(255,255,255,.7)", lineHeight: 1.4, marginTop: 4 }}>
+				<div
+					style={{
+						fontSize: 12,
+						color: "rgba(255,255,255,.7)",
+						lineHeight: 1.4,
+						marginTop: 4,
+					}}
+				>
 					Listened every day for <strong style={{ color: "#fff" }}>{streak} days</strong>.
 				</div>
 			)}
@@ -1857,7 +1928,13 @@ async function drawWrappedCompactGenreRows(
 	x: number,
 	y: number,
 	w: number,
-	opts: { barH: number; rowGap: number; labelMax: number; labelPx: number; pctPx: number },
+	opts: {
+		barH: number;
+		rowGap: number;
+		labelMax: number;
+		labelPx: number;
+		pctPx: number;
+	},
 ): Promise<number> {
 	if (top.length === 0) return y;
 	const maxCount = top[0].count || 1;
@@ -2160,7 +2237,9 @@ export async function copyShareCardToClipboard(
 export async function shareOrDownload(blob: Blob): Promise<"shared" | "copied" | "downloaded"> {
 	if (navigator.share) {
 		try {
-			const file = new File([blob], "listening-stats.png", { type: "image/png" });
+			const file = new File([blob], "listening-stats.png", {
+				type: "image/png",
+			});
 			await navigator.share({ files: [file] });
 			return "shared";
 		} catch {

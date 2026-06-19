@@ -10,6 +10,7 @@ import { markdownLiteToHtml } from "../../shared/update/markdown-lite";
 import type { UpdateCheckResult } from "../../shared/update/update-check";
 import { snoozeUpdatePrompt } from "../../shared/update/update-check";
 import { CloseIcon } from "../icons";
+import { Toggle } from "./spicetify-ui";
 
 const { useState, useEffect, useCallback, useRef } = Spicetify.React;
 
@@ -54,7 +55,6 @@ export function UpdateModal({
 	receiveBetaUpdates,
 	onReceiveBetaUpdatesChange,
 }: UpdateModalProps) {
-	const Toggle = Spicetify.ReactComponent.Toggle;
 	const [changelogMd, setChangelogMd] = useState<string | null>(null);
 	const [changelogErr, setChangelogErr] = useState<string | null>(null);
 	const [copiedWhich, setCopiedWhich] = useState<null | "bash" | "powershell">(null);

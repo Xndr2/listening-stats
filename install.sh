@@ -23,39 +23,68 @@ REPO_SLUG="Xndr2/listening-stats"
 APP_NAME="listening-stats"
 MIN_ZIP_BYTES=2000
 
+# Scan recent releases for the newest one that actually ships listening-stats.zip.
+# Must not assume a stable "latest" release exists: when only prereleases are
+# published (or the newest tag has no zip yet), releases/latest/download/… 404s.
+# Stable mode prefers non-prereleases but falls back to a prerelease with the
+# asset rather than failing. Requires jq or python3; otherwise stable mode uses
+# the static latest-download URL and prerelease mode errors out.
 resolve_zip_url() {
 	local slug="$1"
-	if [[ "${LISTENING_STATS_PRERELEASE:-}" == "1" ]]; then
-		local api_url="https://api.github.com/repos/${slug}/releases?per_page=20"
-		local json tag
-		json="$(curl -sSf -H "Accept: application/vnd.github+json" "${api_url}")" || {
-			echo "! Could not reach GitHub API (prerelease lookup)." >&2
-			exit 1
-		}
+	local want_pre="${LISTENING_STATS_PRERELEASE:-}"
+	local api_url="https://api.github.com/repos/${slug}/releases?per_page=20"
+	local json="" url=""
+
+	if json="$(curl -sSf -H "Accept: application/vnd.github+json" "${api_url}" 2>/dev/null)"; then
 		if command -v jq >/dev/null 2>&1; then
-			tag="$(printf '%s' "${json}" | jq -r '.[] | select((.assets // []) | map(.name) | index("listening-stats.zip")) | .tag_name' | head -n1)"
+			url="$(printf '%s' "${json}" | jq -r --arg pre "${want_pre}" '
+				[ .[] | select(.draft != true)
+				| select(((.assets // []) | map(.name) | index("listening-stats.zip")) != null) ] as $all
+				| (if $pre == "1" then ($all | first)
+				   else (($all | map(select(.prerelease != true)) | first) // ($all | first)) end)
+				| select(. != null)
+				| .assets[] | select(.name == "listening-stats.zip") | .browser_download_url
+			' 2>/dev/null | head -n1)"
 		elif command -v python3 >/dev/null 2>&1; then
-			tag="$(printf '%s' "${json}" | python3 -c '
-import json, sys
+			url="$(printf '%s' "${json}" | LISTENING_STATS_PRERELEASE="${want_pre}" python3 -c '
+import json, os, sys
 data = json.load(sys.stdin)
-for r in data:
-    names = [a.get("name") for a in r.get("assets") or []]
-    if "listening-stats.zip" in names:
-        print(r["tag_name"])
-        break
-')"
-		else
-			echo "! LISTENING_STATS_PRERELEASE=1 requires jq or python3." >&2
-			exit 1
+pre = os.environ.get("LISTENING_STATS_PRERELEASE") == "1"
+with_zip = [r for r in data
+            if not r.get("draft")
+            and any(a.get("name") == "listening-stats.zip" for a in r.get("assets") or [])]
+pick = None
+if pre:
+    pick = with_zip[0] if with_zip else None
+else:
+    stable = [r for r in with_zip if not r.get("prerelease")]
+    pick = stable[0] if stable else (with_zip[0] if with_zip else None)
+if pick:
+    for a in pick["assets"]:
+        if a.get("name") == "listening-stats.zip":
+            print(a["browser_download_url"])
+            break
+' 2>/dev/null)"
 		fi
-		[[ -n "${tag}" ]] || {
-			echo "! No GitHub release includes listening-stats.zip." >&2
-			exit 1
-		}
-		printf '%s\n' "https://github.com/${slug}/releases/download/${tag}/listening-stats.zip"
-	else
-		printf '%s\n' "https://github.com/${slug}/releases/latest/download/listening-stats.zip"
 	fi
+
+	if [[ -n "${url}" && "${url}" != "null" ]]; then
+		printf '%s\n' "${url}"
+		return 0
+	fi
+
+	if [[ "${want_pre}" == "1" ]]; then
+		if ! command -v jq >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
+			echo "! LISTENING_STATS_PRERELEASE=1 requires jq or python3." >&2
+		else
+			echo "! No GitHub release includes listening-stats.zip (or the GitHub API is unreachable)." >&2
+			echo "! Check https://github.com/${slug}/releases" >&2
+		fi
+		exit 1
+	fi
+
+	# GitHub API unreachable or no parser available: last-resort static URL.
+	printf '%s\n' "https://github.com/${slug}/releases/latest/download/listening-stats.zip"
 }
 
 if [[ -t 1 ]]; then
@@ -403,7 +432,9 @@ done
 
 step "Downloading ${DIM}${ZIP_URL}${RST}"
 if command -v curl >/dev/null 2>&1; then
-	curl -fSL --progress-bar "${ZIP_URL}" -o "${ZIP_PATH}"
+	if ! curl -fSL --progress-bar "${ZIP_URL}" -o "${ZIP_PATH}"; then
+		die "Download failed (${ZIP_URL}). Check https://github.com/${REPO_SLUG}/releases for a release that includes listening-stats.zip, then re-run the installer."
+	fi
 else
 	die "curl not found. Install curl or download the zip manually from GitHub."
 fi

@@ -1,6 +1,7 @@
 import { EVENTS } from "../../../shared/constants/events";
 import { GITHUB_REPO_WEB_URL } from "../../../shared/constants/github-repo";
 import { getPreferences, setPreference } from "../../preferences";
+import { Toggle } from "../spicetify-ui";
 
 const { useCallback } = Spicetify.React;
 
@@ -12,7 +13,6 @@ interface AboutTabProps {
 }
 
 export function AboutTab({ version, onOpenUpdates, onPrefsChanged, onReceiveBetaUpdatesChanged }: AboutTabProps) {
-	const Toggle = Spicetify.ReactComponent.Toggle;
 	const prefs = getPreferences();
 
 	const handleBetaChannel = useCallback(

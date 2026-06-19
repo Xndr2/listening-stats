@@ -1,6 +1,7 @@
 import type { WorldChartKind, WorldIndicator, WorldTrack, WorldWindow } from "../../../shared/types/world-charts";
 import { formatDuration } from "../../world-charts-service";
 import { navigateWorldItem, playOrOpenWorldTrack, trackPlayTooltip } from "../../world-spotify-actions";
+import { Tooltip } from "../spicetify-ui";
 import { getRankClass } from "../TopLists";
 
 const { useMemo } = Spicetify.React;
@@ -136,7 +137,7 @@ export function TrackPlayButton({ item, size = 28 }: { item: WorldTrack; size?: 
 	};
 
 	return (
-		<Spicetify.ReactComponent.TooltipWrapper label={tooltip} placement="top">
+		<Tooltip label={tooltip} placement="top">
 			<button
 				type="button"
 				className="world-chart-playbtn"
@@ -148,7 +149,7 @@ export function TrackPlayButton({ item, size = 28 }: { item: WorldTrack; size?: 
 					<path d="M2.5 1.5L8 5L2.5 8.5Z" />
 				</svg>
 			</button>
-		</Spicetify.ReactComponent.TooltipWrapper>
+		</Tooltip>
 	);
 }
 
@@ -177,10 +178,20 @@ function asideCardMeta(item: WorldTrack, kind: WorldChartKind) {
 	}
 	if (kind === "artist") {
 		const genres = item.genres?.slice(0, 2).join(" · ");
-		return { title: item.title, sub: genres || "Artist", stat: item.plays, art };
+		return {
+			title: item.title,
+			sub: genres || "Artist",
+			stat: item.plays,
+			art,
+		};
 	}
 	const year = item.albumYear ? ` · ${item.albumYear}` : "";
-	return { title: item.title, sub: item.artist ? `${item.artist}${year}` : "", stat: item.plays, art };
+	return {
+		title: item.title,
+		sub: item.artist ? `${item.artist}${year}` : "",
+		stat: item.plays,
+		art,
+	};
 }
 
 function HeroAsideCard({ label, item, kind }: { label: string; item: WorldTrack; kind: WorldChartKind }) {
@@ -277,7 +288,7 @@ export function WorldHeroSection({
 								</div>
 							) : null}
 						</div>
-						<Spicetify.ReactComponent.TooltipWrapper label={trackPlayTooltip(item)} placement="top">
+						<Tooltip label={trackPlayTooltip(item)} placement="top">
 							<button
 								type="button"
 								className="btn-primary world-hero-play"
@@ -287,7 +298,7 @@ export function WorldHeroSection({
 							>
 								Play
 							</button>
-						</Spicetify.ReactComponent.TooltipWrapper>
+						</Tooltip>
 					</div>
 				</div>
 			</div>

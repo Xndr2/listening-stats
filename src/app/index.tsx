@@ -1,6 +1,9 @@
 import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlaybarWidget } from "./components/PlaybarWidget";
 import { injectStyles } from "./styles";
+
+declare const __VERSION__: string;
 
 const { React } = Spicetify;
 
@@ -55,14 +58,17 @@ export function render() {
 		document.body.appendChild(widgetContainer);
 		startAttachLoop(widgetContainer);
 
-		Spicetify.ReactDOM.render(React.createElement(PlaybarWidget), widgetContainer);
+		Spicetify.ReactDOM.render(
+			React.createElement(ErrorBoundary, { silent: true }, React.createElement(PlaybarWidget)),
+			widgetContainer,
+		);
 	} else if (widgetContainer && !playbarObserver) {
 		// unmount() stopped the attach loop; restart it so the playbar widget
 		// keeps re-attaching after the user navigates back to the app.
 		startAttachLoop(widgetContainer);
 	}
 
-	return React.createElement(App);
+	return React.createElement(ErrorBoundary, { appVersion: __VERSION__ }, React.createElement(App));
 }
 
 export function unmount() {

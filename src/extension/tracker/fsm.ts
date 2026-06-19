@@ -51,6 +51,8 @@ export interface PlayerData {
 	item: {
 		uri: string;
 		name: string;
+		/** "narration" for Spotify DJ voice clips, "ad" for ads. */
+		provider?: string;
 		duration?: { milliseconds: number };
 		metadata?: {
 			title?: string;
@@ -62,6 +64,47 @@ export interface PlayerData {
 			image_xlarge_url?: string;
 		};
 	} | null;
+}
+
+/**
+ * True for items that should be recorded as plays. Excludes Spotify DJ voice
+ * clips and ads — they are not music and would pollute the stats.
+ */
+export function isTrackableItem(item: { uri?: string; provider?: string }): boolean {
+	if (item.provider === "narration" || item.provider === "ad") return false;
+	const uri = item.uri ?? "";
+	if (
+		uri.startsWith("spotify:narration:") ||
+		uri.startsWith("spotify:ad:") ||
+		uri.startsWith("spotify:interruption:")
+	) {
+		return false;
+	}
+	return true;
+}
+
+/**
+ * Local-file URIs encode metadata directly: spotify:local:<artist>:<album>:<title>:<duration>
+ * (components are URL-encoded with "+" for spaces). Used as a fallback when
+ * Player metadata is missing for local files.
+ */
+export function parseLocalFileUri(uri: string): { artist: string; album: string; title: string } | null {
+	if (!uri.startsWith("spotify:local:")) return null;
+	const parts = uri.split(":");
+	const decode = (s: string | undefined): string => {
+		if (!s) return "";
+		const spaced = s.replace(/\+/g, " ");
+		try {
+			return decodeURIComponent(spaced);
+		} catch {
+			return spaced;
+		}
+	};
+	return {
+		artist: decode(parts[2]),
+		album: decode(parts[3]),
+		title: decode(parts[4]),
+	};
 }
 
 // ─── Dependency Injection Interface ───────────────────────────────────────────
@@ -132,17 +175,31 @@ export class TrackingFSM {
 		// Reset progress to prevent false loop detection after real track change
 		this._state.lastProgressMs = 0;
 
-		if (playerData?.item) {
+		if (playerData?.item && isTrackableItem(playerData.item)) {
 			const item = playerData.item;
 			const meta = item.metadata;
 
+			// Local files: fall back to URI-encoded metadata and give artist/album
+			// stable name-based URIs so different local artists don't all collapse
+			// into one empty-URI bucket during aggregation.
+			const localMeta = parseLocalFileUri(item.uri);
+			const trackName = item.name || meta?.title || localMeta?.title || "Unknown Track";
+			const artistName = meta?.artist_name || localMeta?.artist || "Unknown Artist";
+			const albumName = meta?.album_title || localMeta?.album || "Unknown Album";
+			let artistUri = meta?.artist_uri || "";
+			let albumUri = meta?.album_uri || "";
+			if (localMeta) {
+				if (!artistUri) artistUri = `local:artist:${artistName.toLowerCase()}`;
+				if (!albumUri) albumUri = `local:album:${artistName.toLowerCase()}:${albumName.toLowerCase()}`;
+			}
+
 			this._state.capturedData = {
 				trackUri: item.uri,
-				trackName: item.name || meta?.title || "Unknown Track",
-				artistName: meta?.artist_name || "Unknown Artist",
-				artistUri: meta?.artist_uri || "",
-				albumName: meta?.album_title || "Unknown Album",
-				albumUri: meta?.album_uri || "",
+				trackName,
+				artistName,
+				artistUri,
+				albumName,
+				albumUri,
 				albumArt: normalizeSpotifyImageUrl(meta?.image_url || meta?.image_xlarge_url),
 				durationMs: item.duration?.milliseconds || 0,
 				startedAt: Date.now(),

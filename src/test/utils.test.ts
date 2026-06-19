@@ -22,6 +22,21 @@ describe("navigateToUri", () => {
 	});
 });
 
+it("does nothing for local-file URIs (no route exists)", () => {
+	navigateToUri("spotify:local:Artist:Album:Title:200");
+	expect(Spicetify.Platform.History.push).not.toHaveBeenCalled();
+});
+
+it("does nothing for synthetic import URIs", () => {
+	navigateToUri("listening-stats:artist:abc123def456");
+	expect(Spicetify.Platform.History.push).not.toHaveBeenCalled();
+});
+
+it("does nothing for name-based local fallback URIs", () => {
+	navigateToUri("local:artist:daft punk");
+	expect(Spicetify.Platform.History.push).not.toHaveBeenCalled();
+});
+
 describe("downloadFile", () => {
 	it("creates a link element and clicks it", () => {
 		const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:url");

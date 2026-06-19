@@ -9,6 +9,7 @@ import {
 import { EVENTS } from "../../../shared/constants/events";
 import { LS_KEYS } from "../../../shared/constants/storage-keys";
 import { SegmentedControl } from "../SegmentedControl";
+import { Toggle } from "../spicetify-ui";
 
 const THRESHOLD_STOPS = [0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000];
 
@@ -56,8 +57,6 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 		setLoggingEnabled(val);
 		onPrefsChanged();
 	};
-
-	const Toggle = Spicetify.ReactComponent.Toggle;
 
 	return (
 		<div>
