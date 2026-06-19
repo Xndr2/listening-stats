@@ -1,5 +1,6 @@
 import { formatHour } from "../format";
 import { getPreferences } from "../preferences";
+import { Tooltip } from "./spicetify-ui";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
@@ -31,13 +32,9 @@ export function ActivityChart({ hourlyDistribution, peakHour }: ActivityChartPro
 					const heightPct = val > 0 ? Math.max((val / max) * 100, 5) : 0;
 					const isPeak = hr === peakHour && val > 0;
 					return (
-						<Spicetify.ReactComponent.TooltipWrapper
-							key={hr}
-							label={`${formatHour(hr, prefs.use24HourTime)}: ${val} plays`}
-							placement="top"
-						>
+						<Tooltip key={hr} label={`${formatHour(hr, prefs.use24HourTime)}: ${val} plays`} placement="top">
 							<div className={`activity-bar${isPeak ? " peak" : ""}`} style={{ height: `${heightPct}%` }} />
-						</Spicetify.ReactComponent.TooltipWrapper>
+						</Tooltip>
 					);
 				})}
 			</div>

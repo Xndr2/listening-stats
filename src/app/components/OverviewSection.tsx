@@ -5,6 +5,7 @@ import { ClockIcon } from "../icons";
 import type { OverviewProviderKey } from "../preferences";
 import { getPreferences, OVERVIEW_CARD_LABELS } from "../preferences";
 import { SkeletonBlock } from "./SkeletonPrimitives";
+import { Tooltip } from "./spicetify-ui";
 
 const { useState, useEffect, useMemo } = Spicetify.React;
 
@@ -122,7 +123,15 @@ function OverviewHero({
 				>
 					{h}
 				</span>
-				<span style={{ fontSize: 28, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>h</span>
+				<span
+					style={{
+						fontSize: 28,
+						fontWeight: 600,
+						color: "rgba(var(--spice-rgb-text), 0.6)",
+					}}
+				>
+					h
+				</span>
 				<span
 					data-testid="hero-minutes"
 					style={{
@@ -134,7 +143,15 @@ function OverviewHero({
 				>
 					{m.toString().padStart(2, "0")}
 				</span>
-				<span style={{ fontSize: 22, fontWeight: 600, color: "rgba(var(--spice-rgb-text), 0.6)" }}>m</span>
+				<span
+					style={{
+						fontSize: 22,
+						fontWeight: 600,
+						color: "rgba(var(--spice-rgb-text), 0.6)",
+					}}
+				>
+					m
+				</span>
 				{showDelta && deltaPct != null && (
 					<span
 						data-testid="hero-delta"
@@ -252,7 +269,7 @@ export default function OverviewSection({ stats, activePeriod, loading = false }
 		if (!card) return null;
 		const label = OVERVIEW_CARD_LABELS[id] ?? id;
 		return (
-			<Spicetify.ReactComponent.TooltipWrapper key={id} label={card.tooltip}>
+			<Tooltip key={id} label={card.tooltip}>
 				<div className="overview-card" data-card-id={id}>
 					<div className="overview-card-label">{label}</div>
 					<div className="overview-card-row">
@@ -262,7 +279,7 @@ export default function OverviewSection({ stats, activePeriod, loading = false }
 						{card.sub && <span className="overview-card-sub">{card.sub}</span>}
 					</div>
 				</div>
-			</Spicetify.ReactComponent.TooltipWrapper>
+			</Tooltip>
 		);
 	};
 
@@ -279,14 +296,21 @@ export default function OverviewSection({ stats, activePeriod, loading = false }
 				periodKey={activePeriod.id}
 			/>
 			{top4.length > 0 && (
-				<div className="overview-right-block" style={{ gridTemplateColumns: `repeat(${topColumns}, minmax(0, 1fr))` }}>
+				<div
+					className="overview-right-block"
+					style={{
+						gridTemplateColumns: `repeat(${topColumns}, minmax(0, 1fr))`,
+					}}
+				>
 					{top4.map(renderTile)}
 				</div>
 			)}
 			{hasBottomRow && (
 				<div
 					className="overview-bottom-row"
-					style={{ gridTemplateColumns: `repeat(${bottomColumns}, minmax(0, 1fr))` }}
+					style={{
+						gridTemplateColumns: `repeat(${bottomColumns}, minmax(0, 1fr))`,
+					}}
 				>
 					{bottom3.map(renderTile)}
 				</div>

@@ -13,6 +13,7 @@ import {
 	SECTION_IDS,
 	setPreference,
 } from "../../preferences";
+import { Toggle } from "../spicetify-ui";
 import { SortableRow } from "./SortableRow";
 import { SortableTile } from "./SortableTile";
 
@@ -252,8 +253,6 @@ export function DisplayTab({ onPrefsChanged, onRestartTour, announcementDismissK
 	});
 
 	const topListsCoarseHidden = prefs.hiddenSections.includes("top-lists");
-
-	const Toggle = Spicetify.ReactComponent.Toggle;
 
 	const renderSortableTile = (
 		id: string,

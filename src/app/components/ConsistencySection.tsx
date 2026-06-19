@@ -1,5 +1,6 @@
 import type { Period } from "../../shared/types/stats";
 import { SkeletonBlock, SkeletonTextLine } from "./SkeletonPrimitives";
+import { Tooltip } from "./spicetify-ui";
 
 interface DailyPoint {
 	date: string;
@@ -93,7 +94,6 @@ export function ConsistencySection({
 	const trendMax = Math.max(...trend.map((p) => p.count), 1);
 	const isTodayPeriod = activePeriod.id === "today" || activePeriod.id === "sfm-today";
 	const isLocalProvider = activeProviderId === "local";
-	const Tooltip = Spicetify.ReactComponent.TooltipWrapper;
 
 	const MetricCard = ({ label, value, sub, tooltip, accent }: MetricCardProps) => (
 		<Tooltip label={tooltip}>

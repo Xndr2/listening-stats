@@ -53,6 +53,8 @@ declare namespace Spicetify {
 					item: {
 						uri: string;
 						name: string;
+						/** "narration" for Spotify DJ voice clips, "ad" for ads. */
+						provider?: string;
 						duration?: { milliseconds: number };
 						metadata?: {
 							title?: string;

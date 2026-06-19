@@ -1,5 +1,7 @@
 const { useRef, useEffect, useState } = Spicetify.React;
 
+import { Tooltip } from "./spicetify-ui";
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 interface DailyCount {
@@ -132,10 +134,13 @@ export function CalendarHeatmap({ dailyPlayCounts, shrink }: CalendarHeatmapProp
 							<div
 								key={wi}
 								className="heatmap-week"
-								style={{ gridTemplateRows: `repeat(7, ${colWidth})`, gap: `${gap}px` }}
+								style={{
+									gridTemplateRows: `repeat(7, ${colWidth})`,
+									gap: `${gap}px`,
+								}}
 							>
 								{week.map((cell, di) => (
-									<Spicetify.ReactComponent.TooltipWrapper
+									<Tooltip
 										key={di}
 										label={cell ? `${cell.date.toDateString()} - ${cell.count} plays` : ""}
 										placement="top"
@@ -148,7 +153,7 @@ export function CalendarHeatmap({ dailyPlayCounts, shrink }: CalendarHeatmapProp
 												background: cell ? cellColor(cell.count, max) : "transparent",
 											}}
 										/>
-									</Spicetify.ReactComponent.TooltipWrapper>
+									</Tooltip>
 								))}
 							</div>
 						))}

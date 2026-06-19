@@ -7,6 +7,7 @@ import { providerRegistry } from "../../shared/stats/provider";
 import type { Period } from "../../shared/types/stats";
 import { GearIcon, ShareIcon } from "../icons";
 import PeriodTabs from "./PeriodTabs";
+import { Tooltip } from "./spicetify-ui";
 
 const { useState, useEffect } = Spicetify.React;
 const STATSFM_REFRESH_WINDOW_MS = 2 * 60_000;
@@ -171,7 +172,7 @@ export default function Header({
 			<div className="stats-header-left">
 				<h1 className="stats-header-title">Listening Stats</h1>
 				<div data-tour-target="health">
-					<Spicetify.ReactComponent.TooltipWrapper label={tooltipText} placement="bottom">
+					<Tooltip label={tooltipText} placement="bottom">
 						<div className="header-provider-pill">
 							<span
 								className={`health-dot health-${healthColor}`}
@@ -180,7 +181,7 @@ export default function Header({
 							<span className="header-provider-name">{providerName}</span>
 							{capabilities?.tier === "plus" && <span className="tier-badge tier-badge--plus">Plus</span>}
 						</div>
-					</Spicetify.ReactComponent.TooltipWrapper>
+					</Tooltip>
 				</div>
 			</div>
 			<div className="stats-header-right">

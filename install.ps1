@@ -32,33 +32,50 @@ $RepoSlug = "Xndr2/listening-stats"
 $AppName = "listening-stats"
 $MinZipBytes = 2000
 
+function Get-ReleaseZipAssetUrl {
+    param($Release)
+    $match = @($Release.assets | Where-Object { $_.name -eq "listening-stats.zip" })
+    if ($match.Count -ge 1) { return $match[0].browser_download_url }
+    return $null
+}
+
 function Resolve-ZipUrl {
+    # Scan recent releases for the newest one that actually ships listening-stats.zip.
+    # This must not assume a stable "latest" release exists: when only prereleases are
+    # published (or the newest tag has no zip yet), /releases/latest/download/… 404s.
+    # Stable mode prefers non-prereleases but falls back to a prerelease with the
+    # asset rather than failing.
     param([string]$Slug)
-    if ($env:LISTENING_STATS_PRERELEASE -eq "1") {
-        $uri = "https://api.github.com/repos/$Slug/releases?per_page=20"
-        $releases = @(Invoke-RestMethod -Uri $uri -Headers @{ Accept = "application/vnd.github+json" })
-        foreach ($rel in $releases) {
-            $names = @($rel.assets | ForEach-Object { $_.name })
-            if ($names -contains "listening-stats.zip") {
-                $tag = $rel.tag_name
-                return "https://github.com/$Slug/releases/download/$tag/listening-stats.zip"
-            }
-        }
-        throw "No GitHub release includes listening-stats.zip."
-    }
-    $apiLatest = "https://api.github.com/repos/$Slug/releases/latest"
+    $wantPrerelease = ($env:LISTENING_STATS_PRERELEASE -eq "1")
+
+    $releases = @()
     try {
-        $rel = Invoke-RestMethod -Uri $apiLatest -Headers @{ Accept = "application/vnd.github+json" } -ErrorAction Stop
+        $uri = "https://api.github.com/repos/$Slug/releases?per_page=20"
+        $releases = @(Invoke-RestMethod -Uri $uri -Headers @{ Accept = "application/vnd.github+json" } -ErrorAction Stop)
     }
     catch {
-        $nonce = [guid]::NewGuid().ToString("N")
-        return "https://github.com/$Slug/releases/latest/download/listening-stats.zip?t=$nonce"
+        $releases = @()
     }
-    $match = @($rel.assets | Where-Object { $_.name -eq "listening-stats.zip" })
-    if ($match.Count -lt 1) {
-        throw "Latest GitHub release has no listening-stats.zip asset."
+
+    if ($releases.Count -gt 0) {
+        $withZip = @($releases | Where-Object { (-not $_.draft) -and (Get-ReleaseZipAssetUrl $_) })
+        if ($withZip.Count -gt 0) {
+            if ($wantPrerelease) {
+                return Get-ReleaseZipAssetUrl $withZip[0]
+            }
+            $stable = @($withZip | Where-Object { -not $_.prerelease })
+            if ($stable.Count -gt 0) {
+                return Get-ReleaseZipAssetUrl $stable[0]
+            }
+            Warn "No stable release ships listening-stats.zip - falling back to prerelease $($withZip[0].tag_name)."
+            return Get-ReleaseZipAssetUrl $withZip[0]
+        }
+        throw "No GitHub release includes listening-stats.zip. Check https://github.com/$Slug/releases"
     }
-    return $match[0].browser_download_url
+
+    # GitHub API unreachable (offline / rate-limited): last-resort static URL.
+    $nonce = [guid]::NewGuid().ToString("N")
+    return "https://github.com/$Slug/releases/latest/download/listening-stats.zip?t=$nonce"
 }
 
 function Write-Rule {
@@ -367,9 +384,14 @@ foreach ($t in $cleanupTargets) {
 try {
     Step "Downloading"
     Detail $ZipUrl
-    Invoke-WebRequest -Uri $ZipUrl -OutFile $TmpZip -UseBasicParsing -Headers @{
-        "Cache-Control" = "no-cache"
-        "Pragma"        = "no-cache"
+    try {
+        Invoke-WebRequest -Uri $ZipUrl -OutFile $TmpZip -UseBasicParsing -Headers @{
+            "Cache-Control" = "no-cache"
+            "Pragma"        = "no-cache"
+        }
+    }
+    catch {
+        throw "Download failed ($($_.Exception.Message)). Check https://github.com/$RepoSlug/releases for a release that includes listening-stats.zip, then re-run the installer."
     }
 
     $len = (Get-Item $TmpZip).Length
