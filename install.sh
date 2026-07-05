@@ -2,15 +2,16 @@
 # Listening Stats  -  install or update for Spicetify (macOS / Linux).
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.sh | bash
-# Prerelease zip (newest GitHub release that includes listening-stats.zip):
+# Opt in to prereleases (only used when strictly newer than the latest stable release):
 #   LISTENING_STATS_PRERELEASE=1 curl -fsSL … | bash
 #
 # If Spicetify CLI is missing, installs it to ~/.spicetify (non-interactive; no Marketplace).
 # Set LISTENING_STATS_SKIP_SPICETIFY_INSTALL=1 to only install LS (fail if spicetify missing).
 #
-# Downloads listening-stats.zip from GitHub Releases (default: latest stable). With
-# LISTENING_STATS_PRERELEASE=1, uses the newest release that ships listening-stats.zip (may be a prerelease).
-# Requires jq or python3 for the prerelease path.
+# Downloads listening-stats.zip from GitHub Releases. Default: latest stable release;
+# prereleases are always skipped. With LISTENING_STATS_PRERELEASE=1, a prerelease is
+# installed only when its version is newer than the newest stable release — otherwise
+# the stable release still wins. Requires jq or python3 for the prerelease path.
 #
 # Installs into the **user-config** CustomApps directory (where `spicetify apply` reads from
 # first), then wipes any stale `listening-stats` copies in the CLI exe-dir CustomApps and any
@@ -24,11 +25,13 @@ APP_NAME="listening-stats"
 MIN_ZIP_BYTES=2000
 
 # Scan recent releases for the newest one that actually ships listening-stats.zip.
-# Must not assume a stable "latest" release exists: when only prereleases are
-# published (or the newest tag has no zip yet), releases/latest/download/… 404s.
-# Stable mode prefers non-prereleases but falls back to a prerelease with the
-# asset rather than failing. Requires jq or python3; otherwise stable mode uses
-# the static latest-download URL and prerelease mode errors out.
+# Stable mode (default): only non-prerelease releases are considered — prereleases
+# are always skipped. Prerelease mode (LISTENING_STATS_PRERELEASE=1): a prerelease
+# is only picked when its version is strictly newer than the newest stable release
+# (a stable 2.1.0 beats its own 2.1.0-beta.N and anything older); otherwise the
+# stable release wins, so the flag is safe even when no prereleases exist yet.
+# Requires jq or python3; otherwise stable mode uses the static latest-download
+# URL and prerelease mode errors out.
 resolve_zip_url() {
 	local slug="$1"
 	local want_pre="${LISTENING_STATS_PRERELEASE:-}"
@@ -37,28 +40,45 @@ resolve_zip_url() {
 
 	if json="$(curl -sSf -H "Accept: application/vnd.github+json" "${api_url}" 2>/dev/null)"; then
 		if command -v jq >/dev/null 2>&1; then
-			url="$(printf '%s' "${json}" | jq -r --arg pre "${want_pre}" '
+			url="$(printf '%s' "${json}" | jq -r --arg want_pre "${want_pre}" '
+				def core: (.tag_name // "" | sub("^[vV]"; "") | split("+")[0] | split("-")[0]
+				           | split(".") | map(tonumber? // 0));
 				[ .[] | select(.draft != true)
 				| select(((.assets // []) | map(.name) | index("listening-stats.zip")) != null) ] as $all
-				| (if $pre == "1" then ($all | first)
-				   else (($all | map(select(.prerelease != true)) | first) // ($all | first)) end)
+				| ($all | map(select(.prerelease != true)) | first) as $stable
+				| ($all | map(select(.prerelease == true)) | first) as $prerel
+				| (if $want_pre != "1" then $stable
+				   elif $stable == null then $prerel
+				   elif $prerel == null then $stable
+				   elif ($prerel | core) > ($stable | core) then $prerel
+				   else $stable end)
 				| select(. != null)
 				| .assets[] | select(.name == "listening-stats.zip") | .browser_download_url
 			' 2>/dev/null | head -n1)"
 		elif command -v python3 >/dev/null 2>&1; then
 			url="$(printf '%s' "${json}" | LISTENING_STATS_PRERELEASE="${want_pre}" python3 -c '
-import json, os, sys
+import json, os, re, sys
 data = json.load(sys.stdin)
-pre = os.environ.get("LISTENING_STATS_PRERELEASE") == "1"
+want_pre = os.environ.get("LISTENING_STATS_PRERELEASE") == "1"
+
+def core(rel):
+    v = re.sub(r"^[vV]", "", rel.get("tag_name") or "")
+    v = v.split("+")[0].split("-")[0]
+    return tuple(int(p) if p.isdigit() else 0 for p in v.split("."))
+
 with_zip = [r for r in data
             if not r.get("draft")
             and any(a.get("name") == "listening-stats.zip" for a in r.get("assets") or [])]
-pick = None
-if pre:
-    pick = with_zip[0] if with_zip else None
+stable = next((r for r in with_zip if not r.get("prerelease")), None)
+prerel = next((r for r in with_zip if r.get("prerelease")), None)
+if not want_pre:
+    pick = stable
+elif stable is None:
+    pick = prerel
+elif prerel is not None and core(prerel) > core(stable):
+    pick = prerel
 else:
-    stable = [r for r in with_zip if not r.get("prerelease")]
-    pick = stable[0] if stable else (with_zip[0] if with_zip else None)
+    pick = stable
 if pick:
     for a in pick["assets"]:
         if a.get("name") == "listening-stats.zip":

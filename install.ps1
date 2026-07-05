@@ -5,11 +5,13 @@
 # If Spicetify CLI is missing, installs it under LocalAppData\spicetify (non-interactive; no Marketplace).
 # Set $env:LISTENING_STATS_SKIP_SPICETIFY_INSTALL = "1" to only install LS (fail if spicetify missing).
 #
-# Downloads listening-stats.zip from GitHub Releases (default: latest stable). Stable builds
-# resolve the real asset URL from the API (avoids stale proxies caching /releases/latest/download/…).
-# Fallback: https://github.com/<repo>/releases/latest/download/listening-stats.zip (GitHub does not
+# Downloads listening-stats.zip from GitHub Releases (default: latest stable; prereleases are
+# always skipped). Stable builds resolve the real asset URL from the API (avoids stale proxies
+# caching /releases/latest/download/…). Fallback:
+# https://github.com/<repo>/releases/latest/download/listening-stats.zip (GitHub does not
 # serve …/releases/latest/listening-stats.zip — that path 404s). With
-# $env:LISTENING_STATS_PRERELEASE = "1", uses the newest release that ships listening-stats.zip.
+# $env:LISTENING_STATS_PRERELEASE = "1", a prerelease is installed only when its version is
+# newer than the newest stable release — otherwise the stable release still wins.
 #
 # Installs into the **user-config** CustomApps directory (where `spicetify apply` reads from
 # first), then wipes any stale `listening-stats` copies in the CLI exe-dir CustomApps and any
@@ -32,19 +34,42 @@ $RepoSlug = "Xndr2/listening-stats"
 $AppName = "listening-stats"
 $MinZipBytes = 2000
 
+function Get-ReleaseCoreVersion {
+    # Numeric core of a release tag ("v2.1.0-beta.1" -> [version]2.1.0) for ordering.
+    param($Release)
+    $v = "$($Release.tag_name)" -replace '^[vV]', ''
+    $v = ($v -split '[-+]')[0]
+    try { return [version]$v } catch { return $null }
+}
+
 function Resolve-ZipUrl {
     param([string]$Slug)
     if ($env:LISTENING_STATS_PRERELEASE -eq "1") {
+        # A prerelease is only picked when its version is strictly newer than the
+        # newest stable release (stable 2.1.0 beats its own 2.1.0-beta.N); otherwise
+        # the stable release wins, so the flag is safe even with no prereleases yet.
         $uri = "https://api.github.com/repos/$Slug/releases?per_page=20"
         $releases = @(Invoke-RestMethod -Uri $uri -Headers @{ Accept = "application/vnd.github+json" })
-        foreach ($rel in $releases) {
-            $names = @($rel.assets | ForEach-Object { $_.name })
-            if ($names -contains "listening-stats.zip") {
-                $tag = $rel.tag_name
-                return "https://github.com/$Slug/releases/download/$tag/listening-stats.zip"
+        $withZip = @($releases | Where-Object {
+            -not $_.draft -and (@($_.assets | ForEach-Object { $_.name }) -contains "listening-stats.zip")
+        })
+        $stable = @($withZip | Where-Object { -not $_.prerelease }) | Select-Object -First 1
+        $prerel = @($withZip | Where-Object { $_.prerelease }) | Select-Object -First 1
+        $pick = $stable
+        if ($prerel) {
+            if (-not $stable) {
+                $pick = $prerel
+            }
+            else {
+                $sv = Get-ReleaseCoreVersion $stable
+                $pv = Get-ReleaseCoreVersion $prerel
+                if ($sv -and $pv -and $pv -gt $sv) { $pick = $prerel }
             }
         }
-        throw "No GitHub release includes listening-stats.zip."
+        if (-not $pick) {
+            throw "No GitHub release includes listening-stats.zip."
+        }
+        return "https://github.com/$Slug/releases/download/$($pick.tag_name)/listening-stats.zip"
     }
     $apiLatest = "https://api.github.com/repos/$Slug/releases/latest"
     try {

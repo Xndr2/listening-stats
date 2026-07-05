@@ -10,10 +10,14 @@ export interface UpdateCheckResult {
 	prerelease?: boolean;
 }
 
-/** True if `remoteVersion` is newer than `localVersion` (semver coercion). */
+/**
+ * True if `remoteVersion` is newer than `localVersion` (semver coercion).
+ * Prerelease identifiers are preserved so a stable release counts as newer
+ * than its own prerelease (2.1.0 > 2.1.0-beta.1).
+ */
 export function compareVersions(localVersion: string, remoteVersion: string): boolean {
-	const a = semver.coerce(localVersion);
-	const b = semver.coerce(remoteVersion);
+	const a = semver.coerce(localVersion, { includePrerelease: true });
+	const b = semver.coerce(remoteVersion, { includePrerelease: true });
 	if (!a || !b) return false;
 	return semver.gt(b, a);
 }
