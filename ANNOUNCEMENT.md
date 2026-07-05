@@ -1,1 +1,2 @@
-UPDATE v2 is out, please update. If you're on v2; Enjoy!
+# Monthly Recap!
+This is a new feature that I just released. Please report any issues you have with this!
