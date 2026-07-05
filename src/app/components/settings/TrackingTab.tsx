@@ -8,8 +8,13 @@ import {
 } from "../../../extension/tracker/settings";
 import { EVENTS } from "../../../shared/constants/events";
 import { LS_KEYS } from "../../../shared/constants/storage-keys";
+<<<<<<< Updated upstream
 import { SegmentedControl } from "../SegmentedControl";
 import { Toggle } from "../spicetify-ui";
+=======
+import { ThresholdSlider } from "../ThresholdSlider";
+import { SettingRow, SettingsGroup, SettingToggle } from "./controls";
+>>>>>>> Stashed changes
 
 const THRESHOLD_STOPS = [0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000];
 
@@ -60,32 +65,35 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 
 	return (
 		<div>
-			{/* Pause Tracking */}
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">Pause Tracking</div>
-					<div className="settings-sublabel">Temporarily stop recording plays</div>
-				</div>
-				{Toggle ? (
-					<Toggle value={paused} onSelected={handlePause} />
-				) : (
-					<input type="checkbox" checked={paused} onChange={(e) => handlePause(e.currentTarget.checked)} />
-				)}
-			</div>
+			<SettingsGroup title="Recording">
+				<SettingRow label="Pause tracking">
+					<SettingToggle value={paused} onChange={handlePause} />
+				</SettingRow>
+				<SettingRow label="Skip repeats" sublabel="Don't count back-to-back plays of the same track">
+					<SettingToggle value={skipRepeats} onChange={handleSkipRepeats} />
+				</SettingRow>
+			</SettingsGroup>
 
-			{/* Skip Repeats */}
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">Skip Repeats</div>
-					<div className="settings-sublabel">Don't count consecutive plays of the same track</div>
-				</div>
-				{Toggle ? (
-					<Toggle value={skipRepeats} onSelected={handleSkipRepeats} />
-				) : (
-					<input type="checkbox" checked={skipRepeats} onChange={(e) => handleSkipRepeats(e.currentTarget.checked)} />
-				)}
-			</div>
+			<SettingsGroup title="Play threshold">
+				<SettingRow label="Use percentage of track length">
+					<SettingToggle value={percentMode} onChange={handlePercentMode} />
+				</SettingRow>
+				<SettingRow
+					label="Count a play after"
+					sublabel="Local tracking only; stats.fm and Last.fm use their own rules"
+					stacked
+				>
+					<ThresholdSlider
+						max={percentMode ? 100 : 60}
+						value={percentMode ? thresholdPct : thresholdSec}
+						presets={percentMode ? PERCENT_PRESETS : SECONDS_PRESETS}
+						onChange={handleThreshold}
+						formatValue={(v) => (percentMode ? `${v}%` : `${v}s`)}
+					/>
+				</SettingRow>
+			</SettingsGroup>
 
+<<<<<<< Updated upstream
 			{/* Play Threshold */}
 			<div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
 				<div style={{ marginBottom: "8px" }}>
@@ -112,6 +120,13 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 					<input type="checkbox" checked={logging} onChange={(e) => handleLogging(e.currentTarget.checked)} />
 				)}
 			</div>
+=======
+			<SettingsGroup title="Diagnostics">
+				<SettingRow label="Console logging">
+					<SettingToggle value={logging} onChange={handleLogging} />
+				</SettingRow>
+			</SettingsGroup>
+>>>>>>> Stashed changes
 		</div>
 	);
 }

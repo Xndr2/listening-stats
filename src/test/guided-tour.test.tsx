@@ -394,7 +394,7 @@ describe("Guided tour auto-start gating", () => {
 	});
 });
 
-describe("DisplayTab restart tour button", () => {
+describe("AboutTab restart tour button", () => {
 	let container: HTMLDivElement;
 
 	beforeEach(() => {
@@ -410,9 +410,11 @@ describe("DisplayTab restart tour button", () => {
 	});
 
 	it("renders restart button when onRestartTour is provided", async () => {
-		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
+		const { AboutTab } = await import("../app/components/settings/AboutTab");
 		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, {
+			Spicetify.React.createElement(AboutTab, {
+				version: "2.0.0",
+				onOpenUpdates: vi.fn(),
 				onPrefsChanged: vi.fn(),
 				onRestartTour: vi.fn(),
 			}),
@@ -424,9 +426,11 @@ describe("DisplayTab restart tour button", () => {
 	});
 
 	it("does not render restart button when onRestartTour is omitted", async () => {
-		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
+		const { AboutTab } = await import("../app/components/settings/AboutTab");
 		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, {
+			Spicetify.React.createElement(AboutTab, {
+				version: "2.0.0",
+				onOpenUpdates: vi.fn(),
 				onPrefsChanged: vi.fn(),
 			}),
 			container,
@@ -436,10 +440,12 @@ describe("DisplayTab restart tour button", () => {
 	});
 
 	it("calls onRestartTour when restart button is clicked", async () => {
-		const { DisplayTab } = await import("../app/components/settings/DisplayTab");
+		const { AboutTab } = await import("../app/components/settings/AboutTab");
 		const onRestartTour = vi.fn();
 		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(DisplayTab, {
+			Spicetify.React.createElement(AboutTab, {
+				version: "2.0.0",
+				onOpenUpdates: vi.fn(),
 				onPrefsChanged: vi.fn(),
 				onRestartTour,
 			}),

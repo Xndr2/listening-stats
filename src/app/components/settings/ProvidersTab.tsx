@@ -188,10 +188,7 @@ export function ProvidersTab() {
 	return (
 		<div>
 			{/* Active Provider section */}
-			<h3 className="section-header">Active Provider</h3>
-			<div className="settings-sublabel" style={{ marginBottom: "12px" }}>
-				Select the data source for your listening statistics
-			</div>
+			<h3 className="section-header">Active provider</h3>
 			<div role="radiogroup" aria-label="Active provider">
 				{providers.map((p) => {
 					const unconfigured = (p.id === "statsfm" && !hasStatsFmConfig) || (p.id === "lastfm" && !hasLastfmConfig);
@@ -218,8 +215,8 @@ export function ProvidersTab() {
 			</div>
 
 			{/* stats.fm Account section */}
-			<h3 className="section-header" style={{ marginTop: "16px" }}>
-				stats.fm Account
+			<h3 className="section-header" style={{ marginTop: "20px" }}>
+				stats.fm account
 			</h3>
 
 			{(phase === "idle" || phase === "connecting" || phase === "error") && (
@@ -238,15 +235,7 @@ export function ProvidersTab() {
 							placeholder="Enter your stats.fm username"
 							disabled={phase === "connecting"}
 							aria-label="stats.fm username"
-							style={{
-								flex: 1,
-								padding: "8px 12px",
-								borderRadius: "4px",
-								border: "1px solid var(--spice-misc)",
-								background: "var(--spice-main)",
-								color: "var(--spice-text)",
-								fontSize: "var(--font-size-sm, 14px)",
-							}}
+							className="settings-input"
 						/>
 						<button
 							type="button"
@@ -312,8 +301,8 @@ export function ProvidersTab() {
 			)}
 
 			{/* Last.fm Account section */}
-			<h3 className="section-header" style={{ marginTop: "16px" }}>
-				Last.fm Account
+			<h3 className="section-header" style={{ marginTop: "20px" }}>
+				Last.fm account
 			</h3>
 
 			{!lfmProvConfig ? (
@@ -332,15 +321,7 @@ export function ProvidersTab() {
 							placeholder="Enter your Last.fm username"
 							disabled={lfmConnecting}
 							aria-label="Last.fm username"
-							style={{
-								flex: 1,
-								padding: "8px 12px",
-								borderRadius: "4px",
-								border: "1px solid var(--spice-misc)",
-								background: "var(--spice-main)",
-								color: "var(--spice-text)",
-								fontSize: "var(--font-size-sm, 14px)",
-							}}
+							className="settings-input"
 						/>
 						<input
 							type="text"
@@ -352,15 +333,7 @@ export function ProvidersTab() {
 							placeholder="Enter your Last.fm API key"
 							disabled={lfmConnecting}
 							aria-label="Last.fm provider API key"
-							style={{
-								flex: 1,
-								padding: "8px 12px",
-								borderRadius: "4px",
-								border: "1px solid var(--spice-misc)",
-								background: "var(--spice-main)",
-								color: "var(--spice-text)",
-								fontSize: "var(--font-size-sm, 14px)",
-							}}
+							className="settings-input"
 						/>
 						<button
 							type="button"

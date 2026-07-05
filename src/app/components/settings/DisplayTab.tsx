@@ -13,7 +13,7 @@ import {
 	SECTION_IDS,
 	setPreference,
 } from "../../preferences";
-import { Toggle } from "../spicetify-ui";
+import { OptionGroup, SettingRow, SettingsGroup, SettingToggle } from "./controls";
 import { SortableRow } from "./SortableRow";
 import { SortableTile } from "./SortableTile";
 
@@ -28,11 +28,21 @@ const SECTION_LABELS: Record<string, string> = {
 	"recently-played": "Recently Played",
 };
 
-const ITEMS_OPTIONS = [3, 5, 10] as const;
+const ITEMS_OPTIONS: { value: number; label: string }[] = [
+	{ value: 3, label: "3" },
+	{ value: 5, label: "5" },
+	{ value: 10, label: "10" },
+];
+
+const PLAY_COUNT_OPTIONS: { value: PlayCountVariant; label: string }[] = [
+	{ value: "pill", label: "Pill" },
+	{ value: "bubble", label: "Bubble" },
+	{ value: "minimal", label: "Minimal" },
+	{ value: "off", label: "Off" },
+];
 
 interface DisplayTabProps {
 	onPrefsChanged: () => void;
-	onRestartTour?: () => void;
 	announcementDismissKey?: string | null;
 }
 
@@ -43,7 +53,7 @@ interface LayoutSnapshot {
 	overviewOrder: { local: string[]; statsfm: string[] };
 }
 
-export function DisplayTab({ onPrefsChanged, onRestartTour, announcementDismissKey = null }: DisplayTabProps) {
+export function DisplayTab({ onPrefsChanged, announcementDismissKey = null }: DisplayTabProps) {
 	const [prefs, setPrefs] = useState(() => getPreferences());
 	const [layoutUndo, setLayoutUndo] = useState<LayoutSnapshot | null>(null);
 
@@ -287,15 +297,7 @@ export function DisplayTab({ onPrefsChanged, onRestartTour, announcementDismissK
 					tileDragProps={{ onPointerDown: sortable.onItemPointerDown(id) }}
 					style={sortable.getItemStyle(id)}
 				>
-					{Toggle ? (
-						<Toggle value={visible} onSelected={(val: boolean) => handleToggleSection(id, val)} />
-					) : (
-						<input
-							type="checkbox"
-							checked={visible}
-							onChange={(e) => handleToggleSection(id, e.currentTarget.checked)}
-						/>
-					)}
+					<SettingToggle value={visible} onChange={(val: boolean) => handleToggleSection(id, val)} />
 				</SortableTile>
 			</div>
 		);
@@ -303,281 +305,153 @@ export function DisplayTab({ onPrefsChanged, onRestartTour, announcementDismissK
 
 	return (
 		<div className="display-tab">
-			<div className="settings-row">
-				<div className="settings-label">Items per section</div>
-				<div style={{ display: "flex", gap: "8px" }}>
-					{ITEMS_OPTIONS.map((val) => (
-						<button
-							key={val}
-							type="button"
-							className={prefs.itemsPerSection === val ? "btn-primary" : "btn-secondary"}
-							onClick={() => handleItemsPerSection(val)}
-							style={{ padding: "4px 12px", minWidth: "40px" }}
-						>
-							{val}
-						</button>
-					))}
-				</div>
-			</div>
-			{layoutUndo && (
-				<div className="settings-row">
-					<div className="settings-sublabel">Layout reset to defaults</div>
+			<SettingsGroup title="Dashboard">
+				<SettingRow label="Items per section">
+					<OptionGroup options={ITEMS_OPTIONS} value={prefs.itemsPerSection} onChange={handleItemsPerSection} />
+				</SettingRow>
+				<SettingRow label="24-hour time">
+					<SettingToggle value={prefs.use24HourTime} onChange={handle24HourTime} />
+				</SettingRow>
+				<SettingRow label="Compact heatmap" sublabel="Fit the calendar to the card instead of scrolling">
+					<SettingToggle value={prefs.heatmapShrink} onChange={handleHeatmapShrink} />
+				</SettingRow>
+				<SettingRow label="Announcement banner">
+					<SettingToggle value={prefs.showAnnouncementBanner} onChange={handleShowAnnouncementBanner} />
+				</SettingRow>
+			</SettingsGroup>
+
+			<SettingsGroup title="Playbar">
+				<SettingRow label="Play count style">
+					<OptionGroup
+						options={PLAY_COUNT_OPTIONS}
+						value={prefs.playCountVariant}
+						onChange={handlePlayCountVariant}
+						testId="play-count-variant"
+					/>
+				</SettingRow>
+				{prefs.playCountVariant !== "off" && (
+					<SettingRow
+						label="Show new streams"
+						sublabel={providerKey === "statsfm" ? undefined : '"New play" hint for tracks with no plays yet'}
+						testId="play-count-extra-context"
+					>
+						<SettingToggle value={prefs.playCountShowPeriodStreams} onChange={handlePlayCountPeriodStreams} />
+					</SettingRow>
+				)}
+			</SettingsGroup>
+
+			<SettingsGroup title="Layout">
+				<SettingRow label="Section and card arrangement">
 					<button
 						type="button"
 						className="btn-secondary"
-						data-testid="undo-reset-layout"
-						onClick={handleUndoResetLayout}
+						data-testid="reset-layout"
+						onClick={handleResetLayout}
 						style={{ padding: "4px 12px" }}
 					>
-						Undo
+						Reset
 					</button>
-				</div>
-			)}
-
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">24-hour time</div>
-					<div className="settings-sublabel">Show timestamps in 24-hour format</div>
-				</div>
-				{Toggle ? (
-					<Toggle value={prefs.use24HourTime} onSelected={handle24HourTime} />
-				) : (
-					<input
-						type="checkbox"
-						checked={prefs.use24HourTime}
-						onChange={(e) => handle24HourTime(e.currentTarget.checked)}
-					/>
-				)}
-			</div>
-
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">Compact heatmap</div>
-					<div className="settings-sublabel">
-						Shrink the calendar heatmap to fit the card width instead of scrolling horizontally
-					</div>
-				</div>
-				{Toggle ? (
-					<Toggle value={prefs.heatmapShrink} onSelected={handleHeatmapShrink} />
-				) : (
-					<input
-						type="checkbox"
-						checked={prefs.heatmapShrink}
-						onChange={(e) => handleHeatmapShrink(e.currentTarget.checked)}
-					/>
-				)}
-			</div>
-
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">Announcement banner</div>
-					<div className="settings-sublabel">
-						Show the banner when one is available (GitHub or version splash). Turning off hides it until the
-						announcement changes or you turn this back on.
-					</div>
-				</div>
-				{Toggle ? (
-					<Toggle value={prefs.showAnnouncementBanner} onSelected={handleShowAnnouncementBanner} />
-				) : (
-					<input
-						type="checkbox"
-						checked={prefs.showAnnouncementBanner}
-						onChange={(e) => handleShowAnnouncementBanner(e.currentTarget.checked)}
-					/>
-				)}
-			</div>
-
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">Monthly recap</div>
-					<div className="settings-sublabel">
-						A recap banner appears at the start of each month. Preview last month's recap card here.
-					</div>
-				</div>
-				<button
-					type="button"
-					className="btn-secondary"
-					data-testid="preview-recap"
-					onClick={() => window.dispatchEvent(new CustomEvent(EVENTS.OPEN_RECAP))}
-					style={{ padding: "4px 12px" }}
-				>
-					Preview recap
-				</button>
-			</div>
-
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">Playbar play count</div>
-					<div className="settings-sublabel">Widget style for now-playing track count</div>
-				</div>
-				<div data-testid="play-count-variant" style={{ display: "flex", gap: "8px" }}>
-					{(["pill", "bubble", "minimal", "off"] as const).map((v) => (
+				</SettingRow>
+				{layoutUndo && (
+					<div className="settings-row">
+						<div className="settings-sublabel">Layout reset to defaults</div>
 						<button
-							key={v}
 							type="button"
-							className={prefs.playCountVariant === v ? "btn-primary" : "btn-secondary"}
-							onClick={() => handlePlayCountVariant(v)}
-							style={{ padding: "4px 12px", minWidth: "40px" }}
+							className="btn-secondary"
+							data-testid="undo-reset-layout"
+							onClick={handleUndoResetLayout}
+							style={{ padding: "4px 12px" }}
 						>
-							{v === "off" ? "Off" : v.charAt(0).toUpperCase() + v.slice(1)}
+							Undo
 						</button>
-					))}
-				</div>
-			</div>
+					</div>
+				)}
 
-			{prefs.playCountVariant !== "off" && (
-				<div className="settings-row" data-testid="play-count-extra-context">
-					<div>
-						<div className="settings-label">Show new streams</div>
-						<div className="settings-sublabel">
-							{providerKey === "statsfm" ? (
-								<>Also show a label for new streams.</>
-							) : (
-								<>
-									When this track has <strong>no qualifying plays</strong> in your database yet, show a{" "}
-									<strong>New play</strong> hint on the playbar (skips excluded).
-								</>
-							)}
+				<div style={{ marginTop: "4px" }} data-drag-active={sortable.dragState.isDragging ? "true" : "false"}>
+					<div className="settings-label" style={{ padding: "12px 0 4px" }}>
+						Visible sections
+					</div>
+					<div
+						className="settings-drop-line"
+						data-active={sortable.dragState.isDragging && sortable.dragState.dropSlotIndex === 0 ? "true" : "false"}
+					/>
+					{sectionOrder.map((id, idx) => {
+						const visible = !prefs.hiddenSections.includes(id);
+						const label = SECTION_LABELS[id] ?? id;
+						return (
+							<Spicetify.React.Fragment key={id}>
+								<div
+									ref={(el: HTMLDivElement | null) => {
+										if (el) rowRefs.current.set(id, el);
+										else rowRefs.current.delete(id);
+										sortable.registerItem(id, el);
+									}}
+								>
+									<SortableRow
+										id={id}
+										label={label}
+										dragHandleProps={{
+											onPointerDown: sortable.onItemPointerDown(id),
+										}}
+										style={sortable.getItemStyle(id)}
+									>
+										<SettingToggle value={visible} onChange={(val: boolean) => handleToggleSection(id, val)} />
+									</SortableRow>
+								</div>
+								<div
+									className="settings-drop-line"
+									data-active={
+										sortable.dragState.isDragging && sortable.dragState.dropSlotIndex === idx + 1 ? "true" : "false"
+									}
+								/>
+							</Spicetify.React.Fragment>
+						);
+					})}
+				</div>
+
+				<div style={{ marginTop: "16px" }} key={providerKey}>
+					<div className="settings-label" style={{ padding: "12px 0 4px" }}>
+						Overview cards
+					</div>
+					<div className="overview-settings-top">
+						<div className="overview-settings-hero" data-testid="overview-settings-hero">
+							<div className="sortable-tile-label">Total Time</div>
+							<div className="overview-settings-hero-sub">Fixed</div>
+						</div>
+						<div className="sortable-grid sortable-grid--2x2">
+							{overviewTop.map((id) => renderSortableTile(id, OVERVIEW_CARD_LABELS, overviewTopSortable, overviewTop))}
 						</div>
 					</div>
-					{Toggle ? (
-						<Toggle value={prefs.playCountShowPeriodStreams} onSelected={handlePlayCountPeriodStreams} />
-					) : (
-						<input
-							type="checkbox"
-							checked={prefs.playCountShowPeriodStreams}
-							onChange={(e) => handlePlayCountPeriodStreams(e.currentTarget.checked)}
-						/>
+					{overviewBottom.length > 0 && (
+						<div className="sortable-grid sortable-grid--1x3" data-testid="overview-bottom-row">
+							{overviewBottom.map((id) =>
+								renderSortableTile(id, OVERVIEW_CARD_LABELS, overviewBottomSortable, overviewBottom),
+							)}
+						</div>
 					)}
 				</div>
-			)}
 
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">Layout</div>
-					<div className="settings-sublabel">Reset section and card arrangement to defaults</div>
-				</div>
-				<button
-					type="button"
-					className="btn-secondary"
-					data-testid="reset-layout"
-					onClick={handleResetLayout}
-					style={{ padding: "4px 12px" }}
-				>
-					Reset layout
-				</button>
-			</div>
-
-			<div style={{ marginTop: "4px" }} data-drag-active={sortable.dragState.isDragging ? "true" : "false"}>
-				<div className="settings-label" style={{ padding: "12px 0 4px" }}>
-					Visible sections
-				</div>
 				<div
-					className="settings-drop-line"
-					data-active={sortable.dragState.isDragging && sortable.dragState.dropSlotIndex === 0 ? "true" : "false"}
-				/>
-				{sectionOrder.map((id, idx) => {
-					const visible = !prefs.hiddenSections.includes(id);
-					const label = SECTION_LABELS[id] ?? id;
-					return (
-						<Spicetify.React.Fragment key={id}>
-							<div
-								ref={(el: HTMLDivElement | null) => {
-									if (el) rowRefs.current.set(id, el);
-									else rowRefs.current.delete(id);
-									sortable.registerItem(id, el);
-								}}
-							>
-								<SortableRow
-									id={id}
-									label={label}
-									dragHandleProps={{
-										onPointerDown: sortable.onItemPointerDown(id),
-									}}
-									style={sortable.getItemStyle(id)}
-								>
-									{Toggle ? (
-										<Toggle value={visible} onSelected={(val: boolean) => handleToggleSection(id, val)} />
-									) : (
-										<input
-											type="checkbox"
-											checked={visible}
-											onChange={(e) => handleToggleSection(id, e.currentTarget.checked)}
-										/>
-									)}
-								</SortableRow>
-							</div>
-							<div
-								className="settings-drop-line"
-								data-active={
-									sortable.dragState.isDragging && sortable.dragState.dropSlotIndex === idx + 1 ? "true" : "false"
-								}
-							/>
-						</Spicetify.React.Fragment>
-					);
-				})}
-			</div>
-
-			<div style={{ marginTop: "16px" }} key={providerKey}>
-				<div className="settings-label" style={{ padding: "12px 0 4px" }}>
-					Overview details
-				</div>
-				<div className="overview-settings-top">
-					<div className="overview-settings-hero" data-testid="overview-settings-hero">
-						<div className="sortable-tile-label">Total Time</div>
-						<div className="overview-settings-hero-sub">Fixed</div>
+					data-testid="top-lists-columns-subsection"
+					style={{
+						marginTop: "16px",
+						opacity: topListsCoarseHidden ? 0.4 : 1,
+						pointerEvents: topListsCoarseHidden ? "none" : "auto",
+					}}
+				>
+					<div className="settings-label" style={{ padding: "12px 0 4px" }}>
+						Top Lists columns
 					</div>
-					<div className="sortable-grid sortable-grid--2x2">
-						{overviewTop.map((id) => renderSortableTile(id, OVERVIEW_CARD_LABELS, overviewTopSortable, overviewTop))}
+					{topListsCoarseHidden && (
+						<div className="settings-sublabel" style={{ marginBottom: "4px" }}>
+							Top Lists is hidden. Re-enable it above to manage individual columns.
+						</div>
+					)}
+					<div className="sortable-grid sortable-grid--1x3">
+						{prefs.columnOrder.map((id) => renderSortableTile(id, COLUMN_LABELS, columnSortable, prefs.columnOrder))}
 					</div>
 				</div>
-				{overviewBottom.length > 0 && (
-					<div className="sortable-grid sortable-grid--1x3" data-testid="overview-bottom-row">
-						{overviewBottom.map((id) =>
-							renderSortableTile(id, OVERVIEW_CARD_LABELS, overviewBottomSortable, overviewBottom),
-						)}
-					</div>
-				)}
-			</div>
-
-			<div
-				data-testid="top-lists-columns-subsection"
-				style={{
-					marginTop: "16px",
-					opacity: topListsCoarseHidden ? 0.4 : 1,
-					pointerEvents: topListsCoarseHidden ? "none" : "auto",
-				}}
-			>
-				<div className="settings-label" style={{ padding: "12px 0 4px" }}>
-					Top Lists columns
-				</div>
-				{topListsCoarseHidden && (
-					<div className="settings-sublabel" style={{ marginBottom: "4px" }}>
-						Top Lists is hidden. Re-enable it above to manage individual columns.
-					</div>
-				)}
-				<div className="sortable-grid sortable-grid--1x3">
-					{prefs.columnOrder.map((id) => renderSortableTile(id, COLUMN_LABELS, columnSortable, prefs.columnOrder))}
-				</div>
-			</div>
-
-			{onRestartTour && (
-				<div className="settings-row" style={{ marginTop: "16px" }}>
-					<div>
-						<div className="settings-label">Guided tour</div>
-						<div className="settings-sublabel">Walk through dashboard features</div>
-					</div>
-					<button
-						type="button"
-						className="btn-secondary"
-						data-testid="restart-tour"
-						onClick={onRestartTour}
-						style={{ padding: "4px 12px" }}
-					>
-						Restart
-					</button>
-				</div>
-			)}
+			</SettingsGroup>
 		</div>
 	);
 }
