@@ -43,6 +43,8 @@ export interface FSMState {
 	lastProgressMs: number;
 	lastLoopDetectedAt: number;
 	lastRecordedUri: string | null;
+	/** DB id of the play event written when this track crossed the threshold, null if not yet written */
+	recordedEventId: number | null;
 }
 
 // Shape of PlayerData passed in from event handlers (subset of Spicetify.Player.data)
@@ -110,8 +112,12 @@ export function parseLocalFileUri(uri: string): { artist: string; album: string;
 // ─── Dependency Injection Interface ───────────────────────────────────────────
 
 export interface TrackingFSMDeps {
-	addPlayEvent: (event: PlayEvent) => Promise<boolean>;
-	getPlayThreshold: () => number;
+	/** Inserts a play event; returns the new event id, or null when deduped */
+	addPlayEvent: (event: PlayEvent) => Promise<number | null>;
+	/** Updates the final play time of an already-written event */
+	updatePlayEvent: (id: number, playedMs: number, endedAt: number) => Promise<void>;
+	/** Effective threshold in ms for a track (percent mode needs the duration) */
+	resolveThresholdMs: (durationMs: number) => number;
 	isTrackingPaused: () => boolean;
 	isSkipRepeatsEnabled: () => boolean;
 	dispatchEvent: (event: Event) => void;
@@ -140,6 +146,7 @@ export class TrackingFSM {
 			lastProgressMs: 0,
 			lastLoopDetectedAt: 0,
 			lastRecordedUri: null,
+			recordedEventId: null,
 		};
 	}
 
@@ -166,10 +173,7 @@ export class TrackingFSM {
 		// Write event for previous track if we were tracking
 		if (this._state.state === "tracking" && this._state.capturedData) {
 			this._state.state = "completing";
-			const totalPlayedMs =
-				this._state.accumulatedPlayMs +
-				(this._state.isPlaying && this._state.playStartTime !== null ? Date.now() - this._state.playStartTime : 0);
-			await this._writePlayEvent(totalPlayedMs);
+			await this._finalizePlayEvent(this._totalPlayedMs());
 		}
 
 		// Reset progress to prevent false loop detection after real track change
@@ -209,7 +213,10 @@ export class TrackingFSM {
 			this._state.playStartTime = Date.now();
 			this._state.accumulatedPlayMs = 0;
 			this._state.isPlaying = !playerData.isPaused;
+			this._state.recordedEventId = null;
 			this._state.state = "tracking";
+			// A 0s/0% threshold counts the play the moment the track starts
+			await this._maybeRecordThresholdCross();
 		} else {
 			// Transition to idle, clear all tracking state
 			this._state = {
@@ -234,6 +241,9 @@ export class TrackingFSM {
 				this._state.accumulatedPlayMs += Date.now() - this._state.playStartTime;
 			}
 			this._state.isPlaying = false;
+			// Record now if the banked time crossed the threshold — the user may
+			// close Spotify without the track ever ending or changing.
+			void this._maybeRecordThresholdCross();
 		} else if (!wasPlaying && !isPaused) {
 			// Resuming: reset start time
 			this._state.playStartTime = Date.now();
@@ -256,14 +266,11 @@ export class TrackingFSM {
 				// Loop detected  -  record completed play for this loop iteration
 				this._state.lastLoopDetectedAt = Date.now();
 
-				const totalPlayedMs =
-					this._state.accumulatedPlayMs +
-					(this._state.isPlaying && this._state.playStartTime !== null ? Date.now() - this._state.playStartTime : 0);
-
 				// Write and re-capture async (don't await in sync handler)
-				void this._writePlayEvent(totalPlayedMs).then(() => {
+				void this._finalizePlayEvent(this._totalPlayedMs()).then(() => {
 					// Reset accumulator for new loop
 					this._state.accumulatedPlayMs = 0;
+					this._state.recordedEventId = null;
 					if (this._state.isPlaying) {
 						this._state.playStartTime = Date.now();
 					}
@@ -279,6 +286,7 @@ export class TrackingFSM {
 		}
 
 		this._state.lastProgressMs = progressMs;
+		void this._maybeRecordThresholdCross();
 	}
 
 	/** Intentional no-op: tracking persists for the session. */
@@ -288,8 +296,81 @@ export class TrackingFSM {
 
 	// ─── Private ──────────────────────────────────────────────────────────────
 
-	private async _writePlayEvent(totalPlayedMs: number): Promise<void> {
+	private _crossWritePromise: Promise<void> | null = null;
+
+	/** Play time so far: banked time plus the current playing stretch */
+	private _totalPlayedMs(): number {
+		return (
+			this._state.accumulatedPlayMs +
+			(this._state.isPlaying && this._state.playStartTime !== null ? Date.now() - this._state.playStartTime : 0)
+		);
+	}
+
+	/**
+	 * Records the play the moment it crosses the threshold, so a track that is
+	 * paused and never "ends" (e.g. Spotify closed) is still counted. The final
+	 * play time is patched in later by _finalizePlayEvent.
+	 */
+	private async _maybeRecordThresholdCross(): Promise<void> {
+		if (this._state.state !== "tracking" || !this._state.capturedData) return;
+		if (this._state.recordedEventId !== null || this._crossWritePromise !== null) return;
+		if (this._deps.isTrackingPaused()) return;
+
+		const duration = this._state.capturedData.durationMs;
+		if (duration <= 0) return;
+
+		// Same rule as classifyPlayOrSkip: ~90% of the track always counts,
+		// even when the configured threshold is longer.
+		const effectiveMs = Math.min(this._deps.resolveThresholdMs(duration), duration * 0.9);
+		if (this._totalPlayedMs() < effectiveMs) return;
+
+		// Skip-repeats suppression: only suppress consecutive plays (not skips)
+		if (this._deps.isSkipRepeatsEnabled() && this._state.capturedData.trackUri === this._state.lastRecordedUri) {
+			return;
+		}
+
+		const write = (async () => {
+			try {
+				const id = await this._writeEvent("play", this._totalPlayedMs());
+				// 0 = deduped (already in DB from elsewhere): counts as recorded so we
+				// neither retry every progress tick nor patch a foreign event later.
+				this._state.recordedEventId = id ?? 0;
+			} catch (err) {
+				// Leave recordedEventId null: later ticks and the end-of-track write retry
+				console.warn("[listening-stats] Failed to write play event:", err);
+			}
+		})();
+		this._crossWritePromise = write;
+		try {
+			await write;
+		} finally {
+			this._crossWritePromise = null;
+		}
+	}
+
+	/**
+	 * Called when a track finishes (song change or repeat-one loop).
+	 * If the play was already recorded at threshold-cross, patches its final
+	 * play time; otherwise classifies play/skip and writes the event.
+	 */
+	private async _finalizePlayEvent(totalPlayedMs: number): Promise<void> {
 		if (!this._state.capturedData) return;
+
+		// A threshold-cross write may still be in flight; let it settle so we
+		// patch that event instead of writing a duplicate.
+		if (this._crossWritePromise !== null) await this._crossWritePromise;
+
+		if (this._state.recordedEventId !== null) {
+			// 0 = recorded-but-deduped: nothing of ours to patch
+			if (this._state.recordedEventId > 0) {
+				try {
+					await this._deps.updatePlayEvent(this._state.recordedEventId, totalPlayedMs, Date.now());
+				} catch (err) {
+					console.warn("[listening-stats] Failed to update play event:", err);
+				}
+			}
+			return;
+		}
 
 		if (this._deps.isTrackingPaused()) {
 			// Dispatch paused event but do NOT write; FSM state is preserved
@@ -297,9 +378,8 @@ export class TrackingFSM {
 			return;
 		}
 
-		const threshold = this._deps.getPlayThreshold();
-		const capturedDuration = this._state.capturedData.durationMs;
-		const eventType = classifyPlayOrSkip(totalPlayedMs, capturedDuration, threshold);
+		const threshold = this._deps.resolveThresholdMs(this._state.capturedData.durationMs);
+		const eventType = classifyPlayOrSkip(totalPlayedMs, this._state.capturedData.durationMs, threshold);
 
 		// Skip-repeats suppression: only suppress consecutive plays (not skips)
 		if (
@@ -310,6 +390,21 @@ export class TrackingFSM {
 			return;
 		}
 
+		try {
+			await this._writeEvent(eventType, totalPlayedMs);
+		} catch (err) {
+			// Log warning but do NOT crash the FSM
+			console.warn("[listening-stats] Failed to write play event:", err);
+		}
+	}
+
+	/**
+	 * Writes the event, updates skip-repeats state, dispatches, logs.
+	 * Returns the new id, null when deduped; throws on write failure.
+	 */
+	private async _writeEvent(eventType: "play" | "skip", totalPlayedMs: number): Promise<number | null> {
+		if (!this._state.capturedData) return null;
+
 		const event: PlayEvent = {
 			trackUri: this._state.capturedData.trackUri,
 			trackName: this._state.capturedData.trackName,
@@ -318,33 +413,29 @@ export class TrackingFSM {
 			albumName: this._state.capturedData.albumName,
 			albumUri: this._state.capturedData.albumUri,
 			albumArt: this._state.capturedData.albumArt,
-			durationMs: capturedDuration,
+			durationMs: this._state.capturedData.durationMs,
 			playedMs: totalPlayedMs,
 			startedAt: this._state.capturedData.startedAt,
 			endedAt: Date.now(),
 			type: eventType,
 		};
 
-		try {
-			const written = await this._deps.addPlayEvent(event);
-			if (written) {
-				// Update skip-repeats tracker for successful play writes
-				if (eventType === "play" && this._deps.isSkipRepeatsEnabled()) {
-					this._state.lastRecordedUri = this._state.capturedData.trackUri;
-				}
-				// Notify listeners (play vs skip)
-				const eventName = eventType === "play" ? EVENTS.PLAY_RECORDED : EVENTS.SKIP_RECORDED;
-				this._deps.dispatchEvent(new CustomEvent(eventName, { detail: event }));
-
-				if (localStorage.getItem(LS_KEYS.LOGGING) === "true") {
-					console.log(
-						`[listening-stats] ${eventType}: "${event.trackName}" by ${event.artistName} (${Math.round(event.playedMs / 1000)}s)`,
-					);
-				}
+		const id = await this._deps.addPlayEvent(event);
+		if (id !== null) {
+			// Update skip-repeats tracker for successful play writes
+			if (eventType === "play" && this._deps.isSkipRepeatsEnabled()) {
+				this._state.lastRecordedUri = this._state.capturedData.trackUri;
 			}
-		} catch (err) {
-			// Log warning but do NOT crash the FSM
-			console.warn("[listening-stats] Failed to write play event:", err);
+			// Notify listeners (play vs skip)
+			const eventName = eventType === "play" ? EVENTS.PLAY_RECORDED : EVENTS.SKIP_RECORDED;
+			this._deps.dispatchEvent(new CustomEvent(eventName, { detail: event }));
+
+			if (localStorage.getItem(LS_KEYS.LOGGING) === "true") {
+				console.log(
+					`[listening-stats] ${eventType}: "${event.trackName}" by ${event.artistName} (${Math.round(event.playedMs / 1000)}s)`,
+				);
+			}
 		}
+		return id;
 	}
 }

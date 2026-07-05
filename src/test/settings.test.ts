@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	getPlayThreshold,
+	getPlayThresholdPercent,
+	getThresholdMode,
 	isSkipRepeatsEnabled,
 	isTrackingPaused,
+	resolveThresholdMs,
 	setPlayThreshold,
+	setPlayThresholdPercent,
 	setSkipRepeatsEnabled,
+	setThresholdMode,
 	setTrackingPaused,
 } from "../extension/tracker/settings";
 import { LS_KEYS } from "../shared/constants/storage-keys";
@@ -63,6 +68,80 @@ describe("Settings accessors", () => {
 		it("clamps value to 60000 maximum", () => {
 			setPlayThreshold(99999);
 			expect(localStorage.getItem(LS_KEYS.PLAY_THRESHOLD)).toBe("60000");
+		});
+
+		it("rounds to whole seconds", () => {
+			setPlayThreshold(12222);
+			expect(localStorage.getItem(LS_KEYS.PLAY_THRESHOLD)).toBe("12000");
+			setPlayThreshold(12600);
+			expect(localStorage.getItem(LS_KEYS.PLAY_THRESHOLD)).toBe("13000");
+		});
+	});
+
+	describe("threshold mode", () => {
+		it("defaults to seconds", () => {
+			expect(getThresholdMode()).toBe("seconds");
+		});
+
+		it("persists percent mode", () => {
+			setThresholdMode("percent");
+			expect(getThresholdMode()).toBe("percent");
+		});
+
+		it("clears the key when set back to seconds", () => {
+			setThresholdMode("percent");
+			setThresholdMode("seconds");
+			expect(localStorage.getItem(LS_KEYS.PLAY_THRESHOLD_MODE)).toBeNull();
+			expect(getThresholdMode()).toBe("seconds");
+		});
+	});
+
+	describe("percent threshold", () => {
+		it("defaults to 25", () => {
+			expect(getPlayThresholdPercent()).toBe(25);
+		});
+
+		it("returns stored value when valid", () => {
+			setPlayThresholdPercent(10);
+			expect(getPlayThresholdPercent()).toBe(10);
+		});
+
+		it("clamps to 0-100 and rounds to whole percent", () => {
+			setPlayThresholdPercent(150);
+			expect(getPlayThresholdPercent()).toBe(100);
+			setPlayThresholdPercent(-5);
+			expect(getPlayThresholdPercent()).toBe(0);
+			setPlayThresholdPercent(12.7);
+			expect(getPlayThresholdPercent()).toBe(13);
+		});
+
+		it("falls back to default for out-of-range stored values", () => {
+			localStorage.setItem(LS_KEYS.PLAY_THRESHOLD_PERCENT, "999");
+			expect(getPlayThresholdPercent()).toBe(25);
+		});
+	});
+
+	describe("resolveThresholdMs", () => {
+		it("returns the ms threshold in seconds mode", () => {
+			setPlayThreshold(12000);
+			expect(resolveThresholdMs(200000)).toBe(12000);
+		});
+
+		it("ignores duration in seconds mode", () => {
+			setPlayThreshold(12000);
+			expect(resolveThresholdMs(0)).toBe(12000);
+		});
+
+		it("returns percent of duration in percent mode", () => {
+			setThresholdMode("percent");
+			setPlayThresholdPercent(10);
+			expect(resolveThresholdMs(200000)).toBe(20000);
+		});
+
+		it("is unreachable in percent mode when duration is unknown", () => {
+			setThresholdMode("percent");
+			setPlayThresholdPercent(10);
+			expect(resolveThresholdMs(0)).toBe(Number.POSITIVE_INFINITY);
 		});
 	});
 

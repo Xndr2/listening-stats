@@ -1761,49 +1761,88 @@ button.announcement-banner-link-btn:hover {
 	gap: 8px;
 }
 
-/* Segmented control */
-.segmented-control {
-	display: flex;
+/* Threshold slider */
+.threshold-slider {
+	padding: 10px 24px 26px;
+}
+
+.threshold-slider-rail {
 	position: relative;
+	height: 28px;
+	cursor: pointer;
+	touch-action: none;
+}
+
+.threshold-slider-track {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	height: 4px;
+	transform: translateY(-50%);
+	border-radius: 2px;
 	background: var(--spice-card);
 	border: 1px solid var(--spice-misc);
-	border-radius: 4px;
-	height: 36px;
-	align-items: center;
-	width: 100%;
 }
 
-.segmented-control-stop {
-	flex: 1;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	cursor: pointer;
+.threshold-slider-fill {
+	position: absolute;
+	left: 0;
+	top: 50%;
+	height: 4px;
+	transform: translateY(-50%);
+	border-radius: 2px;
+	background: var(--spice-button);
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.threshold-slider-handle {
+	position: absolute;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	min-width: 40px;
+	padding: 3px 6px;
+	border-radius: 4px;
+	background: var(--spice-button);
+	color: var(--spice-main);
+	font-size: var(--font-size-sm, 12px);
+	font-weight: 700;
+	text-align: center;
+	user-select: none;
+	cursor: grab;
+	z-index: 1;
+}
+
+.threshold-slider-handle:active {
+	cursor: grabbing;
+}
+
+.threshold-slider-presets {
+	position: relative;
+	height: 16px;
+	margin-top: 6px;
+}
+
+.threshold-slider-preset {
+	position: absolute;
+	transform: translateX(-50%);
+	background: none;
+	border: none;
+	padding: 0;
 	font-size: var(--font-size-sm, 12px);
 	color: var(--spice-subtext);
-	z-index: 1;
-	transition: color 0.15s;
+	cursor: pointer;
 	user-select: none;
-	padding: 0 2px;
-	min-width: 0;
 }
 
-.segmented-control-stop.active {
+.threshold-slider-preset:hover {
+	color: var(--spice-text);
+}
+
+.threshold-slider-preset.active {
 	color: var(--spice-text);
 	font-weight: 700;
-}
-
-.segmented-control-indicator {
-	position: absolute;
-	top: 2px;
-	bottom: 2px;
-	border-radius: 3px;
-	background: var(--spice-button);
-	opacity: 0.85;
-	transition:
-		left 0.2s ease,
-		width 0.2s ease;
-	pointer-events: none;
 }
 
 /* ───────────────────────────────────────────────────────────────────────

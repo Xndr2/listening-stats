@@ -1,5 +1,7 @@
 export const LS_KEYS = {
 	PLAY_THRESHOLD: "listening-stats:playThreshold",
+	PLAY_THRESHOLD_MODE: "listening-stats:playThresholdMode",
+	PLAY_THRESHOLD_PERCENT: "listening-stats:playThresholdPercent",
 	TRACKING_PAUSED: "listening-stats:tracking-paused",
 	SKIP_REPEATS: "listening-stats:skip-repeats",
 	LAST_UPDATE: "listening-stats:lastUpdate",

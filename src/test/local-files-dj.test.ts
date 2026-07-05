@@ -37,8 +37,9 @@ function makePlayEvent(overrides: Partial<PlayEvent> = {}): PlayEvent {
 
 function makeDeps(overrides: Partial<TrackingFSMDeps> = {}): TrackingFSMDeps {
 	return {
-		addPlayEvent: vi.fn(() => Promise.resolve(true)),
-		getPlayThreshold: vi.fn(() => 30000),
+		addPlayEvent: vi.fn(() => Promise.resolve(1)),
+		updatePlayEvent: vi.fn(() => Promise.resolve()),
+		resolveThresholdMs: vi.fn(() => 30000),
 		isTrackingPaused: vi.fn(() => false),
 		isSkipRepeatsEnabled: vi.fn(() => false),
 		dispatchEvent: vi.fn(),
