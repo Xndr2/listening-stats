@@ -1,7 +1,7 @@
 import { EVENTS } from "../../../shared/constants/events";
 import { GITHUB_REPO_WEB_URL } from "../../../shared/constants/github-repo";
 import { getPreferences, setPreference } from "../../preferences";
-import { Toggle } from "../spicetify-ui";
+import { SettingRow, SettingsGroup, SettingToggle } from "./controls";
 
 const { useCallback } = Spicetify.React;
 
@@ -10,9 +10,16 @@ interface AboutTabProps {
 	onOpenUpdates: () => void;
 	onPrefsChanged: () => void;
 	onReceiveBetaUpdatesChanged?: () => void;
+	onRestartTour?: () => void;
 }
 
-export function AboutTab({ version, onOpenUpdates, onPrefsChanged, onReceiveBetaUpdatesChanged }: AboutTabProps) {
+export function AboutTab({
+	version,
+	onOpenUpdates,
+	onPrefsChanged,
+	onReceiveBetaUpdatesChanged,
+	onRestartTour,
+}: AboutTabProps) {
 	const prefs = getPreferences();
 
 	const handleBetaChannel = useCallback(
@@ -27,45 +34,31 @@ export function AboutTab({ version, onOpenUpdates, onPrefsChanged, onReceiveBeta
 
 	return (
 		<div className="settings-about">
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">Listening Stats</div>
-					<div className="settings-sublabel">Version {version}</div>
-				</div>
-			</div>
+			<SettingsGroup title="Updates">
+				<SettingRow label="Listening Stats" sublabel={`Version ${version}`}>
+					<button type="button" className="btn-secondary" onClick={onOpenUpdates}>
+						Check for updates…
+					</button>
+				</SettingRow>
+				<SettingRow label="Prereleases" sublabel="Include beta versions in update checks">
+					<SettingToggle value={prefs.receiveBetaUpdates} onChange={handleBetaChannel} />
+				</SettingRow>
+			</SettingsGroup>
 
-			<div className="settings-row settings-about-beta-row">
-				<div>
-					<div className="settings-label">Prereleases</div>
-					<div className="settings-sublabel">
-						Same setting as in the updates window - affects version checks and which install command is copied there.
-					</div>
-				</div>
-				{Toggle ? (
-					<Toggle value={prefs.receiveBetaUpdates} onSelected={handleBetaChannel} />
-				) : (
-					<input
-						type="checkbox"
-						checked={prefs.receiveBetaUpdates}
-						onChange={(e) => handleBetaChannel(e.currentTarget.checked)}
-					/>
+			<SettingsGroup title="Help">
+				{onRestartTour && (
+					<SettingRow label="Guided tour">
+						<button type="button" className="btn-secondary" data-testid="restart-tour" onClick={onRestartTour}>
+							Restart
+						</button>
+					</SettingRow>
 				)}
-			</div>
-
-			<p className="settings-about-short-lead">
-				Changelog, install commands, and release checks are in <strong>Check for updates</strong> (footer or below).
-			</p>
-
-			<button type="button" className="btn-secondary settings-about-check-updates" onClick={onOpenUpdates}>
-				Check for updates…
-			</button>
-
-			<p className="settings-about-hint">
-				Source:{" "}
-				<a className="settings-inline-link" href={GITHUB_REPO_WEB_URL} target="_blank" rel="noopener noreferrer">
-					{GITHUB_REPO_WEB_URL.replace("https://", "")}
-				</a>
-			</p>
+				<SettingRow label="Source">
+					<a className="settings-inline-link" href={GITHUB_REPO_WEB_URL} target="_blank" rel="noopener noreferrer">
+						{GITHUB_REPO_WEB_URL.replace("https://", "")}
+					</a>
+				</SettingRow>
+			</SettingsGroup>
 		</div>
 	);
 }

@@ -1177,6 +1177,82 @@ button.announcement-banner-link-btn:hover {
 	margin-top: 2px;
 }
 
+/* Settings groups: kicker header + rows, mirrors the dashboard section anatomy */
+.settings-group {
+	margin-top: 20px;
+}
+
+.settings-group:first-child {
+	margin-top: 0;
+}
+
+.settings-group > .section-header {
+	margin-bottom: 0;
+	padding-bottom: 6px;
+	border-bottom: 1px solid rgba(var(--spice-rgb-misc, 255, 255, 255), 0.15);
+}
+
+.settings-group .settings-row:last-child {
+	border-bottom: none;
+}
+
+/* Compact action buttons inside settings rows */
+.settings-row .btn-primary,
+.settings-row .btn-secondary,
+.settings-row .btn-destructive {
+	padding: 4px 12px;
+	font-size: var(--font-size-sm, 12px);
+	white-space: nowrap;
+}
+
+/* Option group: joined segmented pills for small option sets */
+.option-group {
+	display: inline-flex;
+	border: 1px solid var(--spice-misc);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.option-group-btn {
+	background: none;
+	border: none;
+	border-left: 1px solid var(--spice-misc);
+	padding: 4px 12px;
+	min-width: 36px;
+	font-size: var(--font-size-sm, 12px);
+	color: var(--spice-subtext);
+	cursor: pointer;
+	transition:
+		color 0.15s,
+		background 0.15s;
+}
+
+.option-group-btn:first-child {
+	border-left: none;
+}
+
+.option-group-btn:hover {
+	color: var(--spice-text);
+}
+
+.option-group-btn.active {
+	background: rgba(var(--spice-rgb-button, 30, 215, 96), 0.2);
+	color: var(--spice-text);
+	font-weight: 700;
+}
+
+/* Text inputs in settings */
+.settings-input {
+	flex: 1;
+	min-width: 0;
+	padding: 8px 12px;
+	border-radius: 4px;
+	border: 1px solid var(--spice-misc);
+	background: var(--spice-main);
+	color: var(--spice-text);
+	font-size: var(--font-size-sm, 14px);
+}
+
 .health-dot {
 	width: 8px;
 	height: 8px;
@@ -2616,22 +2692,6 @@ button.announcement-banner-link-btn:hover {
 
 .stats-app-footer-install-link:hover {
 	color: var(--spice-button-active, var(--spice-button));
-}
-
-.settings-about-short-lead {
-	font-size: var(--font-size-sm, 12px);
-	color: var(--spice-subtext);
-	line-height: 1.5;
-	margin: 12px 0 0;
-}
-
-.settings-about-check-updates {
-	margin-top: 12px;
-	padding: 6px 14px;
-}
-
-.settings-about-beta-row {
-	padding-top: 4px;
 }
 
 .update-modal-repo-hint {

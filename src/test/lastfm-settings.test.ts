@@ -60,7 +60,7 @@ afterEach(() => {
 function getLastfmSection(container: HTMLElement): HTMLElement | null {
 	const headings = container.querySelectorAll("h3");
 	for (const h of headings) {
-		if (h.textContent === "Last.fm Account") {
+		if (h.textContent === "Last.fm account") {
 			const el = h.nextElementSibling;
 			if (el instanceof HTMLElement) return el;
 		}

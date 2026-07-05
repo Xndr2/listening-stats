@@ -12,7 +12,7 @@ export type SettingsTab = "tracking" | "display" | "data" | "providers" | "about
 const TAB_LABELS: Record<SettingsTab, string> = {
 	tracking: "Tracking",
 	display: "Display",
-	data: "Data Management",
+	data: "Data",
 	providers: "Providers",
 	about: "About",
 };
@@ -91,11 +91,7 @@ export function SettingsModal({
 
 				{activeTab === "tracking" && <TrackingTab onPrefsChanged={onPrefsChanged} />}
 				{activeTab === "display" && (
-					<DisplayTab
-						onPrefsChanged={onPrefsChanged}
-						onRestartTour={onRestartTour}
-						announcementDismissKey={announcementDismissKey}
-					/>
+					<DisplayTab onPrefsChanged={onPrefsChanged} announcementDismissKey={announcementDismissKey} />
 				)}
 				{activeTab === "data" && <DataTab onRefresh={onRefresh} />}
 				{activeTab === "providers" && <ProvidersTab />}
@@ -105,6 +101,7 @@ export function SettingsModal({
 						onOpenUpdates={onOpenUpdates}
 						onPrefsChanged={onPrefsChanged}
 						onReceiveBetaUpdatesChanged={onReceiveBetaUpdatesChanged}
+						onRestartTour={onRestartTour}
 					/>
 				)}
 			</div>

@@ -33,7 +33,7 @@ describe("DisplayTab playCountVariant toggle", () => {
 		Spicetify.ReactDOM.render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }), container);
 		const buttons = container.querySelectorAll("[data-testid='play-count-variant'] button");
 		const pillBtn = Array.from(buttons).find((b) => b.textContent === "Pill");
-		expect(pillBtn?.className).toContain("btn-primary");
+		expect(pillBtn?.className).toContain("active");
 	});
 
 	it("clicking 'Bubble' updates preference to bubble", async () => {
@@ -84,6 +84,6 @@ describe("DisplayTab playCountVariant toggle", () => {
 		Spicetify.ReactDOM.render(Spicetify.React.createElement(DisplayTab, { onPrefsChanged: vi.fn() }), container);
 		const buttons = container.querySelectorAll("[data-testid='play-count-variant'] button");
 		const minimalBtn = Array.from(buttons).find((b) => b.textContent === "Minimal");
-		expect(minimalBtn?.className).toContain("btn-primary");
+		expect(minimalBtn?.className).toContain("active");
 	});
 });

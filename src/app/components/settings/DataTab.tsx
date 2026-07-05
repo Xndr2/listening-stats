@@ -5,6 +5,7 @@ import { statsCache } from "../../../shared/stats/stats-cache";
 import { db } from "../../../shared/storage/db";
 import { importFileEvents, type ParseResult, parseJsonEvents, parseV1Csv } from "../../../shared/storage/import";
 import { downloadFile } from "../../utils";
+import { SettingRow, SettingsGroup } from "./controls";
 
 const { useState, useRef } = Spicetify.React;
 
@@ -227,148 +228,142 @@ export function DataTab({ onRefresh }: Props) {
 
 	return (
 		<div>
-			<div
-				className="settings-row"
-				style={{
-					flexDirection: "column",
-					alignItems: "flex-start",
-					gap: "12px",
-				}}
-			>
-				<input
-					ref={fileInputRef}
-					type="file"
-					accept=".csv,.json"
-					style={{ display: "none" }}
-					onChange={handleFileSelected}
-					aria-label="Import play history file"
-				/>
+			<SettingsGroup title="Library">
+				<div
+					className="settings-row"
+					style={{
+						flexDirection: "column",
+						alignItems: "flex-start",
+						gap: "12px",
+					}}
+				>
+					<input
+						ref={fileInputRef}
+						type="file"
+						accept=".csv,.json"
+						style={{ display: "none" }}
+						onChange={handleFileSelected}
+						aria-label="Import play history file"
+					/>
 
-				{importPhase === "idle" && (
-					<div
-						style={{
-							display: "flex",
-							width: "100%",
-							alignItems: "center",
-							justifyContent: "space-between",
-						}}
-					>
-						<div>
-							<div className="settings-label">Import play history</div>
-							<div className="settings-sublabel">Accepts .csv or .json from a v1 export</div>
-						</div>
-						<button type="button" className="btn-primary" onClick={() => fileInputRef.current?.click()}>
-							Import Data
-						</button>
-					</div>
-				)}
-
-				{importPhase === "importing" && (
-					<div className="import-progress">
-						<span className="import-progress-label">
-							Importing... {importProgress.current} / {importProgress.total}
-						</span>
-						<progress className="import-progress-bar" value={importProgress.current} max={importProgress.total} />
-					</div>
-				)}
-
-				{importPhase === "complete" && importSummary && (
-					<div className="import-result-card">
-						<div className="import-result-row">
-							<span className="import-result-count import-result-count--success">{importSummary.imported}</span>
-							<span className="import-result-label">imported</span>
-						</div>
-						<div className="import-result-row">
-							<span className="import-result-count import-result-count--neutral">{importSummary.skipped}</span>
-							<span className="import-result-label">skipped as duplicates</span>
-						</div>
-						{importSummary.errors > 0 && (
-							<div className="import-result-row">
-								<span className="import-result-count import-result-count--error">{importSummary.errors}</span>
-								<span className="import-result-label">errors</span>
+					{importPhase === "idle" && (
+						<div
+							style={{
+								display: "flex",
+								width: "100%",
+								alignItems: "center",
+								justifyContent: "space-between",
+							}}
+						>
+							<div>
+								<div className="settings-label">Import play history</div>
+								<div className="settings-sublabel">.csv or .json from a v1 export</div>
 							</div>
-						)}
-						{importSummary.errors > 0 && importSummary.errorDetails.length > 0 && (
-							<div className="import-result-errors">
-								{importSummary.errorDetails.slice(0, 3).map((detail, i) => (
-									<div
-										key={i}
-										style={{
-											overflow: "hidden",
-											textOverflow: "ellipsis",
-											whiteSpace: "nowrap",
-											maxWidth: "100%",
-										}}
-									>
-										{detail.length > 80 ? `${detail.slice(0, 80)}\u2026` : detail}
-									</div>
-								))}
-							</div>
-						)}
-						<div className="import-result-actions">
-							<button type="button" className="btn-secondary" onClick={handleDismissResults}>
-								Dismiss Results
+							<button type="button" className="btn-primary" onClick={() => fileInputRef.current?.click()}>
+								Import
 							</button>
 						</div>
-					</div>
-				)}
-			</div>
+					)}
 
-			{/* Refresh Stats */}
-			<div className="settings-row">
-				<div className="settings-label">Refresh statistics cache</div>
-				<button type="button" className="btn-primary" onClick={handleRefresh}>
-					Refresh Stats
-				</button>
-			</div>
+					{importPhase === "importing" && (
+						<div className="import-progress">
+							<span className="import-progress-label">
+								Importing... {importProgress.current} / {importProgress.total}
+							</span>
+							<progress className="import-progress-bar" value={importProgress.current} max={importProgress.total} />
+						</div>
+					)}
 
-			{/* Export JSON */}
-			<div className="settings-row">
-				<div className="settings-label">Export data as JSON</div>
-				<button type="button" className="btn-primary" onClick={handleExportJson}>
-					Export JSON
-				</button>
-			</div>
-
-			{/* Export CSV */}
-			<div className="settings-row">
-				<div className="settings-label">Export top tracks as CSV</div>
-				<button type="button" className="btn-primary" onClick={handleExportCsv}>
-					Export CSV
-				</button>
-			</div>
-
-			{/* Test Write */}
-			<div className="settings-row">
-				<div>
-					<div className="settings-label">Test IndexedDB write</div>
-					<div className="settings-sublabel">Verify database write access</div>
+					{importPhase === "complete" && importSummary && (
+						<div className="import-result-card">
+							<div className="import-result-row">
+								<span className="import-result-count import-result-count--success">{importSummary.imported}</span>
+								<span className="import-result-label">imported</span>
+							</div>
+							<div className="import-result-row">
+								<span className="import-result-count import-result-count--neutral">{importSummary.skipped}</span>
+								<span className="import-result-label">skipped as duplicates</span>
+							</div>
+							{importSummary.errors > 0 && (
+								<div className="import-result-row">
+									<span className="import-result-count import-result-count--error">{importSummary.errors}</span>
+									<span className="import-result-label">errors</span>
+								</div>
+							)}
+							{importSummary.errors > 0 && importSummary.errorDetails.length > 0 && (
+								<div className="import-result-errors">
+									{importSummary.errorDetails.slice(0, 3).map((detail, i) => (
+										<div
+											key={i}
+											style={{
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+												maxWidth: "100%",
+											}}
+										>
+											{detail.length > 80 ? `${detail.slice(0, 80)}\u2026` : detail}
+										</div>
+									))}
+								</div>
+							)}
+							<div className="import-result-actions">
+								<button type="button" className="btn-secondary" onClick={handleDismissResults}>
+									Dismiss Results
+								</button>
+							</div>
+						</div>
+					)}
 				</div>
-				<button type="button" className="btn-primary" onClick={handleTestWrite}>
-					Test Write
-				</button>
-			</div>
 
-			{/* Wipe All Data */}
-			<div
-				className="settings-row"
-				style={{
-					flexDirection: "column",
-					alignItems: "flex-start",
-					gap: "12px",
-				}}
-			>
-				{!confirmWipe ? (
-					<button type="button" className="btn-destructive" onClick={() => setConfirmWipe(true)}>
-						Wipe All Data
+				<SettingRow label="Export data as JSON">
+					<button type="button" className="btn-secondary" onClick={handleExportJson}>
+						Export
 					</button>
+				</SettingRow>
+
+				<SettingRow label="Export top tracks as CSV">
+					<button type="button" className="btn-secondary" onClick={handleExportCsv}>
+						Export
+					</button>
+				</SettingRow>
+			</SettingsGroup>
+
+			<SettingsGroup title="Maintenance">
+				<SettingRow label="Refresh statistics cache">
+					<button type="button" className="btn-secondary" onClick={handleRefresh}>
+						Refresh
+					</button>
+				</SettingRow>
+
+				<SettingRow label="Test database write">
+					<button type="button" className="btn-secondary" onClick={handleTestWrite}>
+						Test
+					</button>
+				</SettingRow>
+			</SettingsGroup>
+
+			<SettingsGroup title="Danger zone">
+				{!confirmWipe ? (
+					<SettingRow label="Wipe all data" sublabel="Deletes all play history permanently">
+						<button type="button" className="btn-destructive" onClick={() => setConfirmWipe(true)}>
+							Wipe
+						</button>
+					</SettingRow>
 				) : (
-					<div style={{ width: "100%" }}>
+					<div
+						className="settings-row"
+						style={{
+							flexDirection: "column",
+							alignItems: "flex-start",
+							gap: "12px",
+						}}
+					>
 						<p
 							style={{
 								fontSize: "var(--font-size-sm, 14px)",
 								color: "var(--spice-text)",
-								marginBottom: "12px",
+								margin: 0,
 							}}
 						>
 							This permanently deletes all play history and cannot be undone. Are you sure?
@@ -383,7 +378,7 @@ export function DataTab({ onRefresh }: Props) {
 						</div>
 					</div>
 				)}
-			</div>
+			</SettingsGroup>
 		</div>
 	);
 }
