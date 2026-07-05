@@ -112,7 +112,7 @@ export function TopLists({
 										{track.artistName}
 									</div>
 								</div>
-								{!stats?.isFreeTier || track.durationMs > 0 ? (
+								{!stats?.isFreeTier || track.count > 0 ? (
 									<div
 										style={{
 											display: "flex",
