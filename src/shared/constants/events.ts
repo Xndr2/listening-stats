@@ -11,4 +11,5 @@ export const EVENTS = {
 	STATSFM_PROFILE_REFRESHED: "listening-stats:statsfm-profile-refreshed",
 	PREFS_CHANGED: "listening-stats:prefs-changed",
 	DASHBOARD_PERIOD_CHANGED: "listening-stats:dashboard-period-changed",
+	OPEN_RECAP: "listening-stats:open-recap",
 } as const;

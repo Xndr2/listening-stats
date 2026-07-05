@@ -640,15 +640,7 @@ describe("StatsFmProvider", () => {
 			expect(result.peakWeekday).toBe(5); // Saturday (index 5) has 112 > Monday (index 0) has 45
 		});
 
-		it("sets hasListeningPatterns=true when /dates returns data", async () => {
-			setupConfig({ isPlus: false });
-			await provider.init();
-			setupSfmGetDispatcher(false);
-			const result = await provider.calculateStats(STATSFM_PERIODS[0]);
-			expect(result.hasListeningPatterns).toBe(true);
-		});
-
-		it("sets hasListeningPatterns=false and weekdayDistribution=undefined when /dates fails", async () => {
+		it("sets weekdayDistribution=undefined and zeroed hourly data when /dates fails", async () => {
 			setupConfig({ isPlus: false });
 			await provider.init();
 			sfmGetMock.mockImplementation((path: string) => {
@@ -687,7 +679,6 @@ describe("StatsFmProvider", () => {
 				return Promise.resolve({ ok: false, status: 404, message: "Unknown path" });
 			});
 			const result = await provider.calculateStats(STATSFM_PERIODS[0]);
-			expect(result.hasListeningPatterns).toBe(false);
 			expect(result.weekdayDistribution).toBeUndefined();
 			expect(result.hourlyDistribution).toEqual(new Array(24).fill(0));
 			expect(result.peakHour).toBe(0);

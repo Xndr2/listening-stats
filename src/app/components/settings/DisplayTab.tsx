@@ -389,6 +389,24 @@ export function DisplayTab({ onPrefsChanged, onRestartTour, announcementDismissK
 
 			<div className="settings-row">
 				<div>
+					<div className="settings-label">Monthly recap</div>
+					<div className="settings-sublabel">
+						A recap banner appears at the start of each month. Preview last month's recap card here.
+					</div>
+				</div>
+				<button
+					type="button"
+					className="btn-secondary"
+					data-testid="preview-recap"
+					onClick={() => window.dispatchEvent(new CustomEvent(EVENTS.OPEN_RECAP))}
+					style={{ padding: "4px 12px" }}
+				>
+					Preview recap
+				</button>
+			</div>
+
+			<div className="settings-row">
+				<div>
 					<div className="settings-label">Playbar play count</div>
 					<div className="settings-sublabel">Widget style for now-playing track count</div>
 				</div>

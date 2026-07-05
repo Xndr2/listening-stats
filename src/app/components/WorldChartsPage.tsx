@@ -1,6 +1,7 @@
 import { LS_KEYS } from "../../shared/constants/storage-keys";
 import type { AppError } from "../../shared/errors";
 import { classifyStatsFmError } from "../../shared/errors";
+import type { WorldChartKind } from "../../shared/types/world-charts";
 import type { WorldChartDataSource, WorldTrack, WorldWindow } from "../world-charts-service";
 import {
 	getAlbumChartsAsync,
@@ -9,16 +10,25 @@ import {
 	isStatsFmWindowSupported,
 } from "../world-charts-service";
 import { InlineErrorCard } from "./InlineErrorCard";
-import { WorldChartsSkeleton } from "./LoadingSkeleton";
-import { ChartCard, HeroSkeleton, WORLD_WINDOWS, WorldHeroSection, WorldWindowTabs } from "./world/WorldSpotlightUi";
+import {
+	WORLD_KINDS,
+	WORLD_WINDOWS,
+	WorldKindTabs,
+	WorldLadder,
+	WorldPodium,
+	WorldStageSkeleton,
+	WorldWindowTabs,
+} from "./world/WorldSpotlightUi";
 
 const { useState, useEffect, useCallback } = Spicetify.React;
 
 const VALID_WINDOWS = new Set<string>(WORLD_WINDOWS.map((w) => w.value));
+const VALID_KINDS = new Set<string>(WORLD_KINDS.map((k) => k.value));
+const WORLD_KIND_KEY = "listening-stats:world-charts-kind";
 
 const PODIUM_SIZE = 3;
-const LIST_ROWS = 7;
-const ROW_TOTAL = PODIUM_SIZE + LIST_ROWS;
+const LADDER_ROWS = 12;
+const ROW_TOTAL = PODIUM_SIZE + LADDER_ROWS;
 
 function restoreWindow(): WorldWindow {
 	const stored = localStorage.getItem(LS_KEYS.WORLD_CHARTS_WINDOW);
@@ -26,6 +36,11 @@ function restoreWindow(): WorldWindow {
 		return stored as WorldWindow;
 	}
 	return "today";
+}
+
+function restoreKind(): WorldChartKind {
+	const stored = localStorage.getItem(WORLD_KIND_KEY);
+	return stored && VALID_KINDS.has(stored) ? (stored as WorldChartKind) : "track";
 }
 
 function buildSourceLine(
@@ -37,15 +52,15 @@ function buildSourceLine(
 		return "Global charts · stats.fm";
 	}
 	const label = (src: WorldChartDataSource, kind: string) => {
-		if (src === "statsfm") return `${kind} · stats.fm`;
 		if (src === "mytopspotify") return `${kind} · mytopspotify.io (daily)`;
-		return `${kind} · demo`;
+		return `${kind} · stats.fm`;
 	};
 	return [label(trackSource, "Tracks"), label(artistSource, "Artists"), label(albumSource, "Albums")].join(" · ");
 }
 
 export function WorldChartsPage() {
 	const [timeWindow, setTimeWindow] = useState<WorldWindow>(restoreWindow);
+	const [kind, setKind] = useState<WorldChartKind>(restoreKind);
 	const [tracks, setTracks] = useState<WorldTrack[]>([]);
 	const [artists, setArtists] = useState<WorldTrack[]>([]);
 	const [albums, setAlbums] = useState<WorldTrack[]>([]);
@@ -65,9 +80,9 @@ export function WorldChartsPage() {
 			getAlbumChartsAsync("world", w),
 		]);
 
-		let trackSource: WorldChartDataSource = "mock";
-		let artistSource: WorldChartDataSource = "mock";
-		let albumSource: WorldChartDataSource = "mock";
+		let trackSource: WorldChartDataSource = "statsfm";
+		let artistSource: WorldChartDataSource = "statsfm";
+		let albumSource: WorldChartDataSource = "statsfm";
 
 		if (trackResult.ok) {
 			setTracks(trackResult.data);
@@ -108,10 +123,15 @@ export function WorldChartsPage() {
 		fetchCharts(timeWindow);
 	};
 
-	const hero = tracks[0];
-	const trackSlice = tracks.slice(0, ROW_TOTAL);
-	const artistSlice = artists.slice(0, ROW_TOTAL);
-	const albumSlice = albums.slice(0, ROW_TOTAL);
+	const handleKindChange = (value: WorldChartKind) => {
+		setKind(value);
+		localStorage.setItem(WORLD_KIND_KEY, value);
+	};
+
+	const stageItems = (kind === "track" ? tracks : kind === "artist" ? artists : albums).slice(0, ROW_TOTAL);
+	const podium = stageItems.slice(0, PODIUM_SIZE);
+	const ladder = stageItems.slice(PODIUM_SIZE);
+	const kindLabel = WORLD_KINDS.find((k) => k.value === kind)?.label ?? "Tracks";
 
 	return (
 		<div className="world-charts-page stats-page-content">
@@ -125,50 +145,42 @@ export function WorldChartsPage() {
 				<WorldWindowTabs value={timeWindow} onChange={handleWindowChange} />
 			</header>
 
-			{loading && (
-				<div className="world-page-grid">
-					<HeroSkeleton />
-					<WorldChartsSkeleton />
-				</div>
-			)}
+			{loading && <WorldStageSkeleton />}
 
 			{!loading && error && <InlineErrorCard error={error} onRetry={handleRetry} onOpenSettings={() => {}} />}
 
 			{!loading && !error && (
 				<>
-					<div className="world-page-grid">
-						{hero ? (
-							<WorldHeroSection
-								item={hero}
-								winLabel={winLabel}
-								runnersUp={tracks.slice(1, 3)}
-								topArtist={artists[0]}
-								topAlbum={albums[0]}
-							/>
-						) : null}
-						<ChartCard
-							kicker="Top"
-							title="Tracks"
-							podium={trackSlice.slice(0, PODIUM_SIZE)}
-							rows={trackSlice.slice(PODIUM_SIZE)}
-							kind="track"
-						/>
-						<ChartCard
-							kicker="Top"
-							title="Artists"
-							podium={artistSlice.slice(0, PODIUM_SIZE)}
-							rows={artistSlice.slice(PODIUM_SIZE)}
-							kind="artist"
-						/>
-						<ChartCard
-							kicker="Top"
-							title="Albums"
-							podium={albumSlice.slice(0, PODIUM_SIZE)}
-							rows={albumSlice.slice(PODIUM_SIZE)}
-							kind="album"
-						/>
-					</div>
-
+					{stageItems.length === 0 ? (
+						<div className="world-charts-empty">
+							<div className="world-charts-empty-title">Nothing charted here yet</div>
+							<div className="world-charts-empty-body">
+								{winLabel} {kindLabel.toLowerCase()} charts came back empty. Try another chart type or time range.
+							</div>
+						</div>
+					) : (
+						<>
+							<section className="section-card world-podium-card" data-testid="world-podium-card">
+								<div className="world-stage-header">
+									<header className="section-heading" style={{ marginBottom: 0 }}>
+										<span className="section-kicker">Global podium · {winLabel}</span>
+										<h2 className="section-title">{kindLabel}</h2>
+									</header>
+									<WorldKindTabs value={kind} onChange={handleKindChange} />
+								</div>
+								<WorldPodium items={podium} kind={kind} />
+							</section>
+							{ladder.length > 0 ? (
+								<section className="section-card" data-testid="world-ladder-card">
+									<header className="section-heading">
+										<span className="section-kicker">Global top 15</span>
+										<h2 className="section-title">Ranks 4–15</h2>
+									</header>
+									<WorldLadder items={ladder} kind={kind} startRank={PODIUM_SIZE + 1} />
+								</section>
+							) : null}
+						</>
+					)}
 					<div className="world-charts-source">{sourceLine}</div>
 				</>
 			)}

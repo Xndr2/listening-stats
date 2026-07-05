@@ -42,6 +42,8 @@ import { TopLists } from "./components/TopLists";
 import { UpdateModal } from "./components/UpdateModal";
 import { WorldChartsPage } from "./components/WorldChartsPage";
 import { getPreferences, setPreference } from "./preferences";
+import type { RecapSource } from "./recap";
+import { buildRecapSummary, dismissRecap, getRecapSource, isRecapDismissed, loadRecapStats } from "./recap";
 import { getTourSteps, shouldAutoStartTour } from "./tour";
 
 export function buildCacheKey(activeProviderId: string, periodId: string): string {
@@ -98,6 +100,9 @@ function App() {
 	const [activePage, setActivePage] = useState<string>(() => getPreferences().activePage);
 	const [showShare, setShowShare] = useState(false);
 	const [remoteAnnouncement, setRemoteAnnouncement] = useState<ParsedRemoteAnnouncement | null>(null);
+	const [recapOffer, setRecapOffer] = useState<{ source: RecapSource; stats: StatsResult } | null>(null);
+	const [showRecap, setShowRecap] = useState(false);
+	const recapCheckedRef = useRef(false);
 	const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult | null>(null);
 	const [showUpdateModal, setShowUpdateModal] = useState(false);
 	// silent=true skips loading skeleton (used for background refresh)
@@ -544,6 +549,51 @@ function App() {
 
 	const activeBanner = !prefs.showAnnouncementBanner ? null : resolvedBanner;
 
+	// Monthly recap: offer a banner once per month when last month has plays.
+	// Independent of the announcement banner so remote GitHub announcements stay visible.
+	useEffect(() => {
+		// Wait for the dashboard's own load to finish (stats non-null) so the recap
+		// computation hits the provider's stats cache instead of racing the initial
+		// API burst — a concurrent duplicate load can trip stats.fm rate limits.
+		if (!initialized || !stats || recapCheckedRef.current) return;
+		recapCheckedRef.current = true;
+		const source = getRecapSource(providerRegistry.getActiveId() ?? "local");
+		if (isRecapDismissed(source.monthKey)) return;
+		const provider = providerRegistry.getActive();
+		if (!provider) return;
+		loadRecapStats(provider, source)
+			.then((recapStats) => {
+				if (recapStats) setRecapOffer({ source, stats: recapStats });
+			})
+			.catch(() => {});
+	}, [initialized, stats]);
+
+	// Settings > Display "Preview recap" hook — always recomputes and opens the modal.
+	useEffect(() => {
+		const handler = () => {
+			const source = getRecapSource(providerRegistry.getActiveId() ?? "local");
+			const provider = providerRegistry.getActive();
+			if (!provider) return;
+			loadRecapStats(provider, source)
+				.then((recapStats) => {
+					if (recapStats) {
+						setRecapOffer({ source, stats: recapStats });
+						setShowRecap(true);
+					} else {
+						Spicetify.showNotification("No plays recorded for last month yet.");
+					}
+				})
+				.catch(() => Spicetify.showNotification("Could not load recap stats.", true));
+		};
+		window.addEventListener(EVENTS.OPEN_RECAP, handler);
+		return () => window.removeEventListener(EVENTS.OPEN_RECAP, handler);
+	}, []);
+
+	const handleDismissRecap = useCallback(() => {
+		if (recapOffer) dismissRecap(recapOffer.source.monthKey);
+		setRecapOffer(null);
+	}, [recapOffer]);
+
 	const handleDismissBanner = useCallback(() => {
 		if (!resolvedBanner) return;
 		setPreference("showAnnouncementBanner", false);
@@ -590,6 +640,19 @@ function App() {
 							onDismiss={handleDismissBanner}
 						/>
 					)}
+					{recapOffer && activePage !== "world" && (
+						<AnnouncementBanner
+							title={
+								recapOffer.source.exactMonth
+									? `Your ${recapOffer.source.monthLabel} recap is ready`
+									: "Your monthly recap is ready"
+							}
+							body={buildRecapSummary(recapOffer.stats)}
+							actionLabel="View recap →"
+							onActionClick={() => setShowRecap(true)}
+							onDismiss={handleDismissRecap}
+						/>
+					)}
 					{renderContent()}
 					<AppFooter version={__VERSION__} onCheckForUpdates={() => void openUpdatesModal()} />
 				</div>
@@ -621,6 +684,16 @@ function App() {
 			/>
 			{showShare && stats && (
 				<ShareModal stats={stats} activePeriod={activePeriod} onClose={() => setShowShare(false)} />
+			)}
+			{showRecap && recapOffer && (
+				<ShareModal
+					stats={recapOffer.stats}
+					activePeriod={recapOffer.source.period}
+					onClose={() => setShowRecap(false)}
+					initialVariant="recap"
+					variantIds={["recap"]}
+					title={recapOffer.source.exactMonth ? `${recapOffer.source.monthLabel} Recap` : "Monthly Recap"}
+				/>
 			)}
 			<UpdateModal
 				open={showUpdateModal}

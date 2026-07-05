@@ -28,6 +28,6 @@ export interface WorldTrack {
 export type WorldScope = "world" | "us" | "gb" | "jp";
 export type WorldWindow = "today" | "week" | "month" | "lifetime";
 
-export type WorldChartDataSource = "statsfm" | "mytopspotify" | "mock";
+export type WorldChartDataSource = "statsfm" | "mytopspotify";
 
 export type WorldChartKind = "track" | "artist" | "album";

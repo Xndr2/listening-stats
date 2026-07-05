@@ -1,5 +1,4 @@
 import type { WorldChartKind, WorldIndicator, WorldTrack, WorldWindow } from "../../../shared/types/world-charts";
-import { formatDuration } from "../../world-charts-service";
 import { navigateWorldItem, playOrOpenWorldTrack, trackPlayTooltip } from "../../world-spotify-actions";
 import { Tooltip } from "../spicetify-ui";
 import { getRankClass } from "../TopLists";
@@ -11,17 +10,11 @@ export const WORLD_WINDOWS: { value: WorldWindow; label: string }[] = [
 	{ value: "week", label: "This Week" },
 ];
 
-const HERO_CELL_STYLE: Record<string, string | number> = {
-	background:
-		"radial-gradient(120% 140% at 0% 0%, rgba(var(--spice-rgb-button),.16), transparent 52%), var(--spice-card)",
-	border: "1px solid rgba(var(--spice-rgb-misc, 255, 255, 255), 0.12)",
-	borderRadius: 8,
-	padding: 20,
-	minHeight: 184,
-	position: "relative",
-	overflow: "hidden",
-	boxSizing: "border-box",
-};
+export const WORLD_KINDS: { value: WorldChartKind; label: string }[] = [
+	{ value: "track", label: "Tracks" },
+	{ value: "artist", label: "Artists" },
+	{ value: "album", label: "Albums" },
+];
 
 function tileFallback(seed: string, label: string): { a: string; b: string; init: string } {
 	let h = 0;
@@ -80,7 +73,7 @@ export function WorldArt({
 				style={{
 					width: size,
 					height: size,
-					borderRadius: round ? "50%" : 4,
+					borderRadius: round ? "50%" : Math.max(4, Math.round(size / 18)),
 					flexShrink: 0,
 				}}
 			/>
@@ -92,7 +85,7 @@ export function WorldArt({
 			style={{
 				width: size,
 				height: size,
-				borderRadius: round ? "50%" : 4,
+				borderRadius: round ? "50%" : Math.max(4, Math.round(size / 18)),
 				flexShrink: 0,
 				background: fallback ? `linear-gradient(135deg, ${fallback.a}, ${fallback.b})` : undefined,
 				display: "flex",
@@ -122,6 +115,25 @@ export function WorldWindowTabs({ value, onChange }: { value: WorldWindow; onCha
 					onClick={() => onChange(w.value)}
 				>
 					{w.label}
+				</button>
+			))}
+		</div>
+	);
+}
+
+export function WorldKindTabs({ value, onChange }: { value: WorldChartKind; onChange: (v: WorldChartKind) => void }) {
+	return (
+		<div className="period-tabs" role="tablist" aria-label="Chart type" data-testid="world-kind-tabs">
+			{WORLD_KINDS.map((k) => (
+				<button
+					type="button"
+					key={k.value}
+					className={`period-tab ${value === k.value ? "active" : ""}`}
+					role="tab"
+					aria-selected={value === k.value}
+					onClick={() => onChange(k.value)}
+				>
+					{k.label}
 				</button>
 			))}
 		</div>
@@ -162,160 +174,76 @@ export function describeItem(item: WorldTrack, kind: WorldChartKind) {
 	if (kind === "artist") {
 		return {
 			title: item.title,
-			sub: `${item.plays} streams`,
+			sub: item.genres?.length ? item.genres.slice(0, 2).join(" · ") : "Artist",
 			art: item.artUrl,
-			genres: item.genres,
 		};
 	}
 	const year = item.albumYear ? ` · ${item.albumYear}` : "";
 	return { title: item.title, sub: `${item.artist}${year}`, art: item.artUrl };
 }
 
-function asideCardMeta(item: WorldTrack, kind: WorldChartKind) {
-	const art = describeItem(item, kind).art;
-	if (kind === "track") {
-		return { title: item.title, sub: item.artist, stat: item.plays, art };
-	}
-	if (kind === "artist") {
-		const genres = item.genres?.slice(0, 2).join(" · ");
-		return {
-			title: item.title,
-			sub: genres || "Artist",
-			stat: item.plays,
-			art,
-		};
-	}
-	const year = item.albumYear ? ` · ${item.albumYear}` : "";
-	return {
-		title: item.title,
-		sub: item.artist ? `${item.artist}${year}` : "",
-		stat: item.plays,
-		art,
-	};
-}
+// ── Podium: ranks 1–3 as an art-forward band (2 · 1 · 3) ────────────────────
 
-function HeroAsideCard({ label, item, kind }: { label: string; item: WorldTrack; kind: WorldChartKind }) {
-	const meta = asideCardMeta(item, kind);
+function PodiumCell({ item, rank, kind }: { item: WorldTrack; rank: number; kind: WorldChartKind }) {
+	const meta = describeItem(item, kind);
+	const artSize = rank === 1 ? 152 : 112;
 	return (
-		<button type="button" className="world-aside-card" onClick={() => navigateWorldItem(item, kind)}>
-			<span className="world-aside-card-label">{label}</span>
-			<div className="world-aside-card-row">
-				<WorldArt
-					src={meta.art}
-					alt={meta.title}
-					size={44}
-					round={kind === "artist"}
-					fallbackSeed={meta.title + meta.sub}
-					fallbackLabel={meta.title}
-				/>
-				<div className="world-aside-card-text">
-					<div className="world-aside-card-title">{meta.title}</div>
-					{meta.sub ? <div className="world-aside-card-sub">{meta.sub}</div> : null}
-					<div className="world-aside-card-stat">{meta.stat}</div>
-				</div>
+		<div className="world-podium-cell" data-rank={rank}>
+			<div className="world-podium-artwrap">
+				<button
+					type="button"
+					className="world-podium-art-btn"
+					onClick={() => navigateWorldItem(item, kind)}
+					aria-label={`Open ${meta.title}`}
+				>
+					<WorldArt
+						src={meta.art}
+						alt={meta.title}
+						size={artSize}
+						round={kind === "artist"}
+						fallbackSeed={meta.title + meta.sub}
+						fallbackLabel={meta.title}
+					/>
+				</button>
+				{kind === "track" ? (
+					<span className="world-podium-play">
+						<TrackPlayButton item={item} size={30} />
+					</span>
+				) : null}
 			</div>
-			{item.indicator ? (
-				<div className="world-aside-card-foot">
-					<Indicator value={item.indicator} />
-				</div>
-			) : null}
-		</button>
+			<div className={`world-podium-rank rank-number ${getRankClass(rank)}`}>{rank}</div>
+			<div className="world-podium-title" data-testid={rank === 1 ? "world-podium-title" : undefined}>
+				{meta.title}
+			</div>
+			<div className="world-podium-sub">{meta.sub}</div>
+			<div className="world-podium-stat">
+				<span>{item.plays}</span>
+				<Indicator value={item.indicator} />
+			</div>
+		</div>
 	);
 }
 
-export function WorldHeroSection({
-	item,
-	winLabel,
-	runnersUp,
-	topArtist,
-	topAlbum,
-}: {
-	item: WorldTrack;
-	winLabel: string;
-	runnersUp: WorldTrack[];
-	topArtist?: WorldTrack;
-	topAlbum?: WorldTrack;
-}) {
-	const windowLabel = winLabel.replace(/^This /, "this ");
-	const showAside = runnersUp.length > 0 || topArtist != null || topAlbum != null;
-
+export function WorldPodium({ items, kind }: { items: WorldTrack[]; kind: WorldChartKind }) {
+	if (items.length === 0) return null;
+	// Classic podium order: 2 · 1 · 3. With fewer items, #1 stays centered.
+	const cells: Array<{ item: WorldTrack; rank: number } | null> = [
+		items[1] ? { item: items[1], rank: 2 } : null,
+		{ item: items[0], rank: 1 },
+		items[2] ? { item: items[2], rank: 3 } : null,
+	];
 	return (
-		<>
-			<div
-				className={`overview-hero-cell world-hero-main world-hero-section${showAside ? "" : " world-hero-section--solo"}`}
-				style={HERO_CELL_STYLE}
-			>
-				<div className="world-hero-main-inner">
-					<button
-						type="button"
-						className="world-hero-art-btn"
-						onClick={() => navigateWorldItem(item, "track")}
-						aria-label={`Open ${item.title}`}
-					>
-						<WorldArt
-							src={item.artUrl}
-							alt={item.title}
-							size={148}
-							fallbackSeed={item.title + item.artist}
-							fallbackLabel={item.title}
-						/>
-					</button>
-					<div className="world-hero-copy">
-						<div className="section-kicker">#1 · {windowLabel}</div>
-						<h2 className="section-title world-hero-title" data-testid="world-hero-title">
-							{item.title}
-						</h2>
-						<p className="world-hero-artist">{item.artist}</p>
-						<div className="world-hero-stats">
-							<div className="overview-card">
-								<div className="overview-card-label">Streams</div>
-								<div className="overview-card-value" style={{ color: "var(--spice-button)" }}>
-									{item.plays}
-								</div>
-							</div>
-							{item.indicator ? (
-								<div className="overview-card">
-									<div className="overview-card-label">Movement</div>
-									<div className="overview-card-value">
-										<Indicator value={item.indicator} />
-									</div>
-								</div>
-							) : null}
-							{item.durationMs ? (
-								<div className="overview-card">
-									<div className="overview-card-label">Duration</div>
-									<div className="overview-card-value">{formatDuration(item.durationMs)}</div>
-								</div>
-							) : null}
-						</div>
-						<Tooltip label={trackPlayTooltip(item)} placement="top">
-							<button
-								type="button"
-								className="btn-primary world-hero-play"
-								data-testid="world-hero-play"
-								aria-label={trackPlayTooltip(item)}
-								onClick={() => playOrOpenWorldTrack(item)}
-							>
-								Play
-							</button>
-						</Tooltip>
-					</div>
-				</div>
-			</div>
-
-			{showAside ? (
-				<div className="world-hero-aside">
-					{runnersUp[0] ? <HeroAsideCard label="#2 Track" item={runnersUp[0]} kind="track" /> : null}
-					{runnersUp[1] ? <HeroAsideCard label="#3 Track" item={runnersUp[1]} kind="track" /> : null}
-					{topArtist ? <HeroAsideCard label="Top artist" item={topArtist} kind="artist" /> : null}
-					{topAlbum ? <HeroAsideCard label="Top album" item={topAlbum} kind="album" /> : null}
-				</div>
-			) : null}
-		</>
+		<div className="world-podium" data-testid="world-podium">
+			{cells.map((c, i) =>
+				c ? <PodiumCell key={c.item.id} item={c.item} rank={c.rank} kind={kind} /> : <div key={`empty-${i}`} />,
+			)}
+		</div>
 	);
 }
 
-export function ChartListRow({ rank, item, kind }: { rank: number; item: WorldTrack; kind: ChartKind }) {
+// ── Ladder: ranks 4–15 in dashboard top-list rows, 6/6 columns ───────────────
+
+function LadderRow({ item, rank, kind }: { item: WorldTrack; rank: number; kind: WorldChartKind }) {
 	const meta = describeItem(item, kind);
 	return (
 		<div
@@ -336,24 +264,12 @@ export function ChartListRow({ rank, item, kind }: { rank: number; item: WorldTr
 				fallbackSeed={meta.title + meta.sub}
 				fallbackLabel={meta.title}
 			/>
-			<div style={{ flex: 1, minWidth: 0 }}>
-				<div className="world-chart-row-title">{meta.title}</div>
-				<div className="world-chart-row-sub">
-					{kind === "artist" && meta.genres?.length ? (
-						<span className="world-genrechips">
-							{meta.genres.map((g) => (
-								<span key={g} className="world-genrechip">
-									{g}
-								</span>
-							))}
-						</span>
-					) : (
-						meta.sub
-					)}
-				</div>
+			<div className="world-chart-text">
+				<div className="world-chart-title">{meta.title}</div>
+				<div className="world-chart-sub">{meta.sub}</div>
 			</div>
-			{kind === "track" ? <TrackPlayButton item={item} size={28} /> : null}
-			<div className="world-chart-row-stats">
+			{kind === "track" ? <TrackPlayButton item={item} size={24} /> : null}
+			<div className="world-chart-stats">
 				<span>{item.plays}</span>
 				<Indicator value={item.indicator} />
 			</div>
@@ -361,45 +277,59 @@ export function ChartListRow({ rank, item, kind }: { rank: number; item: WorldTr
 	);
 }
 
-export function ChartCard({
-	kicker,
-	title,
-	podium,
-	rows,
+export function WorldLadder({
+	items,
 	kind,
+	startRank,
 }: {
-	kicker: string;
-	title: string;
-	podium: WorldTrack[];
-	rows: WorldTrack[];
-	kind: ChartKind;
+	items: WorldTrack[];
+	kind: WorldChartKind;
+	startRank: number;
 }) {
-	const all = [...podium, ...rows];
+	if (items.length === 0) return null;
 	return (
-		<section
-			className="section-card"
-			data-section={kind === "track" ? "tracks" : kind === "artist" ? "artists" : "albums"}
-		>
-			<header className="section-heading">
-				<span className="section-kicker">{kicker}</span>
-				<h2 className="section-title">{title}</h2>
-			</header>
-			{all.map((it, i) => (
-				<ChartListRow key={it.id} rank={i + 1} item={it} kind={kind} />
+		<div className="world-ladder" data-testid="world-ladder">
+			{items.map((it, i) => (
+				<LadderRow key={it.id} item={it} rank={startRank + i} kind={kind} />
 			))}
-		</section>
+		</div>
 	);
 }
 
-export function HeroSkeleton() {
+// ── Skeleton: two cards, mirroring the loaded layout ─────────────────────────
+
+export function WorldStageSkeleton() {
 	return (
-		<>
-			<div className="overview-hero-cell world-hero-main" style={{ ...HERO_CELL_STYLE, minHeight: 184 }} aria-hidden />
-			<div className="world-hero-aside" aria-hidden>
-				{Array.from({ length: 4 }).map((_, i) => (
-					<div key={i} className="world-aside-card" style={{ minHeight: 88 }} />
-				))}
-			</div>
-		</>
+		<div className="world-stage-skeleton stats-page-content" aria-hidden>
+			<section className="section-card world-podium-card">
+				<div className="world-podium">
+					{[112, 152, 112].map((sz, i) => (
+						<div key={i} className="world-podium-cell">
+							<div className="skeleton-shimmer" style={{ width: sz, height: sz, borderRadius: 8 }} />
+							<div
+								className="skeleton-shimmer"
+								style={{ width: sz * 0.8, height: 12, borderRadius: 4, marginTop: 10 }}
+							/>
+						</div>
+					))}
+				</div>
+			</section>
+			<section className="section-card">
+				<div className="world-ladder">
+					{Array.from({ length: 6 }).map((_, i) => (
+						<div key={i} className="top-list-row" style={{ pointerEvents: "none" }}>
+							<span className="rank-number" style={{ color: "transparent" }}>
+								0
+							</span>
+							<div className="skeleton-shimmer" style={{ width: 44, height: 44, borderRadius: 4, flexShrink: 0 }} />
+							<div className="world-chart-text">
+								<div className="skeleton-shimmer" style={{ width: "60%", height: 11, borderRadius: 4 }} />
+								<div className="skeleton-shimmer" style={{ width: "40%", height: 9, borderRadius: 4, marginTop: 6 }} />
+							</div>
+						</div>
+					))}
+				</div>
+			</section>
+		</div>
 	);
 }

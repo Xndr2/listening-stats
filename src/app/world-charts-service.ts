@@ -89,281 +89,6 @@ function unsupportedWindowResult(window: WorldWindow): WorldChartResult<WorldTra
 	};
 }
 
-export const WORLD_TRACKS: readonly WorldTrack[] = [
-	{
-		id: "w1",
-		title: "Espresso",
-		artist: "Sabrina Carpenter",
-		country: "GL",
-		plays: "12.4M",
-		delta: 2,
-		indicator: "UP",
-	},
-	{
-		id: "w2",
-		title: "Beautiful Things",
-		artist: "Benson Boone",
-		country: "GL",
-		plays: "9.8M",
-		delta: null,
-		indicator: "NONE",
-	},
-	{ id: "w3", title: "Houdini", artist: "Dua Lipa", country: "GL", plays: "8.2M", delta: 5, indicator: "UP" },
-	{
-		id: "w4",
-		title: "Lose Control",
-		artist: "Teddy Swims",
-		country: "GL",
-		plays: "7.9M",
-		delta: -1,
-		indicator: "DOWN",
-	},
-	{
-		id: "w5",
-		title: "Cruel Summer",
-		artist: "Taylor Swift",
-		country: "GL",
-		plays: "7.1M",
-		delta: -3,
-		indicator: "DOWN",
-	},
-	{
-		id: "w6",
-		title: "Stick Season",
-		artist: "Noah Kahan",
-		country: "GL",
-		plays: "6.4M",
-		delta: 1,
-		indicator: "UP",
-	},
-	{ id: "w7", title: "Bad Habit", artist: "Steve Lacy", country: "GL", plays: "5.9M", delta: -2, indicator: "DOWN" },
-	{ id: "w8", title: "Pedro", artist: "Jaxomy & Agatino", country: "GL", plays: "5.3M", delta: 8, indicator: "NEW" },
-	{
-		id: "w9",
-		title: "Bird of a Feather",
-		artist: "Billie Eilish",
-		country: "GL",
-		plays: "5.0M",
-		delta: 1,
-		indicator: "UP",
-	},
-	{
-		id: "w10",
-		title: "A Bar Song",
-		artist: "Shaboozey",
-		country: "GL",
-		plays: "4.8M",
-		delta: null,
-		indicator: "NONE",
-	},
-];
-
-export const WORLD_ARTISTS: readonly WorldTrack[] = [
-	{
-		id: "a1",
-		title: "Taylor Swift",
-		artist: "",
-		country: "GL",
-		plays: "95.2M",
-		delta: null,
-		indicator: "NONE",
-		genres: ["pop"],
-	},
-	{
-		id: "a2",
-		title: "The Weeknd",
-		artist: "",
-		country: "GL",
-		plays: "82.1M",
-		delta: 1,
-		indicator: "UP",
-		genres: ["r&b"],
-	},
-	{
-		id: "a3",
-		title: "Bad Bunny",
-		artist: "",
-		country: "GL",
-		plays: "71.4M",
-		delta: -1,
-		indicator: "DOWN",
-		genres: ["latin"],
-	},
-	{
-		id: "a4",
-		title: "Drake",
-		artist: "",
-		country: "GL",
-		plays: "63.8M",
-		delta: 2,
-		indicator: "UP",
-		genres: ["hip-hop/rap", "rap"],
-	},
-	{
-		id: "a5",
-		title: "Sabrina Carpenter",
-		artist: "",
-		country: "GL",
-		plays: "58.3M",
-		delta: 5,
-		indicator: "NEW",
-		genres: ["pop"],
-	},
-	{
-		id: "a6",
-		title: "Billie Eilish",
-		artist: "",
-		country: "GL",
-		plays: "52.7M",
-		delta: -2,
-		indicator: "DOWN",
-		genres: ["alternative"],
-	},
-	{
-		id: "a7",
-		title: "Dua Lipa",
-		artist: "",
-		country: "GL",
-		plays: "47.9M",
-		delta: 3,
-		indicator: "UP",
-		genres: ["pop"],
-	},
-	{
-		id: "a8",
-		title: "BTS",
-		artist: "",
-		country: "GL",
-		plays: "44.1M",
-		delta: -1,
-		indicator: "DOWN",
-		genres: ["k-pop"],
-	},
-	{
-		id: "a9",
-		title: "Kendrick Lamar",
-		artist: "",
-		country: "GL",
-		plays: "41.0M",
-		delta: 2,
-		indicator: "UP",
-		genres: ["hip-hop/rap"],
-	},
-	{
-		id: "a10",
-		title: "Ariana Grande",
-		artist: "",
-		country: "GL",
-		plays: "39.5M",
-		delta: null,
-		indicator: "NONE",
-		genres: ["pop"],
-	},
-];
-
-export const WORLD_ALBUMS: readonly WorldTrack[] = [
-	{
-		id: "al1",
-		title: "THE TORTURED POETS DEPARTMENT",
-		artist: "Taylor Swift",
-		country: "GL",
-		plays: "4.2M",
-		delta: 1,
-		indicator: "UP",
-		albumYear: 2024,
-	},
-	{
-		id: "al2",
-		title: "HIT ME HARD AND SOFT",
-		artist: "Billie Eilish",
-		country: "GL",
-		plays: "3.8M",
-		delta: null,
-		indicator: "NONE",
-		albumYear: 2024,
-	},
-	{
-		id: "al3",
-		title: "Short n' Sweet",
-		artist: "Sabrina Carpenter",
-		country: "GL",
-		plays: "3.5M",
-		delta: 3,
-		indicator: "NEW",
-		albumYear: 2024,
-	},
-	{
-		id: "al4",
-		title: "GNX",
-		artist: "Kendrick Lamar",
-		country: "GL",
-		plays: "3.1M",
-		delta: -1,
-		indicator: "DOWN",
-		albumYear: 2024,
-	},
-	{
-		id: "al5",
-		title: "CHROMAKOPIA",
-		artist: "Tyler, The Creator",
-		country: "GL",
-		plays: "2.9M",
-		delta: 2,
-		indicator: "UP",
-		albumYear: 2024,
-	},
-	{
-		id: "al6",
-		title: "Radical Optimism",
-		artist: "Dua Lipa",
-		country: "GL",
-		plays: "2.6M",
-		delta: -2,
-		indicator: "DOWN",
-		albumYear: 2024,
-	},
-	{
-		id: "al7",
-		title: "EUSEXUA",
-		artist: "FKA twigs",
-		country: "GL",
-		plays: "2.4M",
-		delta: null,
-		indicator: "NONE",
-		albumYear: 2025,
-	},
-	{
-		id: "al8",
-		title: "ICEMAN",
-		artist: "Drake",
-		country: "GL",
-		plays: "2.2M",
-		delta: 1,
-		indicator: "UP",
-		albumYear: 2025,
-	},
-	{
-		id: "al9",
-		title: "BRAT",
-		artist: "Charli xcx",
-		country: "GL",
-		plays: "2.0M",
-		delta: -1,
-		indicator: "DOWN",
-		albumYear: 2024,
-	},
-	{
-		id: "al10",
-		title: "Romance",
-		artist: "Fontaines D.C.",
-		country: "GL",
-		plays: "1.8M",
-		delta: null,
-		indicator: "NONE",
-		albumYear: 2024,
-	},
-];
-
 function parseIndicator(ind: string | undefined | null): WorldIndicator | null {
 	if (ind == null) return null;
 	const u = String(ind).toUpperCase();
@@ -505,10 +230,11 @@ async function fetchChartAlbums(range: string): Promise<WorldTrack[]> {
 	return (json.items ?? []).map((row) => mapAlbumRow(row));
 }
 
-/** Synchronous fallback data (tests, offline). */
-export function getCharts(_scope: WorldScope, _window: WorldWindow): WorldTrack[] {
-	return [...WORLD_TRACKS];
-}
+const offlineResult: WorldChartResult<WorldTrack[]> = {
+	ok: false,
+	status: 0,
+	message: "Could not load world charts. Check your connection and retry.",
+};
 
 export async function getChartsAsync(_scope: WorldScope, window: WorldWindow): Promise<WorldChartResult<WorldTrack[]>> {
 	if (!isStatsFmWindowSupported(window)) return unsupportedWindowResult(window);
@@ -527,7 +253,7 @@ export async function getChartsAsync(_scope: WorldScope, window: WorldWindow): P
 		}
 		const withArt = enrichWorldTracksWithMytopImages(raw, lookups);
 		const data = await enrichTracksWithSpotifyIds(withArt, { max: WORLD_SPOTIFY_ENRICH_LIMIT });
-		if (data.length === 0) return { ok: true, data: [...WORLD_TRACKS], source: "mock" };
+		if (data.length === 0) return offlineResult;
 		return { ok: true, data, source: "statsfm" };
 	} catch {
 		try {
@@ -536,7 +262,7 @@ export async function getChartsAsync(_scope: WorldScope, window: WorldWindow): P
 		} catch {
 			// fall through
 		}
-		return { ok: true, data: [...WORLD_TRACKS], source: "mock" };
+		return offlineResult;
 	}
 }
 
@@ -557,7 +283,7 @@ export async function getArtistChartsAsync(
 		} catch {
 			// fall through
 		}
-		return { ok: true, data: [...WORLD_ARTISTS], source: "mock" };
+		return offlineResult;
 	}
 }
 
@@ -572,6 +298,6 @@ export async function getAlbumChartsAsync(
 		if (data.length === 0) throw new Error("empty");
 		return { ok: true, data, source: "statsfm" };
 	} catch {
-		return { ok: true, data: [...WORLD_ALBUMS], source: "mock" };
+		return offlineResult;
 	}
 }

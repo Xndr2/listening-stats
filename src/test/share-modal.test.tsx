@@ -148,12 +148,27 @@ describe("ShareModal", () => {
 		container.remove();
 	});
 
-	it("hides genre variant for local provider", async () => {
+	it("shows genre variant when genre data exists, hides it when empty", async () => {
 		providerRegistry.setActive("local");
-		const { container } = await renderShareModal();
-		const labels = Array.from(document.querySelectorAll(".share-variant-tab")).map((t) => t.textContent?.trim());
-		expect(labels).not.toContain("Genre");
-		Spicetify.ReactDOM.unmountComponentAtNode(container);
-		container.remove();
+		const { getAvailableVariants } = await import("../app/components/ShareModal");
+		const caps = { hasGenreData: true, hasStreakData: true };
+		const withGenres = getAvailableVariants(mockStats, caps).map((v) => v.label);
+		expect(withGenres).toContain("Genre");
+		const withoutGenres = getAvailableVariants({ ...mockStats, topGenres: [] }, caps).map((v) => v.label);
+		expect(withoutGenres).not.toContain("Genre");
+	});
+
+	it("hides streak variant when streak is zero even for local provider", async () => {
+		const { getAvailableVariants } = await import("../app/components/ShareModal");
+		const caps = { hasGenreData: true, hasStreakData: true };
+		const labels = getAvailableVariants({ ...mockStats, streak: 0 }, caps).map((v) => v.label);
+		expect(labels).not.toContain("Streak");
+	});
+
+	it("recap variant only offered when explicitly restricted to", async () => {
+		const { getAvailableVariants } = await import("../app/components/ShareModal");
+		const caps = { hasGenreData: true, hasStreakData: true };
+		expect(getAvailableVariants(mockStats, caps).map((v) => v.id)).not.toContain("recap");
+		expect(getAvailableVariants(mockStats, caps, ["recap"]).map((v) => v.id)).toEqual(["recap"]);
 	});
 });

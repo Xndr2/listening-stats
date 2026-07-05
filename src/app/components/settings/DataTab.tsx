@@ -1,4 +1,3 @@
-import { lastfmCache } from "../../../shared/api/lastfm-cache";
 import { EVENTS } from "../../../shared/constants/events";
 import { LOCAL_PERIODS } from "../../../shared/stats/periods";
 import { providerRegistry } from "../../../shared/stats/provider";
@@ -55,6 +54,13 @@ export function DataTab({ onRefresh }: Props) {
 
 		if (!isCSV && !isJSON) {
 			Spicetify.showNotification("Unsupported file type. Use .csv or .json.", true);
+			return;
+		}
+
+		// A decade of heavy listening exports well under this; larger files would freeze the renderer
+		const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
+		if (file.size > MAX_IMPORT_BYTES) {
+			Spicetify.showNotification("Import failed: file larger than 100 MB", true);
 			return;
 		}
 
@@ -206,7 +212,8 @@ export function DataTab({ onRefresh }: Props) {
 		try {
 			await db.delete();
 			statsCache.invalidate();
-			await lastfmCache.deleteDatabase();
+			// Legacy cache DB from the removed Last.fm world-charts backend
+			indexedDB.deleteDatabase("listening-stats-lastfm-cache");
 			removePrefixedKeys(localStorage);
 			removePrefixedKeys(sessionStorage);
 			Spicetify.showNotification("All data wiped");

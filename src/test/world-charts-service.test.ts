@@ -43,14 +43,6 @@ afterEach(() => {
 	localStorage.clear();
 });
 
-describe("getCharts (sync fallback)", () => {
-	it("returns WORLD_TRACKS (10 entries)", async () => {
-		const { getCharts, WORLD_TRACKS } = await import("../app/world-charts-service");
-		expect(getCharts("world", "today")).toEqual([...WORLD_TRACKS]);
-		expect(WORLD_TRACKS).toHaveLength(10);
-	});
-});
-
 describe("getChartsAsync", () => {
 	it("maps stats.fm chart payload", async () => {
 		const fetchMock = vi.fn((url: string | URL) => {
@@ -74,16 +66,16 @@ describe("getChartsAsync", () => {
 		expect(fetchMock).toHaveBeenCalled();
 	});
 
-	it("falls back to WORLD_TRACKS when fetch fails", async () => {
-		const fetchMock = vi.fn().mockRejectedValueOnce(new Error("network")).mockRejectedValueOnce(new Error("network"));
+	it("returns a retryable failure when every backend fails", async () => {
+		const fetchMock = vi.fn().mockRejectedValue(new Error("network"));
 		vi.stubGlobal("fetch", fetchMock);
 
-		const { getChartsAsync, WORLD_TRACKS } = await import("../app/world-charts-service");
+		const { getChartsAsync } = await import("../app/world-charts-service");
 		const result = await getChartsAsync("world", "today");
-		expect(result.ok).toBe(true);
-		if (result.ok) {
-			expect(result.data).toEqual([...WORLD_TRACKS]);
-			expect(result.source).toBe("mock");
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.status).toBe(0);
+			expect(result.message).toContain("Could not load world charts");
 		}
 	});
 });
@@ -100,12 +92,5 @@ describe("getArtistChartsAsync", () => {
 			expect(result.data[0].title).toBe("Top Artist");
 			expect(result.data[0].delta).toBe(1);
 		}
-	});
-});
-
-describe("WORLD_ARTISTS mock data", () => {
-	it("has at least 8 entries", async () => {
-		const { WORLD_ARTISTS } = await import("../app/world-charts-service");
-		expect(WORLD_ARTISTS.length).toBeGreaterThanOrEqual(8);
 	});
 });

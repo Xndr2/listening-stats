@@ -38,6 +38,16 @@ const V1_CSV_HEADER = "Track,Artist,Album,Duration (ms),Played (ms),Started At,E
 /** Cap error details at 10 entries to avoid bloating the result */
 const MAX_ERROR_DETAILS = 10;
 
+/** Album art from imported files ends up in <img src> and CSS url(); only allow Spotify CDN shapes. */
+function isSafeAlbumArtUrl(value: string): boolean {
+	if (value.startsWith("spotify:image:")) return true;
+	try {
+		return new URL(value).protocol === "https:";
+	} catch {
+		return false;
+	}
+}
+
 // ──────────────────────────────────────────────────────
 // CSV field splitter (handles quoted commas)
 // ──────────────────────────────────────────────────────
@@ -294,7 +304,7 @@ export async function parseJsonEvents(text: string): Promise<ParseResult> {
 			type: "play",
 		};
 
-		if (typeof item.albumArt === "string" && item.albumArt) {
+		if (typeof item.albumArt === "string" && isSafeAlbumArtUrl(item.albumArt)) {
 			event.albumArt = item.albumArt;
 		}
 
