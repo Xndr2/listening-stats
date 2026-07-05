@@ -195,11 +195,11 @@ describe("Issue 41: data wipe clears all storage", () => {
 		sessionStorage.setItem("test-key", "test-value");
 		const { db } = await import("../shared/storage/db");
 		const { statsCache } = await import("../shared/stats/stats-cache");
-		const { lastfmCache } = await import("../shared/api/lastfm-cache");
+		// legacy lastfm cache DB removed; wipe deletes it directly
 
 		await db.delete();
 		statsCache.invalidate();
-		await lastfmCache.deleteDatabase();
+		indexedDB.deleteDatabase("listening-stats-lastfm-cache");
 		localStorage.clear();
 		sessionStorage.clear();
 

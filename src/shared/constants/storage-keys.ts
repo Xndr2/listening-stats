@@ -30,4 +30,6 @@ export const LS_KEYS = {
 	DISMISSED_REMOTE_ANNOUNCEMENT_ID: "listening-stats:dismissed-remote-announcement-id",
 	// Update modal snooze (epoch ms  -  show prompt again after this time)
 	UPDATE_PROMPT_SNOOZE_UNTIL: "listening-stats:update-prompt-snooze-until",
+	// Monthly recap banner dismissal (month key, e.g. "2026-06")
+	RECAP_DISMISSED_MONTH: "listening-stats:recap-dismissed-month",
 } as const;

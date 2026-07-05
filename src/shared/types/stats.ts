@@ -94,7 +94,6 @@ export interface StatsResult {
 	listeningDays?: number; // total days with at least one play; undefined = not computed
 	weekdayDistribution?: number[]; // 7-element, index 0=Monday through 6=Sunday; undefined = not computed
 	peakWeekday?: number; // index (0-6) with most plays; undefined = not computed
-	hasListeningPatterns?: boolean; // true = /dates returned usable data; false/undefined = hide section
 	dailyPlayCounts?: Array<{ date: string; count: number }>;
 	// Prior-window metrics (undefined for all-time / insufficient history)
 	newArtistCount?: number;

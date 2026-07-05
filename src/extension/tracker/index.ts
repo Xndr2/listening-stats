@@ -1,6 +1,8 @@
 import { LS_KEYS } from "../../shared/constants/storage-keys";
+import { backupToIdb } from "../../shared/storage/backup";
 import { db, registerVersionChangeHandler } from "../../shared/storage/db";
 import { runStartupChecks } from "../../shared/storage/integrity";
+import { initDatabase } from "../../shared/storage/migration-manager";
 import { addPlayEvent } from "../../shared/storage/play-events";
 import type { PlayEvent } from "../../shared/types/play-event";
 import { TrackingFSM } from "./fsm";
@@ -32,6 +34,9 @@ export async function initTracker(): Promise<void> {
 		health?.recordFailure("DB connection closed  -  version upgrade in another tab");
 	});
 
+	// Open DB via initDatabase so the pre-upgrade backup fires on schema bumps
+	await initDatabase();
+
 	// Integrity check before tracking
 	const integrity = await runStartupChecks();
 	if (integrity.wipeDetected) {
@@ -40,6 +45,11 @@ export async function initTracker(): Promise<void> {
 		} else {
 			health.recordFailure(integrity.warning ?? "External data wipe detected  -  play history lost");
 		}
+	}
+
+	// Refresh the wipe-recovery snapshot once tracking starts from a healthy state
+	if (integrity.ok) {
+		backupToIdb().catch(() => {});
 	}
 
 	// Wrap addPlayEvent to feed health indicator on success/failure

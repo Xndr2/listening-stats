@@ -1,4 +1,3 @@
-import { lastfmCache } from "../../../shared/api/lastfm-cache";
 import { lastfmGetUserInfo } from "../../../shared/api/lastfm-client";
 import { type StatsFmConfig, validateUsername } from "../../../shared/api/statsfm-client";
 import { EVENTS } from "../../../shared/constants/events";
@@ -152,7 +151,6 @@ export function ProvidersTab() {
 			localStorage.setItem(LS_KEYS.LASTFM_CONFIG, JSON.stringify(newConfig));
 			localStorage.setItem(LS_KEYS.LASTFM_API_KEY, apiKey);
 			await lastfmProvider.init();
-			await lastfmCache.invalidate();
 			statsCache.invalidate();
 			providerRegistry.setActive("lastfm");
 			window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));

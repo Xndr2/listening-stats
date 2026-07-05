@@ -13,15 +13,23 @@ vi.mock("../app/world-charts-service", async (importOriginal) => {
 });
 
 import type { WorldChartResult } from "../app/world-charts-service";
-import {
-	getAlbumChartsAsync,
-	getArtistChartsAsync,
-	getChartsAsync,
-	WORLD_ALBUMS,
-	WORLD_ARTISTS,
-	WORLD_TRACKS,
-} from "../app/world-charts-service";
+import { getAlbumChartsAsync, getArtistChartsAsync, getChartsAsync } from "../app/world-charts-service";
 import type { WorldTrack } from "../shared/types/world-charts";
+
+function makeRows(prefix: string, count: number): WorldTrack[] {
+	return Array.from({ length: count }, (_, i) => ({
+		id: `${prefix}-${i + 1}`,
+		title: `${prefix} title ${i + 1}`,
+		artist: `${prefix} artist ${i + 1}`,
+		country: "",
+		plays: `${(count - i) * 100}K`,
+		delta: null,
+	}));
+}
+
+const WORLD_TRACKS = makeRows("track", 10);
+const WORLD_ARTISTS = makeRows("artist", 10);
+const WORLD_ALBUMS = makeRows("album", 10);
 
 const getChartsAsyncMock = vi.mocked(getChartsAsync);
 const getArtistChartsAsyncMock = vi.mocked(getArtistChartsAsync);
@@ -59,7 +67,7 @@ describe("WorldChartsPage — async loading", () => {
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
 		const { container } = render(React.createElement(WorldChartsPage));
 
-		const skeleton = container.querySelector(".world-page-grid");
+		const skeleton = container.querySelector(".world-stage-skeleton");
 		expect(skeleton).not.toBeNull();
 		const shimmerRows = skeleton!.querySelectorAll(".skeleton-shimmer");
 		expect(shimmerRows.length).toBeGreaterThan(0);
@@ -74,9 +82,9 @@ describe("WorldChartsPage — async loading", () => {
 		const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
 		const { container } = render(React.createElement(WorldChartsPage));
 
-		const skeleton = container.querySelector(".world-page-grid");
+		const skeleton = container.querySelector(".world-stage-skeleton");
 		expect(skeleton).not.toBeNull();
-		const tilePlaceholders = skeleton!.querySelectorAll(".skeleton-tile");
+		const tilePlaceholders = skeleton!.querySelectorAll(".skeleton-shimmer");
 		expect(tilePlaceholders.length).toBeGreaterThanOrEqual(9);
 	});
 

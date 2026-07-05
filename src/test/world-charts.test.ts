@@ -50,13 +50,13 @@ beforeEach(() => {
 	vi.stubGlobal("fetch", (url: string | URL) => {
 		const u = url.toString();
 		if (u.includes("/charts/top/tracks")) {
-			return Promise.resolve(makeResponse(200, { items: chartTrackItems(10) }));
+			return Promise.resolve(makeResponse(200, { items: chartTrackItems(15) }));
 		}
 		if (u.includes("/charts/top/artists")) {
-			return Promise.resolve(makeResponse(200, { items: chartArtistItems(10) }));
+			return Promise.resolve(makeResponse(200, { items: chartArtistItems(15) }));
 		}
 		if (u.includes("/charts/top/albums")) {
-			return Promise.resolve(makeResponse(200, { items: chartAlbumItems(10) }));
+			return Promise.resolve(makeResponse(200, { items: chartAlbumItems(15) }));
 		}
 		if (u.includes("mytopspotify.io")) {
 			return Promise.resolve(makeResponse(200, { data: [] }));
@@ -76,36 +76,10 @@ async function renderAndWaitForLoad() {
 	const { WorldChartsPage } = await import("../app/components/WorldChartsPage");
 	const result = render(React.createElement(WorldChartsPage));
 	await vi.waitFor(() => {
-		expect(result.container.querySelector("[data-testid='world-hero-title']")).not.toBeNull();
+		expect(result.container.querySelector("[data-testid='world-podium-title']")).not.toBeNull();
 	});
 	return result;
 }
-
-describe("WorldTrack type and WORLD_TRACKS mock data", () => {
-	it("WORLD_TRACKS has 10 entries", async () => {
-		const { WORLD_TRACKS } = await import("../app/world-charts-service");
-		expect(WORLD_TRACKS).toHaveLength(10);
-	});
-
-	it("each track has required fields", async () => {
-		const { WORLD_TRACKS } = await import("../app/world-charts-service");
-		for (const t of WORLD_TRACKS) {
-			expect(typeof t.id).toBe("string");
-			expect(typeof t.title).toBe("string");
-			expect(typeof t.artist).toBe("string");
-			expect(typeof t.country).toBe("string");
-			expect(typeof t.plays).toBe("string");
-			expect(t.delta === null || typeof t.delta === "number").toBe(true);
-		}
-	});
-});
-
-describe("worldChartsService", () => {
-	it("getCharts returns 10 tracks", async () => {
-		const { getCharts } = await import("../app/world-charts-service");
-		expect(getCharts("world", "today")).toHaveLength(10);
-	});
-});
 
 describe("WorldChartsPage — rendering", () => {
 	it("renders page kicker and World title", async () => {
@@ -130,38 +104,48 @@ describe("WorldChartsPage — rendering", () => {
 		expect(source?.textContent).toContain("stats.fm");
 	});
 
-	it("renders three chart section cards", async () => {
+	it("renders kind tabs in the podium card header", async () => {
 		const { container } = await renderAndWaitForLoad();
-		expect(container.querySelector("[data-section='tracks']")).not.toBeNull();
-		expect(container.querySelector("[data-section='artists']")).not.toBeNull();
-		expect(container.querySelector("[data-section='albums']")).not.toBeNull();
+		const card = container.querySelector("[data-testid='world-podium-card']");
+		const kindTabs = card!.querySelector("[data-testid='world-kind-tabs']");
+		expect(kindTabs).not.toBeNull();
+		const labels = Array.from(kindTabs!.querySelectorAll("button")).map((b) => b.textContent);
+		expect(labels).toEqual(["Tracks", "Artists", "Albums"]);
 	});
 
-	it("renders hero for #1 track", async () => {
+	it("renders the podium with #1 centered and medal ranks", async () => {
 		const { container } = await renderAndWaitForLoad();
-		expect(container.querySelector(".world-hero-section")).not.toBeNull();
-		expect(container.querySelector("[data-testid='world-hero-title']")?.textContent).toBe("Track 1");
+		const podium = container.querySelector("[data-testid='world-podium']");
+		expect(podium).not.toBeNull();
+		expect(container.querySelector("[data-testid='world-podium-title']")?.textContent).toBe("Track 1");
+		const ranks = Array.from(podium!.querySelectorAll(".world-podium-rank")).map((r) => r.textContent);
+		expect(ranks).toEqual(["2", "1", "3"]);
+		expect(podium!.querySelector(".world-podium-rank")?.classList.contains("rank-silver")).toBe(true);
 	});
 
-	it("renders hero aside highlights on large layout", async () => {
+	it("renders the ladder card with ranks 4-15 in top-list rows", async () => {
 		const { container } = await renderAndWaitForLoad();
-		const aside = container.querySelector(".world-hero-aside");
-		expect(aside).not.toBeNull();
-		expect(aside!.querySelectorAll(".world-aside-card").length).toBeGreaterThanOrEqual(3);
+		const card = container.querySelector("[data-testid='world-ladder-card']");
+		expect(card).not.toBeNull();
+		const rows = card!.querySelectorAll(".top-list-row");
+		expect(rows.length).toBe(12);
+		expect(rows[0].querySelector(".rank-number")?.textContent).toBe("4");
+		expect(rows[11].querySelector(".rank-number")?.textContent).toBe("15");
 	});
 
-	it("renders list rows in tracks section", async () => {
+	it("switching kind swaps the stage and persists the choice", async () => {
 		const { container } = await renderAndWaitForLoad();
-		const tracksSection = container.querySelector("[data-section='tracks']");
-		expect(tracksSection!.querySelectorAll(".top-list-row").length).toBe(10);
+		const artistsBtn = container.querySelectorAll("[data-testid='world-kind-tabs'] button")[1]!;
+		fireEvent.click(artistsBtn);
+		expect(container.querySelector("[data-testid='world-podium-title']")?.textContent).toBe("Star 1");
+		expect(localStorage.getItem("listening-stats:world-charts-kind")).toBe("artist");
 	});
 });
 
 describe("WorldChartsPage — art tiles", () => {
-	it("row tiles use gradient fallback when no art URL", async () => {
+	it("tiles use gradient fallback when no art URL", async () => {
 		const { container } = await renderAndWaitForLoad();
-		const tracksSection = container.querySelector("[data-section='tracks']");
-		const tile = tracksSection!.querySelector(".track-art--fallback") as HTMLElement;
+		const tile = container.querySelector(".track-art--fallback") as HTMLElement;
 		expect(tile).not.toBeNull();
 		expect(tile.style.background).toContain("linear-gradient");
 	});
@@ -196,11 +180,12 @@ describe("WorldChartsPage — click navigation", () => {
 		vi.mocked(Spicetify.Platform.History.push).mockClear();
 	});
 
-	it("clicking hero play uses Spotify player when track id exists", async () => {
+	it("clicking the #1 podium play button uses Spotify player when track id exists", async () => {
 		const playUri = vi.fn();
 		(Spicetify.Player as { playUri?: (uri: string) => void }).playUri = playUri;
 		const { container } = await renderAndWaitForLoad();
-		const playBtn = container.querySelector("[data-testid='world-hero-play']") as HTMLButtonElement;
+		const cell = container.querySelector(".world-podium-cell[data-rank='1']");
+		const playBtn = cell!.querySelector(".world-chart-playbtn") as HTMLButtonElement;
 		fireEvent.click(playBtn);
 		expect(playUri).toHaveBeenCalledWith("spotify:track:spotify-track-1");
 	});
@@ -222,11 +207,11 @@ describe("WorldChartsPage — click navigation", () => {
 		expect(active?.textContent).toBe("Today");
 	});
 
-	it("clicking a list row opens track page after spotify id enrichment", async () => {
+	it("clicking a ladder row opens track page after spotify id enrichment", async () => {
 		const { container } = await renderAndWaitForLoad();
-		const tracksSection = container.querySelector("[data-section='tracks']");
-		const rows = tracksSection!.querySelectorAll(".top-list-row");
-		fireEvent.click(rows[3] as HTMLElement);
+		const card = container.querySelector("[data-testid='world-ladder-card']");
+		const rows = card!.querySelectorAll(".top-list-row");
+		fireEvent.click(rows[0] as HTMLElement);
 		expect(Spicetify.Platform.History.push).toHaveBeenCalledWith("/track/resolved-spotify-id");
 	});
 });

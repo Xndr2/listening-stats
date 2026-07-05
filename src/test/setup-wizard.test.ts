@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Imports that will exist after Task 2 (GREEN phase)
 import { buildCacheKey, buildProviderChangedState, markWizardSeen, shouldShowWizard } from "../app/App";
-import { filterOverviewCards } from "../app/components/OverviewCards";
 import { LS_KEYS } from "../shared/constants/storage-keys";
 import { providerRegistry } from "../shared/stats/provider";
 
@@ -25,62 +24,6 @@ describe("Provider-qualified cacheKey", () => {
 		expect(buildCacheKey("local", "today")).toBe("local:today");
 	});
 });
-
-// ─── Test Suite 2: OverviewCards card filtering ───────────────────────────────
-
-const localCaps = {
-	hasActivityData: true,
-	hasGenreData: true,
-	hasStreakData: true,
-	hasSkipRate: false,
-	tier: "n/a" as const,
-};
-const statsfmFreeCaps = {
-	hasActivityData: false,
-	hasGenreData: true,
-	hasStreakData: false,
-	hasSkipRate: false,
-	tier: "free" as const,
-};
-
-describe("OverviewCards card filtering", () => {
-	beforeEach(() => {
-		localStorage.clear();
-		providerRegistry._resetForTesting();
-	});
-
-	afterEach(() => {
-		localStorage.clear();
-	});
-
-	const allCards = [
-		{ label: "Total Time", value: "10h", tooltip: "Total listening time" },
-		{ label: "Tracks", value: "100", tooltip: "Total tracks played" },
-		{ label: "Unique Artists", value: "50", tooltip: "Unique artists played" },
-		{ label: "Peak Hour", value: "3 PM", tooltip: "Hour with most plays", localOnly: true },
-		{ label: "Streak", value: "\u2014", tooltip: "Consecutive listening days" },
-		{ label: "Skip Rate", value: "20%", tooltip: "Percentage of tracks skipped", localOnly: true },
-		{ label: "Est. Payout", value: "$0.02", tooltip: "Estimated streaming payout" },
-	];
-
-	it("filterOverviewCards excludes Peak Hour and Skip Rate for non-local provider (capabilities.tier !== 'n/a')", () => {
-		const filtered = filterOverviewCards(allCards, statsfmFreeCaps);
-		expect(filtered).toHaveLength(5);
-		const labels = filtered.map((c) => c.label);
-		expect(labels).not.toContain("Peak Hour");
-		expect(labels).not.toContain("Skip Rate");
-	});
-
-	it("filterOverviewCards returns all 7 cards for local provider (capabilities.tier === 'n/a')", () => {
-		const filtered = filterOverviewCards(allCards, localCaps);
-		expect(filtered).toHaveLength(7);
-		const labels = filtered.map((c) => c.label);
-		expect(labels).toContain("Peak Hour");
-		expect(labels).toContain("Skip Rate");
-	});
-});
-
-// ─── Test Suite 3: Wizard seen flag ──────────────────────────────────────────
 
 describe("Wizard seen flag", () => {
 	beforeEach(() => {

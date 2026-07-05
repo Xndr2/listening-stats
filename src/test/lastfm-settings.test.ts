@@ -4,12 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../shared/api/lastfm-client", () => ({
 	lastfmGetUserInfo: vi.fn(),
-	validateLastfmKey: vi.fn(),
-	lastfmGetCharts: vi.fn(),
-}));
-
-vi.mock("../shared/api/lastfm-cache", () => ({
-	lastfmCache: { invalidate: vi.fn().mockResolvedValue(undefined) },
 }));
 
 vi.mock("../shared/stats/lastfm-provider", () => {

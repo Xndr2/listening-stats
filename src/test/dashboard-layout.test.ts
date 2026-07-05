@@ -19,21 +19,6 @@ function setActiveProvider(id: "local" | "statsfm"): void {
 	providerRegistry.setActive(id);
 }
 
-const localCaps = {
-	hasActivityData: true,
-	hasGenreData: true,
-	hasStreakData: true,
-	hasSkipRate: false,
-	tier: "n/a" as const,
-};
-const statsfmFreeCaps = {
-	hasActivityData: false,
-	hasGenreData: true,
-	hasStreakData: false,
-	hasSkipRate: false,
-	tier: "free" as const,
-};
-
 // Frozen time for deterministic tests: 2023-11-14T22:13:20Z
 const FROZEN_MS = 1700000000000;
 
@@ -429,52 +414,6 @@ describe("EmptyState component", () => {
 	});
 });
 
-describe("ErrorState component", () => {
-	let container: HTMLDivElement;
-
-	beforeEach(() => {
-		container = document.createElement("div");
-		document.body.appendChild(container);
-	});
-
-	afterEach(() => {
-		Spicetify.ReactDOM.unmountComponentAtNode(container);
-		document.body.removeChild(container);
-	});
-
-	it("renders section name in error message", async () => {
-		const ErrorState = (await import("../app/components/ErrorState")).default;
-		const onRetry = vi.fn();
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(ErrorState, { sectionName: "Top Tracks", onRetry }),
-			container,
-		);
-		expect(container.textContent).toContain("Top Tracks");
-	});
-
-	it('renders "Retry Load" button', async () => {
-		const ErrorState = (await import("../app/components/ErrorState")).default;
-		const onRetry = vi.fn();
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(ErrorState, { sectionName: "Activity Chart", onRetry }),
-			container,
-		);
-		expect(container.textContent).toContain("Retry Load");
-	});
-
-	it("calls onRetry when Retry Load button is clicked", async () => {
-		const ErrorState = (await import("../app/components/ErrorState")).default;
-		const onRetry = vi.fn();
-		Spicetify.ReactDOM.render(
-			Spicetify.React.createElement(ErrorState, { sectionName: "Top Tracks", onRetry }),
-			container,
-		);
-		const button = container.querySelector("button");
-		button?.click();
-		expect(onRetry).toHaveBeenCalledOnce();
-	});
-});
-
 describe("PeriodTabs component", () => {
 	let container: HTMLDivElement;
 
@@ -586,33 +525,6 @@ describe("OverviewCards tooltips", () => {
 		expect(hero).not.toBeNull();
 	});
 
-	it("shows Streak tooltip for local provider", async () => {
-		const { filterOverviewCards } = await import("../app/components/OverviewCards");
-		// Verify filterOverviewCards preserves tooltip field
-		const testCards = [
-			{
-				label: "Streak",
-				value: "5d",
-				tooltip: "Consecutive calendar days with at least one play (local timezone)",
-			},
-		];
-		const filtered = filterOverviewCards(testCards, localCaps);
-		expect(filtered[0].tooltip).toBe("Consecutive calendar days with at least one play (local timezone)");
-	});
-
-	it("shows Listening Days tooltip for stats.fm provider", async () => {
-		const { filterOverviewCards } = await import("../app/components/OverviewCards");
-		const testCards = [
-			{
-				label: "Listening Days",
-				value: "12",
-				tooltip: "Number of days with at least one play in the selected period",
-			},
-		];
-		const filtered = filterOverviewCards(testCards, statsfmFreeCaps);
-		expect(filtered[0].tooltip).toBe("Number of days with at least one play in the selected period");
-	});
-
 	it("renders stat grid cards for stats.fm provider plus hero cell", async () => {
 		// stats.fm tiles omit streak/skip-rate; with newArtistCount we still expect hero + several cards
 		setActiveProvider("statsfm");
@@ -628,54 +540,6 @@ describe("OverviewCards tooltips", () => {
 		expect(cards.length).toBeGreaterThanOrEqual(3);
 		const hero = container.querySelector(".overview-hero-cell");
 		expect(hero).not.toBeNull();
-	});
-});
-
-describe("RecentlyPlayedSkeleton component", () => {
-	let container: HTMLDivElement;
-
-	beforeEach(() => {
-		container = document.createElement("div");
-		document.body.appendChild(container);
-	});
-
-	afterEach(() => {
-		Spicetify.ReactDOM.unmountComponentAtNode(container);
-		document.body.removeChild(container);
-	});
-
-	it("renders 6 items with recently-played-item wrapper", async () => {
-		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
-		Spicetify.ReactDOM.render(Spicetify.React.createElement(RecentlyPlayedSkeleton, null), container);
-		const items = container.querySelectorAll(".recently-played-item");
-		expect(items).toHaveLength(6);
-	});
-
-	it("each item has a 120x120 skeleton art div", async () => {
-		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
-		Spicetify.ReactDOM.render(Spicetify.React.createElement(RecentlyPlayedSkeleton, null), container);
-		const arts = container.querySelectorAll(".recently-played-skeleton-art");
-		expect(arts).toHaveLength(6);
-		arts.forEach((art) => {
-			expect(art.classList.contains("skeleton-shimmer")).toBe(true);
-		});
-	});
-
-	it("each item has text and subtext skeleton lines", async () => {
-		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
-		Spicetify.ReactDOM.render(Spicetify.React.createElement(RecentlyPlayedSkeleton, null), container);
-		const texts = container.querySelectorAll(".recently-played-skeleton-text");
-		const subtexts = container.querySelectorAll(".recently-played-skeleton-subtext");
-		expect(texts).toHaveLength(6);
-		expect(subtexts).toHaveLength(6);
-	});
-
-	it("renders inside a recently-played container with aria-hidden", async () => {
-		const { RecentlyPlayedSkeleton } = await import("../app/components/LoadingSkeleton");
-		Spicetify.ReactDOM.render(Spicetify.React.createElement(RecentlyPlayedSkeleton, null), container);
-		const wrapper = container.querySelector(".recently-played");
-		expect(wrapper).not.toBeNull();
-		expect(wrapper?.getAttribute("aria-hidden")).toBe("true");
 	});
 });
 

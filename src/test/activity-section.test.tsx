@@ -1,7 +1,6 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ActivitySection } from "../app/components/ActivitySection";
-import { ActivityChartSkeleton } from "../app/components/LoadingSkeleton";
 import { LS_KEYS } from "../shared/constants/storage-keys";
 
 afterEach(() => {
@@ -164,7 +163,7 @@ function renderActivityForTest(args: {
 	const { loading, stats, activityCaps } = args;
 	if (!activityCaps) return null;
 	if (!activityCaps.hasActivityData) return null;
-	if (loading) return <ActivityChartSkeleton />;
+	if (loading) return <div className="activity-chart skeleton-shimmer" aria-hidden="true" />;
 	if (!stats) return null;
 	return (
 		<ActivitySection

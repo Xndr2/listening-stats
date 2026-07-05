@@ -490,7 +490,7 @@ describe("tracker/index integrity and versionchange wiring", () => {
 			runStartupChecks: mockRunStartupChecks,
 		}));
 		vi.doMock("../shared/storage/db", () => ({
-			db: { playEvents: { count: vi.fn().mockResolvedValue(0) } },
+			db: { playEvents: { count: vi.fn().mockResolvedValue(0) }, isOpen: () => true, verno: 5 },
 			registerVersionChangeHandler: vi.fn(),
 		}));
 
@@ -515,7 +515,7 @@ describe("tracker/index integrity and versionchange wiring", () => {
 			runStartupChecks: mockRunStartupChecks,
 		}));
 		vi.doMock("../shared/storage/db", () => ({
-			db: { playEvents: { count: vi.fn().mockResolvedValue(0) } },
+			db: { playEvents: { count: vi.fn().mockResolvedValue(0) }, isOpen: () => true, verno: 5 },
 			registerVersionChangeHandler: vi.fn(),
 		}));
 
@@ -546,7 +546,7 @@ describe("tracker/index integrity and versionchange wiring", () => {
 			capturedVersionChangeCallback = cb;
 		});
 		vi.doMock("../shared/storage/db", () => ({
-			db: { playEvents: { count: vi.fn().mockResolvedValue(0) } },
+			db: { playEvents: { count: vi.fn().mockResolvedValue(0) }, isOpen: () => true, verno: 5 },
 			registerVersionChangeHandler: mockRegisterVersionChangeHandler,
 		}));
 
@@ -581,7 +581,7 @@ describe("tracker/index integrity and versionchange wiring", () => {
 			}),
 		}));
 		vi.doMock("../shared/storage/db", () => ({
-			db: { playEvents: { count: vi.fn().mockResolvedValue(0) } },
+			db: { playEvents: { count: vi.fn().mockResolvedValue(0) }, isOpen: () => true, verno: 5 },
 			registerVersionChangeHandler: vi.fn(),
 		}));
 

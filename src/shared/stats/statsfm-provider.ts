@@ -225,7 +225,7 @@ export class StatsFmProvider implements StatsProvider {
 
 		const rangeParams: Record<string, string> = { range };
 
-		const username = this.config.username;
+		const username = encodeURIComponent(this.config.username);
 		const isPlus = this.config.isPlus;
 
 		const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -438,7 +438,6 @@ export class StatsFmProvider implements StatsProvider {
 			listeningDays,
 			weekdayDistribution,
 			peakWeekday,
-			hasListeningPatterns: hasDateData,
 			dailyPlayCounts,
 			newArtistCount,
 			priorPeriodTotalDuration,
@@ -476,7 +475,7 @@ export class StatsFmProvider implements StatsProvider {
 		if (!range) throw new Error(`Unknown stats.fm period: ${period.id}`);
 
 		const rangeParams: Record<string, string> = { range };
-		const username = this.config.username;
+		const username = encodeURIComponent(this.config.username);
 		const isPlus = this.config.isPlus;
 		const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -720,7 +719,6 @@ export class StatsFmProvider implements StatsProvider {
 				{
 					hourlyDistribution: new Array(24).fill(0) as number[],
 					peakHour: 0,
-					hasListeningPatterns: false,
 				},
 				3,
 				classifyStatsFmError(datesFailure.status, datesFailure.message),
@@ -732,7 +730,6 @@ export class StatsFmProvider implements StatsProvider {
 					peakHour,
 					weekdayDistribution,
 					peakWeekday,
-					hasListeningPatterns: hasDateData,
 				},
 				3,
 			);
@@ -756,7 +753,6 @@ export class StatsFmProvider implements StatsProvider {
 			listeningDays,
 			weekdayDistribution,
 			peakWeekday,
-			hasListeningPatterns: hasDateData,
 			dailyPlayCounts,
 			newArtistCount,
 			priorPeriodTotalDuration,
