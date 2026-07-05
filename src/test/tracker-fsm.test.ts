@@ -35,8 +35,9 @@ function makePlayerData(
 
 function makeDeps(overrides: Partial<TrackingFSMDeps> = {}): TrackingFSMDeps {
 	return {
-		addPlayEvent: vi.fn(() => Promise.resolve(true)),
-		getPlayThreshold: vi.fn(() => 30000),
+		addPlayEvent: vi.fn(() => Promise.resolve(1)),
+		updatePlayEvent: vi.fn(() => Promise.resolve()),
+		resolveThresholdMs: vi.fn(() => 30000),
 		isTrackingPaused: vi.fn(() => false),
 		isSkipRepeatsEnabled: vi.fn(() => false),
 		dispatchEvent: vi.fn(),
@@ -168,7 +169,7 @@ describe("TrackingFSM", () => {
 				...deps,
 				addPlayEvent: vi.fn(async (event) => {
 					expect(event.type).toBe("play");
-					return true;
+					return 1;
 				}),
 			});
 			// Start tracking track A
@@ -190,9 +191,9 @@ describe("TrackingFSM", () => {
 				...makeDeps(),
 				addPlayEvent: vi.fn(async (event) => {
 					capturedType = event.type;
-					return true;
+					return 1;
 				}),
-				getPlayThreshold: vi.fn(() => 30000),
+				resolveThresholdMs: vi.fn(() => 30000),
 			});
 			// Start tracking with durationMs = 180000 (> threshold)
 			await fsmSkip.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }));
@@ -209,9 +210,9 @@ describe("TrackingFSM", () => {
 				...makeDeps(),
 				addPlayEvent: vi.fn(async (event) => {
 					capturedType = event.type;
-					return true;
+					return 1;
 				}),
-				getPlayThreshold: vi.fn(() => 30000),
+				resolveThresholdMs: vi.fn(() => 30000),
 			});
 			await fsmShort.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 5000 }));
 			await fsmShort.handleSongChange(makePlayerData({ uri: "spotify:track:B", durationMs: 5000 }));
@@ -224,9 +225,9 @@ describe("TrackingFSM", () => {
 				...makeDeps(),
 				addPlayEvent: vi.fn(async (event) => {
 					capturedType = event.type;
-					return true;
+					return 1;
 				}),
-				getPlayThreshold: vi.fn(() => 30000),
+				resolveThresholdMs: vi.fn(() => 30000),
 			});
 			await fsmShort.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 5000 }));
 			const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 4600);
@@ -302,7 +303,7 @@ describe("TrackingFSM", () => {
 		it("suppresses consecutive plays of same trackUri when skip-repeats enabled", async () => {
 			const skipDeps = makeDeps({
 				isSkipRepeatsEnabled: vi.fn(() => true),
-				addPlayEvent: vi.fn(async () => true),
+				addPlayEvent: vi.fn(async () => 1),
 			});
 			const skipFsm = new TrackingFSM(skipDeps);
 
@@ -350,6 +351,91 @@ describe("TrackingFSM", () => {
 			expect(deps.dispatchEvent).toHaveBeenCalledTimes(1);
 			const eventArg = (deps.dispatchEvent as ReturnType<typeof vi.fn>).mock.calls[0][0];
 			expect(eventArg.type).toBe("listening-stats:skip-recorded");
+		});
+	});
+
+	describe("threshold-cross immediate recording", () => {
+		const flush = () => new Promise((r) => setTimeout(r, 0));
+
+		it("records the play the moment the threshold is crossed, without a song change", async () => {
+			await fsm.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }));
+			const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 35000);
+			fsm.handlePlayPause(true); // bank 35s > 30s threshold
+			spy.mockRestore();
+			await flush();
+
+			expect(deps.addPlayEvent).toHaveBeenCalledTimes(1);
+			const event = (deps.addPlayEvent as ReturnType<typeof vi.fn>).mock.calls[0][0];
+			expect(event.trackUri).toBe("spotify:track:A");
+			expect(event.type).toBe("play");
+			const snap = fsm.getSnapshot();
+			expect(snap.recordedEventId).toBe(1);
+		});
+
+		it("records instantly at song start when the threshold is 0", async () => {
+			const zeroFsm = new TrackingFSM({ ...deps, resolveThresholdMs: vi.fn(() => 0) });
+			await zeroFsm.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }));
+			expect(deps.addPlayEvent).toHaveBeenCalledTimes(1);
+			expect((deps.addPlayEvent as ReturnType<typeof vi.fn>).mock.calls[0][0].type).toBe("play");
+		});
+
+		it("records via progress ticks while the track keeps playing", async () => {
+			await fsm.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }));
+			const start = Date.now();
+			const spy = vi.spyOn(Date, "now").mockReturnValue(start + 40000);
+			fsm.handleProgress(40000, 180000, 0);
+			spy.mockRestore();
+			await flush();
+			expect(deps.addPlayEvent).toHaveBeenCalledTimes(1);
+			expect((deps.addPlayEvent as ReturnType<typeof vi.fn>).mock.calls[0][0].type).toBe("play");
+		});
+
+		it("does not record twice: song end patches the recorded event instead", async () => {
+			await fsm.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }));
+			const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 35000);
+			fsm.handlePlayPause(true);
+			spy.mockRestore();
+			await flush();
+
+			await fsm.handleSongChange(makePlayerData({ uri: "spotify:track:B", durationMs: 180000 }));
+			expect(deps.addPlayEvent).toHaveBeenCalledTimes(1);
+			expect(deps.updatePlayEvent).toHaveBeenCalledTimes(1);
+			const [id, playedMs] = (deps.updatePlayEvent as ReturnType<typeof vi.fn>).mock.calls[0];
+			expect(id).toBe(1);
+			expect(playedMs).toBeGreaterThanOrEqual(35000);
+		});
+
+		it("records at the percent threshold when the resolver derives it from duration", async () => {
+			const pctFsm = new TrackingFSM({
+				...deps,
+				resolveThresholdMs: vi.fn((durationMs: number) => durationMs * 0.1),
+			});
+			await pctFsm.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 200000 }));
+			const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 25000);
+			pctFsm.handlePlayPause(true); // 25s > 10% of 200s (20s)
+			spy.mockRestore();
+			await flush();
+			expect(deps.addPlayEvent).toHaveBeenCalledTimes(1);
+		});
+
+		it("does not record below the threshold", async () => {
+			await fsm.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }));
+			const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 10000);
+			fsm.handlePlayPause(true);
+			spy.mockRestore();
+			await flush();
+			expect(deps.addPlayEvent).not.toHaveBeenCalled();
+		});
+
+		it("does not record on cross when tracking is paused", async () => {
+			const pausedDeps = makeDeps({ isTrackingPaused: vi.fn(() => true) });
+			const pausedFsm = new TrackingFSM(pausedDeps);
+			await pausedFsm.handleSongChange(makePlayerData({ uri: "spotify:track:A", durationMs: 180000 }));
+			const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 35000);
+			pausedFsm.handlePlayPause(true);
+			spy.mockRestore();
+			await flush();
+			expect(pausedDeps.addPlayEvent).not.toHaveBeenCalled();
 		});
 	});
 

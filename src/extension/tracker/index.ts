@@ -3,11 +3,11 @@ import { backupToIdb } from "../../shared/storage/backup";
 import { db, registerVersionChangeHandler } from "../../shared/storage/db";
 import { runStartupChecks } from "../../shared/storage/integrity";
 import { initDatabase } from "../../shared/storage/migration-manager";
-import { addPlayEvent } from "../../shared/storage/play-events";
+import { addPlayEvent, updatePlayEventPlaytime } from "../../shared/storage/play-events";
 import type { PlayEvent } from "../../shared/types/play-event";
 import { TrackingFSM } from "./fsm";
 import { HealthIndicator } from "./health";
-import { getPlayThreshold, isSkipRepeatsEnabled, isTrackingPaused } from "./settings";
+import { isSkipRepeatsEnabled, isTrackingPaused, resolveThresholdMs } from "./settings";
 import { Watchdog } from "./watchdog";
 
 // ─── Module-level state ───────────────────────────────────────────────────────
@@ -53,14 +53,14 @@ export async function initTracker(): Promise<void> {
 	}
 
 	// Wrap addPlayEvent to feed health indicator on success/failure
-	const wrappedAddPlayEvent = async (event: PlayEvent): Promise<boolean> => {
+	const wrappedAddPlayEvent = async (event: PlayEvent): Promise<number | null> => {
 		try {
-			const written = await addPlayEvent(event);
-			if (written) {
+			const id = await addPlayEvent(event);
+			if (id !== null) {
 				health?.recordSuccess(event.trackName);
 				localStorage.setItem(LS_KEYS.LAST_WRITE, String(Date.now()));
 			}
-			return written;
+			return id;
 		} catch (err) {
 			health?.recordFailure(err instanceof Error ? err.message : String(err));
 			throw err;
@@ -69,7 +69,8 @@ export async function initTracker(): Promise<void> {
 
 	fsm = new TrackingFSM({
 		addPlayEvent: wrappedAddPlayEvent,
-		getPlayThreshold,
+		updatePlayEvent: updatePlayEventPlaytime,
+		resolveThresholdMs,
 		isTrackingPaused,
 		isSkipRepeatsEnabled,
 		dispatchEvent: (event: Event) => window.dispatchEvent(event),

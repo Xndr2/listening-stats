@@ -196,20 +196,22 @@ describe("tracker/index  -  initTracker()", () => {
 		expect(typeof originalSongHandler).toBe("function");
 	});
 
-	it("when wrapped addPlayEvent resolves true, health.recordSuccess is called with track name", async () => {
+	it("when wrapped addPlayEvent resolves an id, health.recordSuccess is called with track name", async () => {
 		const stub = makeSpicetifyStub();
 		(globalThis as unknown as Record<string, unknown>).Spicetify = stub;
 
 		// Mock addPlayEvent to resolve true
-		const mockAddPlayEvent = vi.fn().mockResolvedValue(true);
+		const mockAddPlayEvent = vi.fn().mockResolvedValue(1);
 		vi.doMock("../shared/storage/play-events", () => ({
 			addPlayEvent: mockAddPlayEvent,
+			updatePlayEventPlaytime: vi.fn().mockResolvedValue(undefined),
 		}));
 
 		vi.resetModules();
 		// Re-mock after resetModules
 		vi.doMock("../shared/storage/play-events", () => ({
 			addPlayEvent: mockAddPlayEvent,
+			updatePlayEventPlaytime: vi.fn().mockResolvedValue(undefined),
 		}));
 
 		const { initTracker } = await import("../extension/tracker/index");
@@ -269,6 +271,7 @@ describe("tracker/index  -  initTracker()", () => {
 		const mockAddPlayEvent = vi.fn().mockRejectedValue(new Error("DB write failed"));
 		vi.doMock("../shared/storage/play-events", () => ({
 			addPlayEvent: mockAddPlayEvent,
+			updatePlayEventPlaytime: vi.fn().mockResolvedValue(undefined),
 		}));
 
 		const stub = makeSpicetifyStub();
@@ -343,10 +346,11 @@ describe("tracker/index  -  health recording", () => {
 		delete (window as unknown as Record<string, unknown>).__lsProgressHandler;
 	});
 
-	it("recordSuccess called with trackName when addPlayEvent resolves true", async () => {
-		const mockAddPlayEvent = vi.fn().mockResolvedValue(true);
+	it("recordSuccess called with trackName when addPlayEvent resolves an id", async () => {
+		const mockAddPlayEvent = vi.fn().mockResolvedValue(1);
 		vi.doMock("../shared/storage/play-events", () => ({
 			addPlayEvent: mockAddPlayEvent,
+			updatePlayEventPlaytime: vi.fn().mockResolvedValue(undefined),
 		}));
 
 		const { HealthIndicator } = await import("../extension/tracker/health");
@@ -407,6 +411,7 @@ describe("tracker/index  -  health recording", () => {
 		const mockAddPlayEvent = vi.fn().mockRejectedValue(testError);
 		vi.doMock("../shared/storage/play-events", () => ({
 			addPlayEvent: mockAddPlayEvent,
+			updatePlayEventPlaytime: vi.fn().mockResolvedValue(undefined),
 		}));
 
 		const { HealthIndicator } = await import("../extension/tracker/health");
@@ -568,9 +573,10 @@ describe("tracker/index integrity and versionchange wiring", () => {
 	});
 
 	it("wrappedAddPlayEvent sets LAST_WRITE in localStorage on successful write", async () => {
-		const mockAddPlayEvent = vi.fn().mockResolvedValue(true);
+		const mockAddPlayEvent = vi.fn().mockResolvedValue(1);
 		vi.doMock("../shared/storage/play-events", () => ({
 			addPlayEvent: mockAddPlayEvent,
+			updatePlayEventPlaytime: vi.fn().mockResolvedValue(undefined),
 		}));
 		vi.doMock("../shared/storage/integrity", () => ({
 			runStartupChecks: vi.fn().mockResolvedValue({
