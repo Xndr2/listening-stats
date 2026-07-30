@@ -180,7 +180,7 @@ export class LastfmProvider implements StatsProvider {
 		const peakWeekday = playEvents.length > 0 ? weekdayDistribution.indexOf(Math.max(...weekdayDistribution)) : 0;
 
 		// Streak: paginate through recent tracks. A failure mid-pagination
-		// (e.g. rate limit) must not discard the stats fetched above — use
+		// (e.g. rate limit) must not discard the stats fetched above - use
 		// whatever pages we managed to get.
 		const allStreakTracks = [...recentAll];
 		try {

@@ -53,7 +53,7 @@ afterEach(() => {
 	localStorage.clear();
 });
 
-describe("WorldChartsPage — async loading", () => {
+describe("WorldChartsPage - async loading", () => {
 	it("shows skeleton loading state while fetching", async () => {
 		let resolveCharts!: (value: WorldChartResult<WorldTrack[]>) => void;
 		getChartsAsyncMock.mockReturnValue(

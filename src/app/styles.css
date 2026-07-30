@@ -1208,12 +1208,16 @@ button.announcement-banner-link-btn:hover {
 /* Option group: joined segmented pills for small option sets */
 .option-group {
 	display: inline-flex;
+	flex-wrap: wrap;
+	/* Hug the buttons even inside stacked rows (align-items: stretch) */
+	width: fit-content;
 	border: 1px solid var(--spice-misc);
 	border-radius: 4px;
 	overflow: hidden;
 }
 
 .option-group-btn {
+	flex: 0 0 auto;
 	background: none;
 	border: none;
 	border-left: 1px solid var(--spice-misc);

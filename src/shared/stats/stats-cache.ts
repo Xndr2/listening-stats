@@ -34,7 +34,7 @@ export class StatsCache {
 	}
 
 	setupInvalidationListeners(): void {
-		// Provider init() can run multiple times (provider switches) — attach once.
+		// Provider init() can run multiple times (provider switches) - attach once.
 		if (this.invalidationListenerAttached) return;
 		this.invalidationListenerAttached = true;
 		// Invalidate cached aggregates after a recorded play

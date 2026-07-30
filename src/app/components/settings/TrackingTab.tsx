@@ -12,13 +12,21 @@ import {
 } from "../../../extension/tracker/settings";
 import { EVENTS } from "../../../shared/constants/events";
 import { LS_KEYS } from "../../../shared/constants/storage-keys";
+import { providerRegistry } from "../../../shared/stats/provider";
+import { getRankMode, type RankMode, setRankMode } from "../../../shared/stats/rank-mode";
+import { statsCache } from "../../../shared/stats/stats-cache";
 import { ThresholdSlider } from "../ThresholdSlider";
-import { SettingRow, SettingsGroup, SettingToggle } from "./controls";
+import { OptionGroup, SettingRow, SettingsGroup, SettingToggle } from "./controls";
 
 const SECONDS_PRESETS = [0, 15, 30, 45, 60];
 const PERCENT_PRESETS = [0, 25, 50, 75, 100];
 
-const { useState } = Spicetify.React;
+const RANK_MODE_OPTIONS: { value: RankMode; label: string }[] = [
+	{ value: "streams", label: "Streams" },
+	{ value: "minutes", label: "Minutes" },
+];
+
+const { useState, useEffect } = Spicetify.React;
 
 function isLoggingEnabled(): boolean {
 	return localStorage.getItem(LS_KEYS.LOGGING) === "true";
@@ -39,6 +47,15 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 	const [thresholdSec, setThresholdSec] = useState(() => getPlayThreshold() / 1000);
 	const [thresholdPct, setThresholdPct] = useState(() => getPlayThresholdPercent());
 	const [logging, setLogging] = useState(() => isLoggingEnabled());
+	const [rankMode, setRankModeState] = useState<RankMode>(() => getRankMode());
+	const [activeProviderId, setActiveProviderId] = useState(() => providerRegistry.getActiveId() ?? "local");
+
+	// The modal can stay open across a provider switch (Providers tab -> back here)
+	useEffect(() => {
+		const handler = () => setActiveProviderId(providerRegistry.getActiveId() ?? "local");
+		window.addEventListener(EVENTS.PROVIDER_CHANGED, handler);
+		return () => window.removeEventListener(EVENTS.PROVIDER_CHANGED, handler);
+	}, []);
 
 	const handlePause = (val: boolean) => {
 		setPaused(val);
@@ -67,6 +84,14 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 			setThresholdSec(val);
 			setPlayThreshold(val * 1000);
 		}
+		onPrefsChanged();
+	};
+
+	const handleRankMode = (val: RankMode) => {
+		setRankModeState(val);
+		setRankMode(val);
+		statsCache.invalidate();
+		window.dispatchEvent(new CustomEvent(EVENTS.RANK_MODE_CHANGED));
 		onPrefsChanged();
 	};
 
@@ -105,6 +130,17 @@ export function TrackingTab({ onPrefsChanged }: TrackingTabProps) {
 					/>
 				</SettingRow>
 			</SettingsGroup>
+
+			{activeProviderId === "local" && (
+				<SettingsGroup title="Ranking">
+					<SettingRow
+						label="Rank top lists by"
+						sublabel="Orders top tracks, artists, and albums by play count or time listened"
+					>
+						<OptionGroup options={RANK_MODE_OPTIONS} value={rankMode} onChange={handleRankMode} testId="rank-mode" />
+					</SettingRow>
+				</SettingsGroup>
+			)}
 
 			<SettingsGroup title="Diagnostics">
 				<SettingRow label="Console logging">
