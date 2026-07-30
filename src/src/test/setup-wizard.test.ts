@@ -20,8 +20,8 @@ describe("Provider-qualified cacheKey", () => {
 		expect(buildCacheKey("statsfm", "sfm-weeks")).toBe("statsfm:sfm-weeks");
 	});
 
-	it("buildCacheKey returns local-qualified key for local provider", () => {
-		expect(buildCacheKey("local", "today")).toBe("local:today");
+	it("buildCacheKey returns local-qualified key including rank mode for local provider", () => {
+		expect(buildCacheKey("local", "today")).toBe("local:today:streams");
 	});
 });
 

@@ -245,7 +245,7 @@ export async function parseJsonEvents(text: string): Promise<ParseResult> {
 			continue;
 		}
 
-		// Reject NaN/Infinity/negative values — they pass the typeof check but
+		// Reject NaN/Infinity/negative values - they pass the typeof check but
 		// would corrupt period queries and duration totals once stored.
 		if (
 			!Number.isFinite(item.startedAt) ||

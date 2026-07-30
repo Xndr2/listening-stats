@@ -18,6 +18,7 @@ vi.mock("../shared/stats/artist-enrichment", async () => {
 
 import { enrichArtists } from "../shared/stats/artist-enrichment";
 import { LocalProvider, localProvider } from "../shared/stats/local-provider";
+import { setRankMode } from "../shared/stats/rank-mode";
 
 const enrichArtistsMock = vi.mocked(enrichArtists);
 
@@ -128,6 +129,30 @@ describe("LocalProvider", () => {
 			expect(result.topTracks[2].trackUri).toBe("spotify:track:c");
 			expect(result.topTracks[2].count).toBe(1);
 			expect(result.topTracks[2].rank).toBe(3);
+		});
+
+		it("ranks by total playedMs when rank mode is 'minutes', and caches per mode", async () => {
+			// Track A: 3 short plays (3 streams, 3 min). Track B: 1 long play (1 stream, 30 min).
+			await db.playEvents.bulkAdd([
+				makePlayEvent({ trackUri: "spotify:track:a", playedMs: 60000, startedAt: 1000 }),
+				makePlayEvent({ trackUri: "spotify:track:a", playedMs: 60000, startedAt: 2000 }),
+				makePlayEvent({ trackUri: "spotify:track:a", playedMs: 60000, startedAt: 3000 }),
+				makePlayEvent({ trackUri: "spotify:track:b", playedMs: 1800000, startedAt: 4000 }),
+			]);
+
+			const byStreams = await provider.calculateStats(allTimePeriod);
+			expect(byStreams.topTracks[0].trackUri).toBe("spotify:track:a");
+
+			setRankMode("minutes");
+			const byMinutes = await provider.calculateStats(allTimePeriod);
+			expect(byMinutes.topTracks[0].trackUri).toBe("spotify:track:b");
+			expect(byMinutes.topTracks[0].rank).toBe(1);
+			expect(byMinutes.topTracks[1].trackUri).toBe("spotify:track:a");
+
+			setRankMode("streams");
+			// Cached per-mode entry from the first call must still rank by streams
+			const cached = await provider.calculateStats(allTimePeriod);
+			expect(cached.topTracks[0].trackUri).toBe("spotify:track:a");
 		});
 
 		it("returns topAlbums grouped by albumUri with correct count/duration", async () => {
@@ -252,7 +277,7 @@ describe("LocalProvider", () => {
 				uniqueTrackCount: 1,
 				uniqueArtistCount: 0,
 			};
-			statsCache.set("local:all-time", fakeStats);
+			statsCache.set("local:all-time:streams", fakeStats);
 
 			const result = await provider.calculateStats(allTimePeriod);
 			expect(result).toEqual(fakeStats);
@@ -264,7 +289,7 @@ describe("LocalProvider", () => {
 
 			await provider.calculateStats(allTimePeriod);
 
-			const cached = statsCache.get<StatsResult>("local:all-time");
+			const cached = statsCache.get<StatsResult>("local:all-time:streams");
 			expect(cached).not.toBeNull();
 			expect(cached?.totalPlays).toBe(1);
 		});

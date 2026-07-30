@@ -81,7 +81,7 @@ async function renderAndWaitForLoad() {
 	return result;
 }
 
-describe("WorldChartsPage — rendering", () => {
+describe("WorldChartsPage - rendering", () => {
 	it("renders page kicker and World title", async () => {
 		const { container } = await renderAndWaitForLoad();
 		expect(container.querySelector("[data-testid='world-page-kicker']")?.textContent).toBe(
@@ -142,7 +142,7 @@ describe("WorldChartsPage — rendering", () => {
 	});
 });
 
-describe("WorldChartsPage — art tiles", () => {
+describe("WorldChartsPage - art tiles", () => {
 	it("tiles use gradient fallback when no art URL", async () => {
 		const { container } = await renderAndWaitForLoad();
 		const tile = container.querySelector(".track-art--fallback") as HTMLElement;
@@ -151,7 +151,7 @@ describe("WorldChartsPage — art tiles", () => {
 	});
 });
 
-describe("WorldChartsPage — window interaction", () => {
+describe("WorldChartsPage - window interaction", () => {
 	it("defaults window to 'today'", async () => {
 		const { container } = await renderAndWaitForLoad();
 		const activeBtn = container.querySelector("[data-testid='world-window-tabs'] .period-tab.active");
@@ -175,7 +175,7 @@ describe("WorldChartsPage — window interaction", () => {
 	});
 });
 
-describe("WorldChartsPage — click navigation", () => {
+describe("WorldChartsPage - click navigation", () => {
 	beforeEach(() => {
 		vi.mocked(Spicetify.Platform.History.push).mockClear();
 	});
@@ -216,7 +216,7 @@ describe("WorldChartsPage — click navigation", () => {
 	});
 });
 
-describe("page navigation — PAGE_IDS", () => {
+describe("page navigation - PAGE_IDS", () => {
 	it("PAGE_IDS contains 'dashboard' and 'world'", async () => {
 		const { PAGE_IDS } = await import("../app/preferences");
 		expect(PAGE_IDS).toContain("dashboard");

@@ -1196,24 +1196,19 @@ button.announcement-banner-link-btn:hover {
 	border-bottom: none;
 }
 
-/* Compact action buttons inside settings rows */
-.settings-row .btn-primary,
-.settings-row .btn-secondary,
-.settings-row .btn-destructive {
-	padding: 4px 12px;
-	font-size: var(--font-size-sm, 12px);
-	white-space: nowrap;
-}
-
 /* Option group: joined segmented pills for small option sets */
 .option-group {
 	display: inline-flex;
+	flex-wrap: wrap;
+	/* Hug the buttons even inside stacked rows (align-items: stretch) */
+	width: fit-content;
 	border: 1px solid var(--spice-misc);
 	border-radius: 4px;
 	overflow: hidden;
 }
 
 .option-group-btn {
+	flex: 0 0 auto;
 	background: none;
 	border: none;
 	border-left: 1px solid var(--spice-misc);
@@ -1346,6 +1341,15 @@ button.announcement-banner-link-btn:hover {
 .btn-secondary:hover {
 	color: var(--spice-text);
 	border-color: var(--spice-text);
+}
+
+/* Compact action buttons inside settings rows */
+.settings-row .btn-primary,
+.settings-row .btn-secondary,
+.settings-row .btn-destructive {
+	padding: 4px 12px;
+	font-size: var(--font-size-sm, 12px);
+	white-space: nowrap;
 }
 
 /* Album art thumbnail */

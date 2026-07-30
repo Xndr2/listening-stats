@@ -6,6 +6,46 @@ declare namespace Spicetify {
 		namespace History {
 			function push(path: string): void;
 		}
+
+		/** Position argument for rootlist/playlist mutations. */
+		type PlaylistPosition = { before: "start" | number } | { after: "end" | number | { uri: string } };
+
+		/**
+		 * Internal desktop-client APIs (not the public Web API - no developer-app
+		 * rate limits). Undocumented and version-dependent: feature-detect optional
+		 * members at runtime.
+		 */
+		const RootlistAPI: {
+			createPlaylist(name: string, position: PlaylistPosition): Promise<string | { uri?: string }>;
+		};
+
+		const PlaylistAPI: {
+			getMetadata(uri: string): Promise<{ name?: string; images?: { url: string }[] }>;
+			getContents(
+				uri: string,
+				opts?: { limit?: number; offset?: number },
+			): Promise<{ items: { uri: string; uid: string }[]; totalLength?: number }>;
+			add(playlistUri: string, trackUris: string[], position: PlaylistPosition): Promise<void>;
+			remove(playlistUri: string, items: { uri: string; uid: string }[]): Promise<void>;
+			setAttributes(
+				playlistUri: string,
+				attributes: { name?: string; description?: string; picture?: string },
+			): Promise<void>;
+			/** Returns an upload token for register-image. Missing on some client versions. */
+			uploadImage?(file: File): Promise<unknown>;
+			clear?(playlistUri: string): Promise<void>;
+			resync?(playlistUri: string): Promise<void>;
+		};
+
+		/** Playlist visibility: "VIEWER" = public, "BLOCKED" = private. Missing on some client versions. */
+		const PlaylistPermissionsAPI:
+			| {
+					setBasePermission?(playlistUri: string, permission: "VIEWER" | "BLOCKED"): Promise<void>;
+			  }
+			| undefined;
+
+		/** Client session; accessToken authorizes internal spclient endpoints. */
+		const Session: { accessToken?: string } | undefined;
 	}
 
 	namespace Locale {
