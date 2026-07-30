@@ -32,7 +32,7 @@
     }
   },
   "files": {
-    "includes": ["src/**"]
+    "includes": ["src/**", "!src/src/**"]
   },
   "overrides": [
     {
