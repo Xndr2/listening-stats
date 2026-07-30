@@ -152,6 +152,28 @@ function Test-PathSafe {
     catch { return $false }
 }
 
+function Remove-TemporaryPath {
+    # Temporary cleanup must never turn an otherwise successful install into a failure.
+    # Use LiteralPath so usernames or temp directories containing wildcard characters are
+    # handled as exact paths, and tolerate stale/invalid short-path aliases reported by some
+    # Windows PowerShell environments.
+    param([string]$Path, [switch]$Recurse)
+    if (-not (Test-PathSafe $Path)) { return }
+
+    try {
+        $params = @{
+            LiteralPath = $Path
+            Force       = $true
+            ErrorAction = 'Stop'
+        }
+        if ($Recurse) { $params.Recurse = $true }
+        Remove-Item @params
+    }
+    catch {
+        Warn "could not remove temporary path at $Path  -  $($_.Exception.Message)"
+    }
+}
+
 function Get-SpicetifyPath {
     param([Parameter(Mandatory)][string[]]$ArgumentList)
     $res = Invoke-Spicetify -ArgumentList $ArgumentList
@@ -285,7 +307,7 @@ function Ensure-SpicetifyCli {
         Expand-Archive -Path $spTmpZip -DestinationPath $spicetifyDir -Force
     }
     finally {
-        Remove-Item -Force $spTmpZip -ErrorAction SilentlyContinue
+        Remove-TemporaryPath -Path $spTmpZip
     }
 
     $userScope = [EnvironmentVariableTarget]::User
@@ -445,8 +467,8 @@ try {
     Confirm-NoNestedAppLayout -AppDir $Dest
 }
 finally {
-    Remove-Item -Force $TmpZip -ErrorAction SilentlyContinue
-    Remove-Item -Recurse -Force $ExtractRoot -ErrorAction SilentlyContinue
+    Remove-TemporaryPath -Path $TmpZip
+    Remove-TemporaryPath -Path $ExtractRoot -Recurse
 }
 
 Invoke-SpicetifyApplyWithRecovery
