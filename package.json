@@ -1,6 +1,6 @@
 {
   "name": "listening-stats",
-  "version": "2.0.4",
+  "version": "2.0.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -38,12 +38,5 @@
   "dependencies": {
     "dexie": "^4.4.2",
     "semver": "^7.8.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "esbuild",
-      "msgpackr-extract"
-    ]
   }
 }
