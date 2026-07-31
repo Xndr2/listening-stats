@@ -10,7 +10,6 @@ export const EVENTS = {
 	STATSFM_HEALTH_CHANGED: "listening-stats:statsfm-health-changed",
 	STATSFM_PROFILE_REFRESHED: "listening-stats:statsfm-profile-refreshed",
 	PREFS_CHANGED: "listening-stats:prefs-changed",
-	RANK_MODE_CHANGED: "listening-stats:rank-mode-changed",
 	DASHBOARD_PERIOD_CHANGED: "listening-stats:dashboard-period-changed",
 	OPEN_RECAP: "listening-stats:open-recap",
 } as const;

@@ -11,13 +11,13 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
         with:
           version: 11
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
@@ -31,14 +31,16 @@ jobs:
         run: |
           mkdir -p release/listening-stats
           cp dist/extension.js dist/index.js dist/manifest.json release/listening-stats/
-          node -e "const fs=require('fs'); const pre=String(process.env.RELEASE_PRE).toLowerCase()==='true'; fs.writeFileSync('release/latest-release.json', JSON.stringify({ tag: process.env.RELEASE_TAG, prerelease: pre }))"
           (cd release && zip -r listening-stats.zip listening-stats/)
+          SHA256=$(sha256sum release/listening-stats.zip | cut -d' ' -f1)
+          printf '%s  listening-stats.zip\n' "$SHA256" > release/listening-stats.zip.sha256
+          RELEASE_SHA256="$SHA256" node -e "const fs=require('fs'); const pre=String(process.env.RELEASE_PRE).toLowerCase()==='true'; fs.writeFileSync('release/latest-release.json', JSON.stringify({ tag: process.env.RELEASE_TAG, prerelease: pre, sha256: process.env.RELEASE_SHA256 }))"
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           RELEASE_PRE: ${{ github.event.release.prerelease }}
 
-      - name: Upload release asset
-        run: gh release upload "${{ github.event.release.tag_name }}" release/listening-stats.zip --clobber
+      - name: Upload release assets
+        run: gh release upload "${{ github.event.release.tag_name }}" release/listening-stats.zip release/listening-stats.zip.sha256 --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -55,6 +57,7 @@ jobs:
           cp dist/extension.js dist/index.js dist/manifest.json listening-stats/
           cp release/latest-release.json .
           cp release/listening-stats.zip .
-          git add extension.js index.js manifest.json listening-stats latest-release.json listening-stats.zip
+          cp release/listening-stats.zip.sha256 .
+          git add extension.js index.js manifest.json listening-stats latest-release.json listening-stats.zip listening-stats.zip.sha256
           git commit -m "Release ${{ github.event.release.tag_name }}"
           git push origin dist-temp:dist --force

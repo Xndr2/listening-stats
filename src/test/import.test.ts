@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { db } from "../shared/storage/db";
-import { importFileEvents, parseJsonEvents, parseV1Csv } from "../shared/storage/import";
+import { importFileEvents, parseHistoryCsv, parseJsonEvents } from "../shared/storage/import";
 import { generateSyntheticUris } from "../shared/storage/synthetic-uris";
 import type { PlayEvent } from "../shared/types/play-event";
 
@@ -61,14 +61,25 @@ describe("generateSyntheticUris", () => {
 		expect(uris1.albumUri).toBe(uris2.albumUri);
 	});
 
-	it("all three URI types share the same hash (based on compound key)", async () => {
-		const uris = await generateSyntheticUris("Track A", "Artist B", "Album C");
-		const trackHash = uris.trackUri.replace("listening-stats:track:", "");
-		const artistHash = uris.artistUri.replace("listening-stats:artist:", "");
-		const albumHash = uris.albumUri.replace("listening-stats:album:", "");
-		// All use the same compound key hash
-		expect(trackHash).toBe(artistHash);
-		expect(artistHash).toBe(albumHash);
+	it("same artist across different tracks/albums shares one artistUri", async () => {
+		const uris1 = await generateSyntheticUris("Track A", "Artist B", "Album C");
+		const uris2 = await generateSyntheticUris("Track X", "Artist B", "Album Z");
+		expect(uris1.artistUri).toBe(uris2.artistUri);
+		expect(uris1.trackUri).not.toBe(uris2.trackUri);
+		expect(uris1.albumUri).not.toBe(uris2.albumUri);
+	});
+
+	it("same album across different tracks shares one albumUri", async () => {
+		const uris1 = await generateSyntheticUris("Track A", "Artist B", "Album C");
+		const uris2 = await generateSyntheticUris("Track X", "Artist B", "Album C");
+		expect(uris1.albumUri).toBe(uris2.albumUri);
+		expect(uris1.trackUri).not.toBe(uris2.trackUri);
+	});
+
+	it("same album name under different artists gets different albumUris", async () => {
+		const uris1 = await generateSyntheticUris("Track A", "Artist B", "Greatest Hits");
+		const uris2 = await generateSyntheticUris("Track A", "Artist Y", "Greatest Hits");
+		expect(uris1.albumUri).not.toBe(uris2.albumUri);
 	});
 
 	it("lowercases inputs before hashing  -  TRACK A == track a", async () => {
@@ -87,15 +98,15 @@ describe("generateSyntheticUris", () => {
 });
 
 // ──────────────────────────────────────────────────────
-// parseV1Csv
+// parseHistoryCsv
 // ──────────────────────────────────────────────────────
 
-describe("parseV1Csv", () => {
+describe("parseHistoryCsv", () => {
 	it("parses a single valid CSV row into a PlayEvent-shaped object", async () => {
 		const csv = buildV1Csv([
 			"Bohemian Rhapsody,Queen,A Night at the Opera,354000,300000,2024-12-01T14:23:00.000Z,2024-12-01T14:28:54.000Z",
 		]);
-		const result = await parseV1Csv(csv);
+		const result = await parseHistoryCsv(csv);
 		expect(result.events).toHaveLength(1);
 		expect(result.errors).toBe(0);
 		const ev = result.events[0];
@@ -114,7 +125,7 @@ describe("parseV1Csv", () => {
 			"Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z",
 			"Track 2,Artist,Album,120000,100000,2024-01-01T11:00:00.000Z,2024-01-01T11:02:00.000Z",
 		]);
-		const result = await parseV1Csv(csv);
+		const result = await parseHistoryCsv(csv);
 		expect(result.events).toHaveLength(2);
 		for (const ev of result.events) {
 			expect(ev.type).toBe("play");
@@ -123,7 +134,7 @@ describe("parseV1Csv", () => {
 
 	it("assigns synthetic URIs with listening-stats: prefix", async () => {
 		const csv = buildV1Csv(["Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z"]);
-		const result = await parseV1Csv(csv);
+		const result = await parseHistoryCsv(csv);
 		const ev = result.events[0];
 		expect(ev.trackUri).toMatch(/^listening-stats:track:/);
 		expect(ev.artistUri).toMatch(/^listening-stats:artist:/);
@@ -133,27 +144,27 @@ describe("parseV1Csv", () => {
 	it("throws when header is missing parentheses (old format)", async () => {
 		const badCsv =
 			"Track,Artist,Album,Duration ms,Played ms,Started At,Ended At\nTrack 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z";
-		await expect(parseV1Csv(badCsv)).rejects.toThrow("unrecognized CSV format");
+		await expect(parseHistoryCsv(badCsv)).rejects.toThrow("unrecognized CSV format");
 	});
 
 	it("throws when header is completely wrong", async () => {
 		const badCsv = "Name,Performer,Record,Duration,Play time,Start,End\nRow";
-		await expect(parseV1Csv(badCsv)).rejects.toThrow("unrecognized CSV format");
+		await expect(parseHistoryCsv(badCsv)).rejects.toThrow("unrecognized CSV format");
 	});
 
 	it("throws with helpful message for stats summary CSV (Period header)", async () => {
 		const statsCsv = "Period,4 Weeks\nExported,2026-04-04\nTotal Time,12h 30m";
-		await expect(parseV1Csv(statsCsv)).rejects.toThrow("stats summary CSV");
+		await expect(parseHistoryCsv(statsCsv)).rejects.toThrow("stats summary CSV");
 	});
 
 	it("throws with helpful message for ranked stats CSV (Rank header)", async () => {
 		const statsCsv = "Rank,Track,Artist,Album,Plays,Duration\n1,Song,Artist,Album,42,180000";
-		await expect(parseV1Csv(statsCsv)).rejects.toThrow("stats summary CSV");
+		await expect(parseHistoryCsv(statsCsv)).rejects.toThrow("stats summary CSV");
 	});
 
 	it("returns empty array for header-only CSV (no data rows)", async () => {
 		const csv = "Track,Artist,Album,Duration (ms),Played (ms),Started At,Ended At";
-		const result = await parseV1Csv(csv);
+		const result = await parseHistoryCsv(csv);
 		expect(result.events).toHaveLength(0);
 		expect(result.errors).toBe(0);
 		expect(result.errorDetails).toHaveLength(0);
@@ -164,7 +175,7 @@ describe("parseV1Csv", () => {
 			"Track 1,Artist,Album,180000,150000,not-a-date,2024-01-01T10:02:30.000Z",
 			"Track 2,Artist,Album,120000,100000,2024-01-01T11:00:00.000Z,2024-01-01T11:02:00.000Z",
 		]);
-		const result = await parseV1Csv(csv);
+		const result = await parseHistoryCsv(csv);
 		expect(result.events).toHaveLength(1);
 		expect(result.errors).toBe(1);
 		expect(result.errorDetails.length).toBeGreaterThan(0);
@@ -174,7 +185,7 @@ describe("parseV1Csv", () => {
 		const csv = buildV1Csv([
 			"Track 1,Artist,Album,not-a-number,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z",
 		]);
-		const result = await parseV1Csv(csv);
+		const result = await parseHistoryCsv(csv);
 		expect(result.events).toHaveLength(0);
 		expect(result.errors).toBe(1);
 	});
@@ -183,7 +194,7 @@ describe("parseV1Csv", () => {
 		const csv = buildV1Csv([
 			'"Track, With Comma","Artist, With Comma","Album, With Comma",180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z',
 		]);
-		const result = await parseV1Csv(csv);
+		const result = await parseHistoryCsv(csv);
 		expect(result.events).toHaveLength(1);
 		expect(result.events[0].trackName).toBe("Track, With Comma");
 		expect(result.events[0].artistName).toBe("Artist, With Comma");
@@ -197,20 +208,96 @@ describe("parseV1Csv", () => {
 				`Track ${i + 1},Artist ${i + 1},Album ${i + 1},180000,150000,2024-0${i + 1}-01T10:00:00.000Z,2024-0${i + 1}-01T10:02:30.000Z`,
 		);
 		const csv = buildV1Csv(rows);
-		const result = await parseV1Csv(csv);
+		const result = await parseHistoryCsv(csv);
 		expect(result.events).toHaveLength(5);
 		expect(result.errors).toBe(0);
 	});
 
 	it("returns ParseResult shape with events, errors, errorDetails", async () => {
 		const csv = buildV1Csv(["Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z"]);
-		const result = await parseV1Csv(csv);
+		const result = await parseHistoryCsv(csv);
 		expect(result).toHaveProperty("events");
 		expect(result).toHaveProperty("errors");
 		expect(result).toHaveProperty("errorDetails");
 		expect(Array.isArray(result.events)).toBe(true);
 		expect(typeof result.errors).toBe("number");
 		expect(Array.isArray(result.errorDetails)).toBe(true);
+	});
+
+	const V2_HEADER =
+		"Track,Artist,Album,Duration (ms),Played (ms),Started At,Ended At,Type,Track URI,Artist URI,Album URI,Album Art";
+
+	it("v2 header: preserves type, URIs and safe-host album art", async () => {
+		const csv = [
+			V2_HEADER,
+			'Song,Artist,Album,200000,15000,2024-01-01T10:00:00.000Z,2024-01-01T10:00:15.000Z,skip,"spotify:track:abc","spotify:artist:xyz","spotify:album:def","https://i.scdn.co/image/abc123"',
+		].join("\n");
+		const result = await parseHistoryCsv(csv);
+		expect(result.errors).toBe(0);
+		const ev = result.events[0];
+		expect(ev.type).toBe("skip");
+		expect(ev.trackUri).toBe("spotify:track:abc");
+		expect(ev.artistUri).toBe("spotify:artist:xyz");
+		expect(ev.albumUri).toBe("spotify:album:def");
+		expect(ev.albumArt).toBe("https://i.scdn.co/image/abc123");
+	});
+
+	it("v2 header: falls back to synthetic URIs when URI columns are empty", async () => {
+		const csv = [
+			V2_HEADER,
+			"Song,Artist,Album,200000,180000,2024-01-01T10:00:00.000Z,2024-01-01T10:03:00.000Z,play,,,,",
+		].join("\n");
+		const result = await parseHistoryCsv(csv);
+		const ev = result.events[0];
+		expect(ev.type).toBe("play");
+		expect(ev.trackUri).toMatch(/^listening-stats:track:/);
+		expect(ev.artistUri).toMatch(/^listening-stats:artist:/);
+		expect(ev.albumUri).toMatch(/^listening-stats:album:/);
+	});
+
+	it("v2 header: drops album art from unapproved hosts", async () => {
+		const csv = [
+			V2_HEADER,
+			'Song,Artist,Album,200000,180000,2024-01-01T10:00:00.000Z,2024-01-01T10:03:00.000Z,play,"spotify:track:abc","spotify:artist:xyz","spotify:album:def","https://evil.example.com/pixel.png"',
+		].join("\n");
+		const result = await parseHistoryCsv(csv);
+		expect(result.events[0].albumArt).toBeUndefined();
+	});
+
+	it("round-trips the app's own CSV backup export shape", async () => {
+		// Mirror of what DataTab's handleExportCsv writes for one db row.
+		const source = {
+			trackName: 'Song, with "quotes"',
+			artistName: "Artist",
+			albumName: "Album",
+			durationMs: 200000,
+			playedMs: 180000,
+			startedAt: 1700000000123,
+			endedAt: 1700000180123,
+			trackUri: "spotify:track:abc",
+			artistUri: "spotify:artist:xyz",
+			albumUri: "spotify:album:def",
+			albumArt: "https://i.scdn.co/image/abc123",
+			type: "skip" as const,
+		};
+		const esc = (s: string) => `"${s.replace(/"/g, '""').replace(/[\r\n]+/g, " ")}"`;
+		const row = [
+			esc(source.trackName),
+			esc(source.artistName),
+			esc(source.albumName),
+			source.durationMs,
+			source.playedMs,
+			new Date(source.startedAt).toISOString(),
+			new Date(source.endedAt).toISOString(),
+			source.type,
+			esc(source.trackUri),
+			esc(source.artistUri),
+			esc(source.albumUri),
+			esc(source.albumArt),
+		].join(",");
+		const result = await parseHistoryCsv([V2_HEADER, row].join("\n"));
+		expect(result.errors).toBe(0);
+		expect(result.events).toEqual([source]);
 	});
 });
 
@@ -240,24 +327,50 @@ describe("parseJsonEvents", () => {
 		expect(result.events[0].trackName).toBe("Test Track");
 	});
 
-	it("sets type: play on all events regardless of source type", async () => {
+	it('preserves type "skip" so this app\'s own JSON backups round-trip', async () => {
+		const base = {
+			trackUri: "spotify:track:abc",
+			trackName: "Test Track",
+			artistName: "Test Artist",
+			artistUri: "spotify:artist:xyz",
+			albumName: "Test Album",
+			albumUri: "spotify:album:def",
+			durationMs: 180000,
+			playedMs: 150000,
+			startedAt: 1700000000000,
+			endedAt: 1700000150000,
+		};
 		const events = [
-			{
-				trackUri: "spotify:track:abc",
-				trackName: "Test Track",
-				artistName: "Test Artist",
-				artistUri: "spotify:artist:xyz",
-				albumName: "Test Album",
-				albumUri: "spotify:album:def",
-				durationMs: 180000,
-				playedMs: 150000,
-				startedAt: 1700000000000,
-				endedAt: 1700000150000,
-				type: "skip", // source says skip, import must override to "play"
-			},
+			{ ...base, type: "skip" },
+			{ ...base, startedAt: 1700000200000, type: "play" },
+			{ ...base, startedAt: 1700000400000, type: "banana" }, // unknown type coerced
+			{ ...base, startedAt: 1700000600000 }, // v1 exports carry no type field
 		];
 		const result = await parseJsonEvents(JSON.stringify(events));
-		expect(result.events[0].type).toBe("play");
+		expect(result.events.map((e) => e.type)).toEqual(["skip", "play", "play", "play"]);
+	});
+
+	it("round-trips the app's own JSON backup export shape losslessly", async () => {
+		// Mirror of what DataTab's handleExportJson writes: db.playEvents rows minus id.
+		const exported = [
+			{
+				trackName: "Song",
+				artistName: "Artist",
+				albumName: "Album",
+				durationMs: 200000,
+				playedMs: 180000,
+				startedAt: 1700000000000,
+				endedAt: 1700000180000,
+				trackUri: "spotify:track:abc",
+				artistUri: "spotify:artist:xyz",
+				albumUri: "spotify:album:def",
+				albumArt: "https://i.scdn.co/image/abc123",
+				type: "play",
+			},
+		];
+		const result = await parseJsonEvents(JSON.stringify(exported));
+		expect(result.errors).toBe(0);
+		expect(result.events).toEqual(exported);
 	});
 
 	it("keeps existing trackUri when present", async () => {
@@ -492,7 +605,7 @@ describe("Integration: CSV parse then import", () => {
 			"Bohemian Rhapsody,Queen,A Night at the Opera,354000,300000,2024-12-01T14:23:00.000Z,2024-12-01T14:28:54.000Z",
 			"Don't Stop Me Now,Queen,Jazz,210000,180000,2024-12-01T15:00:00.000Z,2024-12-01T15:03:00.000Z",
 		]);
-		const parsed = await parseV1Csv(csv);
+		const parsed = await parseHistoryCsv(csv);
 		expect(parsed.events).toHaveLength(2);
 
 		const importResult = await importFileEvents(parsed.events);
@@ -507,7 +620,7 @@ describe("Integration: CSV parse then import", () => {
 
 	it("re-importing same CSV file deduplicates all events", async () => {
 		const csv = buildV1Csv(["Track 1,Artist,Album,180000,150000,2024-01-01T10:00:00.000Z,2024-01-01T10:02:30.000Z"]);
-		const parsed = await parseV1Csv(csv);
+		const parsed = await parseHistoryCsv(csv);
 		await importFileEvents(parsed.events);
 		const second = await importFileEvents(parsed.events);
 		expect(second.imported).toBe(0);

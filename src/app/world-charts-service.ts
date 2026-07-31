@@ -33,7 +33,7 @@ const RANGE_BY_WINDOW: Partial<Record<WorldWindow, string>> = {
 	week: "weeks",
 };
 
-export const STATS_FM_SUPPORTED_WINDOWS: readonly WorldWindow[] = ["today", "week"] as const;
+const STATS_FM_SUPPORTED_WINDOWS: readonly WorldWindow[] = ["today", "week"] as const;
 
 interface ChartTrackPayload {
 	position: number;
@@ -119,12 +119,6 @@ function parseAlbumReleaseYear(releaseDate: number | undefined): number | undefi
 	const current = new Date().getFullYear();
 	if (!Number.isFinite(year) || year < 1900 || year > current + 1) return undefined;
 	return year;
-}
-
-export function formatDuration(ms: number | undefined): string {
-	if (!ms) return "";
-	const s = Math.round(ms / 1000);
-	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 function pickTrackCover(r: ChartTrackPayload): string | undefined {

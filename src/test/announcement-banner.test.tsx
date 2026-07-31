@@ -17,38 +17,30 @@ describe("AnnouncementBanner", () => {
 	});
 
 	describe("banners.ts  -  config and gating logic", () => {
-		it("getActiveBanner returns config when version has active banner and not dismissed", async () => {
-			const { getActiveBanner } = await import("../app/banners");
-			const banner = getActiveBanner("2.6");
+		it("resolveAnnouncementBanner returns local banner when configured and not dismissed", async () => {
+			const { resolveAnnouncementBanner } = await import("../app/banners");
+			const banner = resolveAnnouncementBanner("2.6", null);
 			expect(banner).not.toBeNull();
+			expect(banner?.source).toBe("local");
 			expect(banner?.title).toBeTruthy();
 			expect(banner?.body).toBeTruthy();
 		});
 
-		it("getActiveBanner returns null when version has no configured banner", async () => {
-			const { getActiveBanner } = await import("../app/banners");
-			const banner = getActiveBanner("0.0.0-unknown");
-			expect(banner).toBeNull();
+		it("returns null when version has no configured banner", async () => {
+			const { resolveAnnouncementBanner } = await import("../app/banners");
+			expect(resolveAnnouncementBanner("0.0.0-unknown", null)).toBeNull();
 		});
 
-		it("getActiveBanner returns null when current version was already dismissed", async () => {
+		it("returns null when current version was already dismissed", async () => {
 			localStorage.setItem(LS_KEYS.DISMISSED_BANNER_VERSION, "2.6");
-			const { getActiveBanner } = await import("../app/banners");
-			const banner = getActiveBanner("2.6");
-			expect(banner).toBeNull();
+			const { resolveAnnouncementBanner } = await import("../app/banners");
+			expect(resolveAnnouncementBanner("2.6", null)).toBeNull();
 		});
 
-		it("getActiveBanner returns config when a different version was dismissed", async () => {
+		it("returns local banner when a different version was dismissed", async () => {
 			localStorage.setItem(LS_KEYS.DISMISSED_BANNER_VERSION, "2.5");
-			const { getActiveBanner } = await import("../app/banners");
-			const banner = getActiveBanner("2.6");
-			expect(banner).not.toBeNull();
-		});
-
-		it("dismissBanner persists version to localStorage", async () => {
-			const { dismissBanner } = await import("../app/banners");
-			dismissBanner("2.6");
-			expect(localStorage.getItem(LS_KEYS.DISMISSED_BANNER_VERSION)).toBe("2.6");
+			const { resolveAnnouncementBanner } = await import("../app/banners");
+			expect(resolveAnnouncementBanner("2.6", null)).not.toBeNull();
 		});
 	});
 
@@ -125,16 +117,15 @@ describe("AnnouncementBanner", () => {
 
 	describe("Integration  -  version-gated display in App", () => {
 		it("does not render banner when no active banner for current version", async () => {
-			const { getActiveBanner } = await import("../app/banners");
-			const banner = getActiveBanner("0.0.0");
-			expect(banner).toBeNull();
+			const { resolveAnnouncementBanner } = await import("../app/banners");
+			expect(resolveAnnouncementBanner("0.0.0", null)).toBeNull();
 		});
 
 		it("dismissing banner hides it on re-query for same version", async () => {
-			const { getActiveBanner, dismissBanner } = await import("../app/banners");
-			expect(getActiveBanner("2.6")).not.toBeNull();
-			dismissBanner("2.6");
-			expect(getActiveBanner("2.6")).toBeNull();
+			const { resolveAnnouncementBanner } = await import("../app/banners");
+			expect(resolveAnnouncementBanner("2.6", null)).not.toBeNull();
+			localStorage.setItem(LS_KEYS.DISMISSED_BANNER_VERSION, "2.6");
+			expect(resolveAnnouncementBanner("2.6", null)).toBeNull();
 		});
 	});
 });

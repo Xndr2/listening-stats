@@ -1,5 +1,5 @@
 /**
- * Safe wrappers around Spicetify.ReactComponent.* - those components are not
+ * Safe wrappers around Spicetify.ReactComponent.* — those components are not
  * guaranteed to exist on every Spotify/Spicetify version, and rendering an
  * undefined element type crashes the whole route with Spotify's generic
  * "Something went wrong" page. Each wrapper degrades gracefully instead.
@@ -31,7 +31,7 @@ export function Tooltip({ children, label, placement }: TooltipProps) {
 			</Native>
 		);
 	}
-	// No extra wrapper element - children are often grid/flex cells and a
+	// No extra wrapper element — children are often grid/flex cells and a
 	// wrapping <span> would break their layout. The tooltip is lost, nothing else.
 	return <>{children}</>;
 }

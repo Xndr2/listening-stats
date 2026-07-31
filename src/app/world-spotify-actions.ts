@@ -34,12 +34,12 @@ export function spotifyTrackUri(trackId: string | undefined): string | null {
 	return `spotify:track:${trackId.trim()}`;
 }
 
-export function spotifyArtistUri(artistId: string | undefined): string | null {
+function spotifyArtistUri(artistId: string | undefined): string | null {
 	if (!artistId?.trim()) return null;
 	return `spotify:artist:${artistId.trim()}`;
 }
 
-export function spotifyAlbumUri(albumId: string | undefined): string | null {
+function spotifyAlbumUri(albumId: string | undefined): string | null {
 	if (!albumId?.trim()) return null;
 	return `spotify:album:${albumId.trim()}`;
 }

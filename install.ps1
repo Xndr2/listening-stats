@@ -424,6 +424,33 @@ try {
         throw "Download is too small ($len bytes)  -  expected a real release zip."
     }
 
+    # Integrity check: every release ships a listening-stats.zip.sha256 asset next to the
+    # zip. A missing asset (releases predating checksums) downgrades to a warning; a
+    # present-but-mismatching checksum is always fatal.
+    Step "Verifying checksum"
+    $shaContent = $null
+    try {
+        $shaContent = (Invoke-WebRequest -Uri "$ZipUrl.sha256" -UseBasicParsing -Headers @{
+            "Cache-Control" = "no-cache"
+            "Pragma"        = "no-cache"
+        }).Content
+        if ($shaContent -is [byte[]]) { $shaContent = [Text.Encoding]::ASCII.GetString($shaContent) }
+    }
+    catch {
+        Warn "no .sha256 asset published for this release  -  skipping checksum verification."
+    }
+    if ($shaContent) {
+        $expectedSha = ($shaContent -split "\s+")[0].ToLowerInvariant()
+        if ($expectedSha -notmatch '^[0-9a-f]{64}$') {
+            throw "Checksum asset is malformed ($ZipUrl.sha256). Refusing to install."
+        }
+        $actualSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $TmpZip).Hash.ToLowerInvariant()
+        if ($actualSha -ne $expectedSha) {
+            throw "Checksum mismatch for listening-stats.zip (expected $expectedSha, got $actualSha). The download may be corrupt or tampered with  -  aborting."
+        }
+        Detail "sha256 OK ($expectedSha)"
+    }
+
     Step "Extracting"
     New-Item -ItemType Directory -Force -Path $ExtractRoot | Out-Null
     Expand-Archive -Path $TmpZip -DestinationPath $ExtractRoot -Force

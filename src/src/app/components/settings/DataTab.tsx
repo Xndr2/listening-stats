@@ -200,7 +200,7 @@ export function DataTab({ onRefresh }: Props) {
 		}
 	};
 
-	// Only remove this app's keys - clear() would wipe storage for the whole
+	// Only remove this app's keys — clear() would wipe storage for the whole
 	// Spotify origin, including Spotify's own settings and other extensions.
 	const removePrefixedKeys = (storage: Storage) => {
 		for (let i = storage.length - 1; i >= 0; i--) {

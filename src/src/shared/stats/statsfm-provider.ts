@@ -764,7 +764,7 @@ export class StatsFmProvider implements StatsProvider {
 		const raw = localStorage.getItem(LS_KEYS.STATSFM_CONFIG);
 		if (!raw) return;
 
-		// Corrupt/foreign localStorage must not throw out of init() - that
+		// Corrupt/foreign localStorage must not throw out of init() — that
 		// would abort initProviders() and leave the whole app stuck loading.
 		try {
 			const parsed = JSON.parse(raw) as StatsFmConfig;

@@ -3,7 +3,7 @@
  *
  * Every variant is a `build()` function that computes ALL geometry up front
  * (pure, synchronous) and returns `{ height, draw }`. The renderer measures,
- * positions, then draws - measured and drawn layout can never diverge, and
+ * positions, then draws — measured and drawn layout can never diverge, and
  * every variant adapts its content to the available height instead of
  * overflowing the card.
  */
@@ -41,7 +41,7 @@ const VARIANT_LABELS: { id: ShareVariant; label: string }[] = [
 ];
 
 /**
- * A card type is offered only when the current stats can fill it - no
+ * A card type is offered only when the current stats can fill it — no
  * half-empty cards. Streak additionally requires the provider to have
  * streak data at all.
  */
@@ -198,7 +198,7 @@ export function loadImage(url: string): Promise<HTMLImageElement | null> {
 	});
 }
 
-/** Gradient pairs for image-less tiles - seeded so an item always gets the same look. */
+/** Gradient pairs for image-less tiles — seeded so an item always gets the same look. */
 const TILE_GRADS: [string, string][] = [
 	["#1d4ed8", "#22d3ee"],
 	["#7c3aed", "#ec4899"],
@@ -215,7 +215,7 @@ function tileSeedHash(seed: string): number {
 	return Math.abs(hash);
 }
 
-/** Image-less tile: seeded gradient monogram - reads as deliberate, never broken. */
+/** Image-less tile: seeded gradient monogram — reads as deliberate, never broken. */
 function fallbackTile(ctx: Ctx2D, x: number, y: number, size: number, radius: number, seed: string) {
 	const pair = TILE_GRADS[tileSeedHash(seed || "♫") % TILE_GRADS.length];
 	const grad = ctx.createLinearGradient(x, y, x + size, y + size);
@@ -375,7 +375,7 @@ interface CardEnv {
 	periodLabel: string;
 	periodDayCount: number;
 	allowStreak: boolean;
-	/** Set for the recap variant - days in the recap window. */
+	/** Set for the recap variant — days in the recap window. */
 	recapDayCount?: number;
 }
 

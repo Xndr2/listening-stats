@@ -29,7 +29,7 @@ export interface RecapSource {
 	exactMonth: boolean;
 }
 
-/** First day of the month before `now` - the month the recap covers. */
+/** First day of the month before `now` — the month the recap covers. */
 function lastMonthStart(now: Date): Date {
 	return new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
 }

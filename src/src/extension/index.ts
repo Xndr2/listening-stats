@@ -1,4 +1,3 @@
-import { initPlaylistScheduler } from "./playlist-scheduler";
 import { initTracker } from "./tracker/index";
 
 const POLL_INTERVAL_MS = 100;
@@ -40,7 +39,6 @@ const POLL_TIMEOUT_MS = 30_000;
 		initTracker().catch((err) => {
 			console.error("[listening-stats] tracker init error:", err);
 		});
-		initPlaylistScheduler();
 	}
 
 	poll();

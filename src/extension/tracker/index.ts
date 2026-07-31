@@ -153,10 +153,3 @@ function registerListeners(): void {
 	win.__lsPauseHandler = playPauseHandler;
 	win.__lsProgressHandler = progressHandler;
 }
-
-// ─── destroyPoller ────────────────────────────────────────────────────────────
-
-/** Intentional no-op: local tracking stays enabled across provider switches. */
-export function destroyPoller(): void {
-	// intentional no-op
-}

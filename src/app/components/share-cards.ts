@@ -9,7 +9,7 @@
  */
 
 import { hydrateShareCardAssets } from "../../shared/share/hydrate-share-assets";
-import type { StatsResult, TopArtist, TopTrack } from "../../shared/types/stats";
+import type { StatsResult } from "../../shared/types/stats";
 import { normalizeSpotifyImageUrl } from "../../shared/util/spotify-image-url";
 import { formatNumber } from "../format";
 
@@ -25,7 +25,7 @@ export interface ShareRenderOptions {
 	hasStreakData?: boolean;
 }
 
-export const TARGET_DIMENSIONS: Record<ShareSize, { width: number; height: number }> = {
+const TARGET_DIMENSIONS: Record<ShareSize, { width: number; height: number }> = {
 	square: { width: 1080, height: 1080 },
 	story: { width: 1080, height: 1920 },
 };
@@ -954,67 +954,113 @@ const buildThrowback: CardBuilder = (_ctx, env, w, availH) => {
 
 // ── Variant: Wrapped / Recap ─────────────────────────────────────────────────
 
-interface WrappedSection {
-	kind: "tracks" | "artists" | "genres";
-	rows: number;
+interface WrappedChip {
+	label: string;
+	value: string;
+	sub?: string;
 }
 
+/**
+ * The big one: hero hours, a stat-chip grid, top tracks and top artists side
+ * by side, then genre bars - every other card's payload on one canvas. Each
+ * block is gated on the period actually having that data; missing blocks
+ * collapse instead of rendering empty.
+ */
 const buildWrapped: CardBuilder = (_ctx, env, _w, availH) => {
-	const { stats, size, palette, periodLabel, allowStreak, recapDayCount } = env;
+	const { stats, size, palette, periodLabel, allowStreak, recapDayCount, periodDayCount } = env;
 	const isStory = size === "story";
 	const isRecap = recapDayCount != null;
 
-	const heroPx = isStory ? 190 : 108;
-	const unitPx = isStory ? 52 : 36;
-	const metaPx = isStory ? 28 : 22;
+	const totalHours = Math.floor(stats.totalDuration / 3_600_000);
+	const totalMinutes = Math.floor(stats.totalDuration / 60_000);
+	const heroValue = totalHours >= 1 ? `${totalHours}` : `${totalMinutes}`;
+	const heroUnit = totalHours >= 1 ? "hours" : "minutes";
+	const showHero = stats.totalDuration > 0;
+
+	// ── Data availability for the selected period ──
+	const genres = stats.topGenres.filter((g) => g.count > 0);
+	const hasHourData = (stats.hourlyDistribution ?? []).some((v) => v > 0);
+	const streak = isRecap || allowStreak ? (stats.streak ?? 0) : 0;
+	const daily = stats.dailyPlayCounts ?? [];
+	const bestDay = daily.length > 0 ? daily.reduce((b, cur) => (cur.count > b.count ? cur : b), daily[0]) : null;
+
+	const chips: WrappedChip[] = [];
+	if (stats.totalPlays > 0) chips.push({ label: "Plays", value: formatNumber(stats.totalPlays) });
+	if (stats.uniqueArtistCount > 0) chips.push({ label: "Artists", value: formatNumber(stats.uniqueArtistCount) });
+	if (stats.uniqueTrackCount > 0) chips.push({ label: "Tracks", value: formatNumber(stats.uniqueTrackCount) });
+	if (totalMinutes > 0)
+		chips.push({ label: "Daily avg", value: `${Math.round(totalMinutes / Math.max(1, periodDayCount))} min` });
+	if (hasHourData) chips.push({ label: "Peak hour", value: formatPeakHour(stats.peakHour) });
+	if (streak > 0)
+		chips.push({
+			label: isRecap && streak >= (recapDayCount ?? Number.POSITIVE_INFINITY) ? "Every day" : "Streak",
+			value: `${streak} days`,
+		});
+	if (bestDay && bestDay.count > 0)
+		chips.push({
+			label: "Best day",
+			value: formatBestDay(bestDay.date),
+			sub: `${formatNumber(bestDay.count)} plays`,
+		});
+
+	const chipCols = 3;
+	const maxChips = isStory ? 6 : 3;
+	const shownChips = chips.slice(0, maxChips);
+	const chipH = isStory ? 168 : 136;
+	const chipGap = 20;
+
 	const sectionKickerPx = isStory ? 24 : 20;
 	const sectionKickerBlock = sectionKickerPx + 20;
-	const sectionGap = isStory ? 36 : 24;
+	const sectionGap = isStory ? 40 : 26;
 
 	const listLayout: RowLayout = isStory
-		? { tile: 84, gap: 18, rank: 40, titlePx: 32, subPx: 24, countPx: 26, capsPx: 16, radius: 9 }
-		: { tile: 56, gap: 13, rank: 30, titlePx: 23, subPx: 17, countPx: 20, capsPx: 13, radius: 7 };
+		? { tile: 84, gap: 18, rank: 34, titlePx: 30, subPx: 22, countPx: 24, capsPx: 15, radius: 9 }
+		: { tile: 56, gap: 13, rank: 26, titlePx: 21, subPx: 16, countPx: 18, capsPx: 12, radius: 7 };
+	const colGap = isStory ? 44 : 30;
 	const genreBarH = isStory ? 24 : 18;
 	const genreGap = isStory ? 20 : 14;
 
+	const heroPx = isStory ? 170 : 100;
+	const unitPx = isStory ? 50 : 34;
 	const heroGlyphH = Math.floor(heroPx * 0.78);
-	// Square puts "hours" inline with the number to save a full text row
-	const heroH = isStory ? heroGlyphH + 24 + lh(unitPx) + 12 + lh(metaPx) : heroGlyphH + 16 + lh(metaPx);
-	const fixed = KICKER_BLOCK + 8 + heroH;
+	const heroH = showHero ? heroGlyphH + 12 : 0;
 
-	// Fill sections greedily into the remaining height
-	const budgetAfter = (used: number) => availH - fixed - used;
-	const sections: WrappedSection[] = [];
-	let used = 0;
-	const sectionH = (kind: WrappedSection["kind"], rows: number) =>
-		kind === "genres"
-			? sectionKickerBlock + rows * (genreBarH + genreGap) - genreGap
-			: sectionKickerBlock + rows * rowHeight(listLayout) - listLayout.gap;
+	// ── Fit: shrink genre rows, then list rows, then the second chip row ──
+	let listRows = isStory ? 5 : 3;
+	let genreRows = Math.min(isStory ? 4 : 2, genres.length);
+	let chipCount = shownChips.length;
 
-	// Every section (including the first, after the hero block) is preceded by sectionGap
-	const tryAdd = (kind: WrappedSection["kind"], want: number, available: number) => {
-		if (available === 0) return;
-		let rows = Math.min(want, available);
-		while (rows > 0) {
-			const h = sectionGap + sectionH(kind, rows);
-			if (h <= budgetAfter(used)) {
-				sections.push({ kind, rows });
-				used += h;
-				return;
-			}
-			rows--;
-		}
+	const tracksRows = () => Math.min(listRows, stats.topTracks.length);
+	const artistsRows = () => Math.min(listRows, stats.topArtists.length);
+	const chipRowCount = () => Math.ceil(chipCount / chipCols);
+	const chipsH = () => (chipCount > 0 ? chipRowCount() * (chipH + chipGap) - chipGap : 0);
+	const listsH = () => {
+		const rows = Math.max(tracksRows(), artistsRows());
+		return rows > 0 ? sectionKickerBlock + rows * rowHeight(listLayout) - listLayout.gap : 0;
+	};
+	const genresH = () => (genreRows > 0 ? sectionKickerBlock + genreRows * (genreBarH + genreGap) - genreGap : 0);
+	const totalH = () => {
+		let h = KICKER_BLOCK + 8 + heroH;
+		if (chipCount > 0) h += sectionGap + chipsH();
+		if (listsH() > 0) h += sectionGap + listsH();
+		if (genresH() > 0) h += sectionGap + genresH();
+		return h;
 	};
 
-	tryAdd("tracks", isStory ? 4 : 3, stats.topTracks.length);
-	// Square: two artist rows so the genre section still fits below
-	tryAdd("artists", isStory ? 4 : 2, stats.topArtists.length);
-	tryAdd("genres", isStory ? 3 : 2, stats.topGenres.filter((g) => g.count > 0).length);
+	while (totalH() > availH && genreRows > 0) genreRows--;
+	while (totalH() > availH && listRows > 2) listRows--;
+	while (totalH() > availH && chipCount > chipCols) chipCount -= chipCols;
 
-	const height = fixed + used;
-	const totalHours = Math.floor(stats.totalDuration / 3_600_000);
-	const hasHourData = (stats.hourlyDistribution ?? []).some((v) => v > 0);
-	const streak = isRecap || allowStreak ? (stats.streak ?? 0) : 0;
+	const height = totalH();
+
+	const drawSectionKicker = (c: Ctx2D, text: string, kx: number, ky: number) => {
+		const prevLs = c.letterSpacing;
+		c.fillStyle = palette.dim;
+		c.font = `700 ${sectionKickerPx}px ${CV_FONT}`;
+		c.letterSpacing = "0.1em";
+		c.fillText(text, kx, ky + sectionKickerPx);
+		c.letterSpacing = prevLs;
+	};
 
 	return {
 		height,
@@ -1028,119 +1074,116 @@ const buildWrapped: CardBuilder = (_ctx, env, _w, availH) => {
 					: "Wrapped";
 			y = drawKicker(c, head, x, y, palette, true) + 8;
 
-			c.font = `900 ${heroPx}px ${CV_FONT}`;
-			c.fillStyle = rgb(palette.accent);
-			const heroBaseline = y + heroGlyphH;
-			c.fillText(`${totalHours}`, x, heroBaseline);
-			if (isStory) {
-				y += heroGlyphH + 24;
+			if (showHero) {
+				c.font = `900 ${heroPx}px ${CV_FONT}`;
+				c.fillStyle = rgb(palette.accent);
+				const heroBaseline = y + heroGlyphH;
+				c.fillText(heroValue, x, heroBaseline);
+				const numW = c.measureText(heroValue).width;
 				c.fillStyle = palette.text;
 				c.font = `700 ${unitPx}px ${CV_FONT}`;
-				c.fillText("hours", x, y + unitPx);
-				y += lh(unitPx) + 12;
-			} else {
-				const numW = c.measureText(`${totalHours}`).width;
-				c.fillStyle = palette.text;
-				c.font = `700 ${unitPx}px ${CV_FONT}`;
-				c.fillText("hours", x + numW + 20, heroBaseline);
-				y += heroGlyphH + 16;
+				c.fillText(heroUnit, x + numW + 20, heroBaseline);
+				y += heroH;
 			}
 
-			let meta =
-				stats.totalPlays > 0 ? `${formatNumber(stats.totalPlays)} plays · ${stats.uniqueArtistCount} artists` : "";
-			if (hasHourData && meta) meta += ` · peak ${formatPeakHour(stats.peakHour)}`;
-			if (streak > 0 && stats.totalPlays > 0) {
-				if (isRecap) {
-					meta +=
-						streak >= (recapDayCount ?? Number.POSITIVE_INFINITY)
-							? " · listened every day"
-							: ` · best run ${streak} days`;
-				} else {
-					meta += ` · ${streak}-day streak`;
-				}
-			}
-			c.fillStyle = palette.muted;
-			c.font = `${metaPx}px ${CV_FONT}`;
-			c.fillText(truncate(c, meta, width), x, y + metaPx);
-			y += lh(metaPx);
-
-			for (let si = 0; si < sections.length; si++) {
-				const sec = sections[si];
+			// Stat chips
+			if (chipCount > 0) {
 				y += sectionGap;
-
-				const prevLs = c.letterSpacing;
-				c.fillStyle = palette.dim;
-				c.font = `700 ${sectionKickerPx}px ${CV_FONT}`;
-				c.letterSpacing = "0.1em";
-				const label = sec.kind === "tracks" ? "TOP TRACKS" : sec.kind === "artists" ? "TOP ARTISTS" : "TOP GENRES";
-				c.fillText(label, x, y + sectionKickerPx);
-				c.letterSpacing = prevLs;
-				y += sectionKickerBlock;
-
-				if (sec.kind === "genres") {
-					const allGenres = stats.topGenres.filter((g) => g.count > 0);
-					const top = allGenres.slice(0, sec.rows);
-					const totalCount = allGenres.reduce((s, g) => s + g.count, 0);
-					const maxCount = top[0]?.count || 1;
-					c.font = `600 ${genreBarH + 2}px ${CV_FONT}`;
-					let labelW = 0;
-					for (const g of top) labelW = Math.max(labelW, c.measureText(g.genre).width);
-					labelW = Math.min(labelW + 6, Math.floor(width * 0.32));
-					for (let i = 0; i < top.length; i++) {
-						const g = top[i];
-						const ry = y + i * (genreBarH + genreGap);
-						const mid = ry + genreBarH / 2;
-						c.textBaseline = "middle";
-						c.fillStyle = palette.text;
-						c.font = `600 ${genreBarH + 2}px ${CV_FONT}`;
-						c.fillText(truncate(c, g.genre, labelW), x, mid);
-						const barX = x + labelW + 20;
-						const pctReserve = 76;
-						const barW = Math.max(48, width - pctReserve - (barX - x) - 16);
-						c.fillStyle = palette.barTrack;
-						fillRoundRect(c, barX, ry, barW, genreBarH, genreBarH / 2);
-						c.fillStyle = rgb(palette.accent, 1 - i * 0.15);
-						fillRoundRect(c, barX, ry, Math.max(genreBarH, barW * (g.count / maxCount)), genreBarH, genreBarH / 2);
-						c.fillStyle = palette.dim;
-						c.font = `600 ${genreBarH}px ${CV_FONT}`;
-						c.textAlign = "right";
-						c.fillText(`${Math.round((g.count / totalCount) * 100)}%`, x + width, mid);
-						c.textAlign = "left";
-						c.textBaseline = "alphabetic";
+				const chipW = Math.floor((width - chipGap * (chipCols - 1)) / chipCols);
+				for (let i = 0; i < chipCount; i++) {
+					const chip = shownChips[i];
+					const cx = x + (i % chipCols) * (chipW + chipGap);
+					const cy = y + Math.floor(i / chipCols) * (chipH + chipGap);
+					drawChunkBg(c, cx, cy, chipW, chipH, palette);
+					drawCapsLabel(c, chip.label, cx + 28, cy + 46, isStory ? 22 : 20, palette.dim);
+					c.fillStyle = palette.text;
+					c.font = `800 ${isStory ? 46 : 38}px ${CV_FONT}`;
+					c.fillText(truncate(c, chip.value, chipW - 56), cx + 28, cy + (isStory ? 108 : 96));
+					if (chip.sub && isStory) {
+						c.fillStyle = palette.muted;
+						c.font = `24px ${CV_FONT}`;
+						c.fillText(truncate(c, chip.sub, chipW - 56), cx + 28, cy + 144);
 					}
-					y += sec.rows * (genreBarH + genreGap) - genreGap;
-				} else {
-					const rows: Array<{ art?: string | null; seed: string; title: string; sub: string; count: number }> =
-						sec.kind === "tracks"
-							? stats.topTracks.slice(0, sec.rows).map((t: TopTrack) => ({
-									art: t.albumArt,
-									seed: t.trackName,
-									title: t.trackName,
-									sub: t.artistName,
-									count: t.count,
-								}))
-							: stats.topArtists.slice(0, sec.rows).map((a: TopArtist) => ({
-									art: a.imageUrl,
-									seed: a.artistName,
-									title: a.artistName,
-									sub: a.count > 0 ? `${formatNumber(a.count)} ${a.count === 1 ? "play" : "plays"}` : "",
-									count: sec.kind === "artists" ? 0 : a.count,
-								}));
-					for (let i = 0; i < rows.length; i++) {
-						const r = rows[i];
-						await drawMediaRow(c, env, listLayout, x, y, width, {
-							rank: i + 1,
-							art: r.art,
-							seed: r.seed,
-							title: r.title,
-							subtitle: r.sub,
-							rightValue: sec.kind === "tracks" && r.count > 0 ? `${r.count}` : undefined,
-							rightCaps: sec.kind === "tracks" && r.count > 0 ? "plays" : undefined,
-						});
-						y += rowHeight(listLayout);
-					}
-					y -= listLayout.gap;
 				}
+				y += chipsH();
+			}
+
+			// Top tracks / top artists side by side (full width when only one exists)
+			const tRows = tracksRows();
+			const aRows = artistsRows();
+			if (tRows > 0 || aRows > 0) {
+				y += sectionGap;
+				const twoCols = tRows > 0 && aRows > 0;
+				const colW = twoCols ? Math.floor((width - colGap) / 2) : width;
+				const rightX = x + colW + colGap;
+
+				if (tRows > 0) drawSectionKicker(c, "TOP TRACKS", x, y);
+				if (aRows > 0) drawSectionKicker(c, "TOP ARTISTS", twoCols ? rightX : x, y);
+				const listTop = y + sectionKickerBlock;
+
+				let ly = listTop;
+				for (let i = 0; i < tRows; i++) {
+					const t = stats.topTracks[i];
+					await drawMediaRow(c, env, listLayout, x, ly, colW, {
+						rank: i + 1,
+						art: t.albumArt,
+						seed: t.trackName,
+						title: t.trackName,
+						subtitle: t.artistName,
+						rightValue: t.count > 0 ? `${t.count}` : undefined,
+					});
+					ly += rowHeight(listLayout);
+				}
+				let ry = listTop;
+				for (let i = 0; i < aRows; i++) {
+					const a = stats.topArtists[i];
+					await drawMediaRow(c, env, listLayout, twoCols ? rightX : x, ry, colW, {
+						rank: i + 1,
+						art: a.imageUrl,
+						seed: a.artistName,
+						title: a.artistName,
+						subtitle: a.count > 0 ? `${formatNumber(a.count)} ${a.count === 1 ? "play" : "plays"}` : "",
+					});
+					ry += rowHeight(listLayout);
+				}
+				y = listTop + Math.max(tRows, aRows) * rowHeight(listLayout) - listLayout.gap;
+			}
+
+			// Genre bars
+			if (genreRows > 0) {
+				y += sectionGap;
+				drawSectionKicker(c, "TOP GENRES", x, y);
+				y += sectionKickerBlock;
+				const top = genres.slice(0, genreRows);
+				const totalCount = genres.reduce((s, g) => s + g.count, 0);
+				const maxCount = top[0]?.count || 1;
+				c.font = `600 ${genreBarH + 2}px ${CV_FONT}`;
+				let labelW = 0;
+				for (const g of top) labelW = Math.max(labelW, c.measureText(g.genre).width);
+				labelW = Math.min(labelW + 6, Math.floor(width * 0.32));
+				for (let i = 0; i < top.length; i++) {
+					const g = top[i];
+					const ry = y + i * (genreBarH + genreGap);
+					const mid = ry + genreBarH / 2;
+					c.textBaseline = "middle";
+					c.fillStyle = palette.text;
+					c.font = `600 ${genreBarH + 2}px ${CV_FONT}`;
+					c.fillText(truncate(c, g.genre, labelW), x, mid);
+					const barX = x + labelW + 20;
+					const pctReserve = 76;
+					const barW = Math.max(48, width - pctReserve - (barX - x) - 16);
+					c.fillStyle = palette.barTrack;
+					fillRoundRect(c, barX, ry, barW, genreBarH, genreBarH / 2);
+					c.fillStyle = rgb(palette.accent, 1 - i * 0.15);
+					fillRoundRect(c, barX, ry, Math.max(genreBarH, barW * (g.count / maxCount)), genreBarH, genreBarH / 2);
+					c.fillStyle = palette.dim;
+					c.font = `600 ${genreBarH}px ${CV_FONT}`;
+					c.textAlign = "right";
+					c.fillText(`${Math.round((g.count / totalCount) * 100)}%`, x + width, mid);
+					c.textAlign = "left";
+					c.textBaseline = "alphabetic";
+				}
+				y += genreRows * (genreBarH + genreGap) - genreGap;
 			}
 		},
 	};

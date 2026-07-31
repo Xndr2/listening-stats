@@ -464,6 +464,31 @@ if (( SIZE < MIN_ZIP_BYTES )); then
 	die "Download is too small (${SIZE} bytes)  -  expected a real release zip. Is ${ZIP_URL} valid?"
 fi
 
+# Integrity check: every release ships a listening-stats.zip.sha256 asset next to the zip.
+# A missing asset (releases predating checksums) downgrades to a warning; a present-but-
+# mismatching checksum is always fatal.
+step "Verifying checksum"
+SHA_PATH="${TMP_DIR}/${APP_NAME}.zip.sha256"
+if curl -fsSL "${ZIP_URL}.sha256" -o "${SHA_PATH}" 2>/dev/null; then
+	EXPECTED_SHA="$(head -1 "${SHA_PATH}" | awk '{print tolower($1)}')"
+	if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{64}$ ]]; then
+		die "Checksum asset is malformed (${ZIP_URL}.sha256). Refusing to install."
+	fi
+	if command -v sha256sum >/dev/null 2>&1; then
+		ACTUAL_SHA="$(sha256sum "${ZIP_PATH}" | awk '{print tolower($1)}')"
+	elif command -v shasum >/dev/null 2>&1; then
+		ACTUAL_SHA="$(shasum -a 256 "${ZIP_PATH}" | awk '{print tolower($1)}')"
+	else
+		die "sha256sum/shasum not found  -  cannot verify the download. Install coreutils and re-run."
+	fi
+	if [[ "${ACTUAL_SHA}" != "${EXPECTED_SHA}" ]]; then
+		die "Checksum mismatch for listening-stats.zip (expected ${EXPECTED_SHA}, got ${ACTUAL_SHA}). The download may be corrupt or tampered with  -  aborting."
+	fi
+	detail "sha256 OK (${EXPECTED_SHA})"
+else
+	warn "No .sha256 asset published for this release  -  skipping checksum verification."
+fi
+
 mkdir -p "${EXTRACT}"
 
 step "Extracting bundle"

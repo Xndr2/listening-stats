@@ -34,9 +34,4 @@ export const LS_KEYS = {
 	UPDATE_PROMPT_SNOOZE_UNTIL: "listening-stats:update-prompt-snooze-until",
 	// Monthly recap banner dismissal (month key, e.g. "2026-06")
 	RECAP_DISMISSED_MONTH: "listening-stats:recap-dismissed-month",
-	// Local stats ranking mode: "streams" | "minutes"
-	RANK_MODE: "listening-stats:rank-mode",
-	// Auto top-songs playlist settings + build state
-	PLAYLIST_CONFIG: "listening-stats:playlist-config",
-	PLAYLIST_STATE: "listening-stats:playlist-state",
 } as const;

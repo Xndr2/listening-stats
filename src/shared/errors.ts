@@ -13,16 +13,16 @@ export interface AppError {
 	resetAt?: number;
 }
 
-export class StatsFmError extends Error {
+export class ClassifiedError extends Error {
 	readonly appError: AppError;
 	constructor(appError: AppError) {
 		super(appError.message);
-		this.name = "StatsFmError";
+		this.name = "ClassifiedError";
 		this.appError = appError;
 	}
 }
 
-export function classifyStatsFmError(status: number, message: string, resetAt?: number): AppError {
+export function classifyHttpError(status: number, message: string, resetAt?: number): AppError {
 	if (status === 404) {
 		return { variant: "UserNotFound", message, retryable: false };
 	}

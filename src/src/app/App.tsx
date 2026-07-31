@@ -16,7 +16,6 @@ import {
 	safeParseProviderPeriods,
 	savePeriodForProvider,
 } from "../shared/stats/provider-periods-storage";
-import { getRankMode } from "../shared/stats/rank-mode";
 import { statsCache } from "../shared/stats/stats-cache";
 import type { Period, StatsResult } from "../shared/types/stats";
 import type { UpdateCheckResult } from "../shared/update/update-check";
@@ -48,9 +47,6 @@ import { buildRecapSummary, dismissRecap, getRecapSource, isRecapDismissed, load
 import { getTourSteps, shouldAutoStartTour } from "./tour";
 
 export function buildCacheKey(activeProviderId: string, periodId: string): string {
-	// Local results depend on the rank mode; keying on it matches LocalProvider's
-	// internal cache key exactly, so both layers share one entry per mode.
-	if (activeProviderId === "local") return `local:${periodId}:${getRankMode()}`;
 	return `${activeProviderId}:${periodId}`;
 }
 
@@ -254,11 +250,7 @@ function App() {
 			loadStats(activePeriod, true);
 		};
 		window.addEventListener(EVENTS.PLAY_RECORDED, handler);
-		window.addEventListener(EVENTS.RANK_MODE_CHANGED, handler);
-		return () => {
-			window.removeEventListener(EVENTS.PLAY_RECORDED, handler);
-			window.removeEventListener(EVENTS.RANK_MODE_CHANGED, handler);
-		};
+		return () => window.removeEventListener(EVENTS.PLAY_RECORDED, handler);
 	}, [activePeriod, loadStats, activePage]);
 
 	useEffect(() => {
@@ -562,7 +554,7 @@ function App() {
 	useEffect(() => {
 		// Wait for the dashboard's own load to finish (stats non-null) so the recap
 		// computation hits the provider's stats cache instead of racing the initial
-		// API burst - a concurrent duplicate load can trip stats.fm rate limits.
+		// API burst — a concurrent duplicate load can trip stats.fm rate limits.
 		if (!initialized || !stats || recapCheckedRef.current) return;
 		recapCheckedRef.current = true;
 		const source = getRecapSource(providerRegistry.getActiveId() ?? "local");
@@ -576,7 +568,7 @@ function App() {
 			.catch(() => {});
 	}, [initialized, stats]);
 
-	// Settings > Display "Preview recap" hook - always recomputes and opens the modal.
+	// Settings > Display "Preview recap" hook — always recomputes and opens the modal.
 	useEffect(() => {
 		const handler = () => {
 			const source = getRecapSource(providerRegistry.getActiveId() ?? "local");

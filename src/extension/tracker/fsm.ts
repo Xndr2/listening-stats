@@ -4,11 +4,7 @@ import type { PlayEvent } from "../../shared/types/play-event";
 import { normalizeSpotifyImageUrl } from "../../shared/util/spotify-image-url";
 
 /** Count as a full play when listened past the user threshold or through ~90% of the track. */
-export function classifyPlayOrSkip(
-	totalPlayedMs: number,
-	capturedDurationMs: number,
-	thresholdMs: number,
-): "play" | "skip" {
+function classifyPlayOrSkip(totalPlayedMs: number, capturedDurationMs: number, thresholdMs: number): "play" | "skip" {
 	if (capturedDurationMs <= 0) return "skip";
 	const ratio = totalPlayedMs / capturedDurationMs;
 	if (ratio >= 0.9) return "play";

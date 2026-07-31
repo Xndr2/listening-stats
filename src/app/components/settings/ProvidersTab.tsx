@@ -30,7 +30,7 @@ export function readStatsFmConfig(): StatsFmConfig | null {
 	}
 }
 
-export function readLastfmConfig(): LastfmProviderConfig | null {
+function readLastfmConfig(): LastfmProviderConfig | null {
 	const raw = localStorage.getItem(LS_KEYS.LASTFM_CONFIG);
 	if (!raw) return null;
 	try {

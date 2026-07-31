@@ -1,13 +1,11 @@
 import { db } from "../storage/db";
 import type { PlayEvent } from "../types/play-event";
 import type { Period, RecentPlay, StatsResult, TopAlbum, TopArtist, TopGenre, TopTrack } from "../types/stats";
-import { toLocalDateKey } from "../util/date-key";
 import { normalizeSpotifyImageUrl } from "../util/spotify-image-url";
 import { enrichArtists, isSpotifyArtistUri } from "./artist-enrichment";
 import { getAdjacentPeriod, getPriorPeriodBoundaries, LOCAL_PERIODS } from "./periods";
 import type { WaveCallback } from "./progressive";
 import type { ProviderInfo, StatsProvider } from "./provider";
-import { getRankMode, type RankMode } from "./rank-mode";
 import { statsCache } from "./stats-cache";
 
 const CACHE_KEY_PREFIX = "local";
@@ -53,15 +51,13 @@ function albumKeyOf(e: PlayEvent): string {
 	return e.albumUri || `local:album:${e.artistName.toLowerCase()}:${e.albumName.toLowerCase()}`;
 }
 
-function cacheKey(periodId: string, rankMode: RankMode): string {
-	return `${CACHE_KEY_PREFIX}:${periodId}:${rankMode}`;
+function cacheKey(periodId: string): string {
+	return `${CACHE_KEY_PREFIX}:${periodId}`;
 }
 
-function rankComparator(mode: RankMode) {
-	return (a: { count: number; durationMs: number }, b: { count: number; durationMs: number }) =>
-		mode === "minutes"
-			? b.durationMs - a.durationMs || b.count - a.count
-			: b.count - a.count || b.durationMs - a.durationMs;
+function toLocalDateKey(timestampMs: number): string {
+	const d = new Date(timestampMs);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function prevDay(d: Date): Date {
@@ -122,8 +118,7 @@ export class LocalProvider implements StatsProvider {
 	}
 
 	async calculateStats(period: Period): Promise<StatsResult> {
-		const rankMode = getRankMode();
-		const key = cacheKey(period.id, rankMode);
+		const key = cacheKey(period.id);
 
 		// Check cache first (per STATS-01)
 		const cached = statsCache.get<StatsResult>(key);
@@ -258,12 +253,12 @@ export class LocalProvider implements StatsProvider {
 
 		// Sort and rank tracks
 		const topTracks: TopTrack[] = Array.from(trackMap.values())
-			.sort(rankComparator(rankMode))
+			.sort((a, b) => b.count - a.count)
 			.map((t, i) => ({ rank: i + 1, ...t }));
 
 		// Sort and rank artists
 		const topArtists: TopArtist[] = Array.from(artistMap.values())
-			.sort(rankComparator(rankMode))
+			.sort((a, b) => b.count - a.count)
 			.map((a, i) => ({
 				rank: i + 1,
 				artistUri: a.uri,
@@ -274,7 +269,7 @@ export class LocalProvider implements StatsProvider {
 
 		// Sort and rank albums
 		const topAlbums: TopAlbum[] = Array.from(albumMap.values())
-			.sort(rankComparator(rankMode))
+			.sort((a, b) => b.count - a.count)
 			.map((a, i) => ({
 				rank: i + 1,
 				albumUri: a.uri,

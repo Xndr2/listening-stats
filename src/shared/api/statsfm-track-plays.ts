@@ -25,11 +25,7 @@ function statsFmRangeForDashboardPeriod(periodId: string): string | null {
  * Paginates stats.fm top tracks until the Spotify id is found or the list ends.
  * Free accounts may cap pages; we scan up to MAX_OFFSET for deep catalog tracks.
  */
-export async function fetchStatsFmTopTrackStreams(
-	username: string,
-	trackUri: string,
-	range: string,
-): Promise<number | null> {
+async function fetchStatsFmTopTrackStreams(username: string, trackUri: string, range: string): Promise<number | null> {
 	const spotifyId = spotifyIdFromTrackUri(trackUri);
 	if (!spotifyId || !username.trim()) return null;
 

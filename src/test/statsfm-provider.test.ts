@@ -14,7 +14,7 @@ vi.mock("../shared/api/statsfm-client", () => ({
 
 import { sfmCircuitBreaker, sfmGet, validateUsername } from "../shared/api/statsfm-client";
 import { LS_KEYS } from "../shared/constants/storage-keys";
-import { StatsFmError } from "../shared/errors";
+import { ClassifiedError } from "../shared/errors";
 import { STATSFM_PERIODS, STATSFM_PERIODS_PLUS } from "../shared/stats/periods";
 import { statsCache } from "../shared/stats/stats-cache";
 import { StatsFmProvider } from "../shared/stats/statsfm-provider";
@@ -583,7 +583,7 @@ describe("StatsFmProvider", () => {
 			expect(result.recentPlays[0].trackUri).toBe("spotify:track:abc123");
 		});
 
-		it("when sfmGet returns { ok: false } for all critical endpoints, throws StatsFmError", async () => {
+		it("when sfmGet returns { ok: false } for all critical endpoints, throws ClassifiedError", async () => {
 			setupConfig({ isPlus: false });
 			await provider.init();
 
@@ -596,7 +596,7 @@ describe("StatsFmProvider", () => {
 				return Promise.resolve({ ok: false, status: 0, message: "skipped" });
 			});
 
-			await expect(provider.calculateStats(STATSFM_PERIODS[0])).rejects.toThrow(StatsFmError);
+			await expect(provider.calculateStats(STATSFM_PERIODS[0])).rejects.toThrow(ClassifiedError);
 		});
 
 		it("calculateStats returns listeningDays counted from per-day stats (days with count > 0)", async () => {
@@ -820,22 +820,22 @@ describe("StatsFmProvider", () => {
 	});
 
 	describe("bulk failure error classification", () => {
-		it("throws StatsFmError with UserNotFound when all critical endpoints return 404", async () => {
+		it("throws ClassifiedError with UserNotFound when all critical endpoints return 404", async () => {
 			setupConfig({ isPlus: false });
 			await provider.init();
 			sfmGetMock.mockResolvedValue({ ok: false, status: 404, message: "HTTP 404" });
 
-			await expect(provider.calculateStats(STATSFM_PERIODS[0])).rejects.toThrow(StatsFmError);
+			await expect(provider.calculateStats(STATSFM_PERIODS[0])).rejects.toThrow(ClassifiedError);
 
 			try {
 				await provider.calculateStats(STATSFM_PERIODS[0]);
 			} catch (e) {
-				expect(e).toBeInstanceOf(StatsFmError);
-				expect((e as StatsFmError).appError.variant).toBe("UserNotFound");
+				expect(e).toBeInstanceOf(ClassifiedError);
+				expect((e as ClassifiedError).appError.variant).toBe("UserNotFound");
 			}
 		});
 
-		it("throws StatsFmError with NetworkError when all critical endpoints fail with status 0", async () => {
+		it("throws ClassifiedError with NetworkError when all critical endpoints fail with status 0", async () => {
 			expect.assertions(3);
 			setupConfig({ isPlus: false });
 			await provider.init();
@@ -844,13 +844,13 @@ describe("StatsFmProvider", () => {
 			try {
 				await provider.calculateStats(STATSFM_PERIODS[0]);
 			} catch (e) {
-				expect(e).toBeInstanceOf(StatsFmError);
-				expect((e as StatsFmError).appError.variant).toBe("NetworkError");
-				expect((e as StatsFmError).appError.retryable).toBe(true);
+				expect(e).toBeInstanceOf(ClassifiedError);
+				expect((e as ClassifiedError).appError.variant).toBe("NetworkError");
+				expect((e as ClassifiedError).appError.retryable).toBe(true);
 			}
 		});
 
-		it("throws StatsFmError with RateLimited when circuit is open and includes resetAt", async () => {
+		it("throws ClassifiedError with RateLimited when circuit is open and includes resetAt", async () => {
 			expect.assertions(3);
 			setupConfig({ isPlus: false });
 			await provider.init();
@@ -865,13 +865,13 @@ describe("StatsFmProvider", () => {
 			try {
 				await provider.calculateStats(STATSFM_PERIODS[0]);
 			} catch (e) {
-				expect(e).toBeInstanceOf(StatsFmError);
-				expect((e as StatsFmError).appError.variant).toBe("RateLimited");
-				expect((e as StatsFmError).appError.resetAt).toBe(resetTimestamp);
+				expect(e).toBeInstanceOf(ClassifiedError);
+				expect((e as ClassifiedError).appError.variant).toBe("RateLimited");
+				expect((e as ClassifiedError).appError.resetAt).toBe(resetTimestamp);
 			}
 		});
 
-		it("throws StatsFmError with ServiceDown for HTTP 500 bulk failure", async () => {
+		it("throws ClassifiedError with ServiceDown for HTTP 500 bulk failure", async () => {
 			expect.assertions(2);
 			setupConfig({ isPlus: false });
 			await provider.init();
@@ -880,8 +880,8 @@ describe("StatsFmProvider", () => {
 			try {
 				await provider.calculateStats(STATSFM_PERIODS[0]);
 			} catch (e) {
-				expect(e).toBeInstanceOf(StatsFmError);
-				expect((e as StatsFmError).appError.variant).toBe("ServiceDown");
+				expect(e).toBeInstanceOf(ClassifiedError);
+				expect((e as ClassifiedError).appError.variant).toBe("ServiceDown");
 			}
 		});
 

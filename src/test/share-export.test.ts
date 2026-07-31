@@ -230,6 +230,56 @@ describe("renderShareCardBlob (Canvas 2D pipeline)", () => {
 		expect(blob).toBeInstanceOf(Blob);
 	});
 
+	it("wrapped draws stat chips and both list sections when the period has full data", async () => {
+		mockCtx.fillText.mockClear();
+		const { renderShareCardCanvas } = await import("../app/components/ShareModal");
+		await renderShareCardCanvas(makeMockStats(), "wrapped", "story", "Last 4 weeks", "");
+		const texts = mockCtx.fillText.mock.calls.map((c: unknown[]) => c[0]);
+		expect(texts).toContain("TOP TRACKS");
+		expect(texts).toContain("TOP ARTISTS");
+		expect(texts).toContain("TOP GENRES");
+		expect(texts).toContain("PLAYS");
+		expect(texts).toContain("PEAK HOUR");
+	});
+
+	it("wrapped omits blocks whose data is missing for the period", async () => {
+		mockCtx.fillText.mockClear();
+		const { renderShareCardCanvas } = await import("../app/components/ShareModal");
+		const sparse = {
+			...makeMockStats(),
+			topGenres: [],
+			hourlyDistribution: Array(24).fill(0),
+			dailyPlayCounts: [],
+			streak: 0,
+		};
+		await renderShareCardCanvas(sparse, "wrapped", "story", "Last 4 weeks", "");
+		const texts = mockCtx.fillText.mock.calls.map((c: unknown[]) => c[0]);
+		expect(texts).toContain("TOP TRACKS");
+		expect(texts).not.toContain("TOP GENRES");
+		expect(texts).not.toContain("PEAK HOUR");
+		expect(texts).not.toContain("STREAK");
+		expect(texts).not.toContain("BEST DAY");
+	});
+
+	it("wrapped survives a period with no data at all", async () => {
+		const { renderShareCardBlob } = await import("../app/components/ShareModal");
+		const empty = {
+			...makeMockStats(),
+			topTracks: [],
+			topArtists: [],
+			topGenres: [],
+			totalPlays: 0,
+			totalDuration: 0,
+			uniqueTrackCount: 0,
+			uniqueArtistCount: 0,
+			hourlyDistribution: Array(24).fill(0),
+			dailyPlayCounts: [],
+			streak: 0,
+		};
+		const blob = await renderShareCardBlob(empty, "wrapped", "square", "Last 4 weeks", "");
+		expect(blob).toBeInstanceOf(Blob);
+	});
+
 	it("handles empty stats gracefully", async () => {
 		const { renderShareCardBlob } = await import("../app/components/ShareModal");
 		const emptyStats = {

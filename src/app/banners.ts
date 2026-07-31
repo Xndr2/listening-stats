@@ -9,7 +9,7 @@ export interface BannerConfig {
 	actionOpensChangelog?: boolean;
 }
 
-export const BANNERS: Record<string, BannerConfig> = {
+const BANNERS: Record<string, BannerConfig> = {
 	"2.6": {
 		title: "v2.6 is here",
 		body: "section streaming, share cards, world charts.",
@@ -22,11 +22,11 @@ export interface ResolvedBanner extends BannerConfig {
 	dismissKey: string;
 }
 
-export function getLocalBanner(version: string): BannerConfig | null {
+function getLocalBanner(version: string): BannerConfig | null {
 	return BANNERS[version] ?? null;
 }
 
-export function isLocalBannerDismissed(version: string): boolean {
+function isLocalBannerDismissed(version: string): boolean {
 	try {
 		return localStorage.getItem(LS_KEYS.DISMISSED_BANNER_VERSION) === version;
 	} catch {
@@ -34,7 +34,7 @@ export function isLocalBannerDismissed(version: string): boolean {
 	}
 }
 
-export function isRemoteAnnouncementDismissed(id: string): boolean {
+function isRemoteAnnouncementDismissed(id: string): boolean {
 	try {
 		return localStorage.getItem(LS_KEYS.DISMISSED_REMOTE_ANNOUNCEMENT_ID) === id;
 	} catch {
@@ -74,28 +74,4 @@ export function resolveAnnouncementBanner(
 	}
 
 	return null;
-}
-
-/** Local banner only  -  used by tests and legacy call sites. */
-export function getActiveBanner(currentVersion: string): BannerConfig | null {
-	const local = getLocalBanner(currentVersion);
-	if (!local) return null;
-	if (isLocalBannerDismissed(currentVersion)) return null;
-	return local;
-}
-
-export function dismissBanner(version: string): void {
-	try {
-		localStorage.setItem(LS_KEYS.DISMISSED_BANNER_VERSION, version);
-	} catch {
-		/* ignore */
-	}
-}
-
-export function dismissRemoteAnnouncement(id: string): void {
-	try {
-		localStorage.setItem(LS_KEYS.DISMISSED_REMOTE_ANNOUNCEMENT_ID, id);
-	} catch {
-		/* ignore */
-	}
 }

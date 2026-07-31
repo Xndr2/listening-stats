@@ -1,7 +1,7 @@
 import { LS_KEYS } from "../../shared/constants/storage-keys";
 
-export const DEFAULT_THRESHOLD_MS = 30_000; // default 30s play threshold (v1 used 10s)
-export const DEFAULT_THRESHOLD_PERCENT = 25;
+const DEFAULT_THRESHOLD_MS = 30_000; // default 30s play threshold (v1 used 10s)
+const DEFAULT_THRESHOLD_PERCENT = 25;
 
 export type ThresholdMode = "seconds" | "percent";
 

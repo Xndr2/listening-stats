@@ -1,83 +1,22 @@
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { PlaybarWidget } from "./components/PlaybarWidget";
 import { injectStyles } from "./styles";
+import { mountPlaybarWidget } from "./widget-mount";
 
 declare const __VERSION__: string;
 
 const { React } = Spicetify;
 
-let widgetMounted = false;
-let widgetContainer: HTMLElement | null = null;
-let playbarObserver: MutationObserver | null = null;
-let retryInterval: ReturnType<typeof setInterval> | null = null;
-
-const PLAYBAR_SELECTORS = [
-	".main-nowPlayingWidget-nowPlaying",
-	".main-nowPlayingBar-left",
-	'[data-testid="now-playing-widget"]',
-];
-
-export function findPlaybarMount(): HTMLElement | null {
-	for (const sel of PLAYBAR_SELECTORS) {
-		const el = document.querySelector<HTMLElement>(sel);
-		if (el) return el;
-	}
-	return null;
-}
-
-function startAttachLoop(container: HTMLElement): void {
-	const tryAttach = () => {
-		// Cheap steady-state check: skip the selector queries while the widget
-		// is still attached somewhere in the document.
-		if (container.isConnected && container.parentElement !== document.body) return;
-		const playbar = findPlaybarMount();
-		if (!playbar) return;
-		if (container.parentElement === playbar) return;
-		playbar.appendChild(container);
-	};
-	tryAttach();
-
-	playbarObserver = new MutationObserver(() => {
-		tryAttach();
-	});
-	playbarObserver.observe(document.body, { childList: true, subtree: true });
-
-	retryInterval = setInterval(tryAttach, 2000);
-}
-
 export function render() {
 	injectStyles();
-
-	if (!widgetMounted) {
-		widgetMounted = true;
-		widgetContainer = document.createElement("div");
-		widgetContainer.id = "listening-stats-widget-root";
-		widgetContainer.style.display = "contents";
-
-		document.body.appendChild(widgetContainer);
-		startAttachLoop(widgetContainer);
-
-		Spicetify.ReactDOM.render(
-			React.createElement(ErrorBoundary, { silent: true }, React.createElement(PlaybarWidget)),
-			widgetContainer,
-		);
-	} else if (widgetContainer && !playbarObserver) {
-		// unmount() stopped the attach loop; restart it so the playbar widget
-		// keeps re-attaching after the user navigates back to the app.
-		startAttachLoop(widgetContainer);
-	}
+	// The extension bundle mounts the playbar widget at startup; this is a
+	// fallback for setups where extension.js did not load. No-op if mounted.
+	mountPlaybarWidget();
 
 	return React.createElement(ErrorBoundary, { appVersion: __VERSION__ }, React.createElement(App));
 }
 
 export function unmount() {
-	if (playbarObserver) {
-		playbarObserver.disconnect();
-		playbarObserver = null;
-	}
-	if (retryInterval) {
-		clearInterval(retryInterval);
-		retryInterval = null;
-	}
+	// The playbar widget is owned by the extension bundle and stays mounted
+	// across navigation; nothing to clean up here.
 }

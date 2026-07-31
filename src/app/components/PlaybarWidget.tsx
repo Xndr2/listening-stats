@@ -12,7 +12,7 @@ import { getPreferences } from "../preferences";
 import { PlayCountPill } from "./PlayCountPill";
 
 const { React } = Spicetify;
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useCallback, useRef } = React;
 
 interface TrackPlayInfo {
 	count: number;
@@ -25,8 +25,15 @@ function useNowPlayingCount(): TrackPlayInfo | null {
 	const [info, setInfo] = useState<TrackPlayInfo | null>(null);
 	const [trackUri, setTrackUri] = useState<string | null>(() => Spicetify.Player.data?.item?.uri ?? null);
 	const [reloadKey, setReloadKey] = useState(0);
+	// Generation guard: a slow stats.fm response for the previous track must not
+	// overwrite the count of the track the user has already switched to.
+	const generationRef = useRef(0);
 
 	const lookupCount = useCallback(async (uri: string) => {
+		const generation = ++generationRef.current;
+		const commit = (value: TrackPlayInfo | null) => {
+			if (generationRef.current === generation) setInfo(value);
+		};
 		try {
 			const prefs = getPreferences();
 			const events = await db.playEvents
@@ -53,19 +60,19 @@ function useNowPlayingCount(): TrackPlayInfo | null {
 					}
 					const count = lifetime ?? localCount;
 					const firstPlayedAt = lifetime != null ? null : localFirst;
-					setInfo({ count, firstPlayedAt, periodStreams, periodLabel });
+					commit({ count, firstPlayedAt, periodStreams, periodLabel });
 					return;
 				}
 			}
 
-			setInfo({
+			commit({
 				count: localCount,
 				firstPlayedAt: localFirst,
 				periodStreams: undefined,
 				periodLabel: undefined,
 			});
 		} catch {
-			setInfo(null);
+			commit(null);
 		}
 	}, []);
 
@@ -73,6 +80,8 @@ function useNowPlayingCount(): TrackPlayInfo | null {
 		if (trackUri) {
 			lookupCount(trackUri);
 		} else {
+			// Invalidate in-flight lookups so they cannot resurrect a stale count.
+			generationRef.current++;
 			setInfo(null);
 		}
 	}, [trackUri, lookupCount, reloadKey]);

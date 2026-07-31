@@ -1,6 +1,10 @@
 /**
  * Synthetic URIs for imports without Spotify IDs: listening-stats:{type}:{hash}.
- * Hash: first 12 hex chars of SHA-256(lower(track|artist|album)).
+ * Hash: first 12 hex chars of SHA-256 over the lowercased identity of each
+ * entity - track: track+artist+album, artist: artist, album: artist+album.
+ * The keys must identify the entity itself: stats aggregation groups by these
+ * URIs, so hashing the full compound into the artist/album URIs would split
+ * one artist into a bucket per track.
  */
 
 async function sha256Truncated(input: string): Promise<string> {
@@ -14,22 +18,20 @@ async function sha256Truncated(input: string): Promise<string> {
 		.slice(0, 12);
 }
 
-/**
- * Generate deterministic synthetic URIs for a track+artist+album combination.
- *
- * All three URIs share the same hash derived from the compound key
- * (trackName + artistName + albumName), lowercased before hashing.
- */
+/** Generate deterministic synthetic URIs for a track+artist+album combination. */
 export async function generateSyntheticUris(
 	trackName: string,
 	artistName: string,
 	albumName: string,
 ): Promise<{ trackUri: string; artistUri: string; albumUri: string }> {
-	const compound = trackName + artistName + albumName;
-	const hash = await sha256Truncated(compound);
+	const [trackHash, artistHash, albumHash] = await Promise.all([
+		sha256Truncated(trackName + artistName + albumName),
+		sha256Truncated(artistName),
+		sha256Truncated(artistName + albumName),
+	]);
 	return {
-		trackUri: `listening-stats:track:${hash}`,
-		artistUri: `listening-stats:artist:${hash}`,
-		albumUri: `listening-stats:album:${hash}`,
+		trackUri: `listening-stats:track:${trackHash}`,
+		artistUri: `listening-stats:artist:${artistHash}`,
+		albumUri: `listening-stats:album:${albumHash}`,
 	};
 }

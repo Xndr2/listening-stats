@@ -172,7 +172,7 @@ async function hydrateAlbumArtFromTracksApi(tracks: TopTrack[]): Promise<void> {
 
 /**
  * Fetches artist portraits into the in-memory stats object. Share cards must not rely on DB TTL
- * skips from enrichArtists - this always fills missing portraits when Spotify returns images.
+ * skips from enrichArtists — this always fills missing portraits when Spotify returns images.
  */
 async function hydrateTopArtistPortraitsFromApi(stats: StatsResult): Promise<void> {
 	const need = stats.topArtists.filter(
@@ -219,7 +219,7 @@ function copyArtistImageFromTopTracks(stats: StatsResult): void {
 	}
 }
 
-/** Uri mismatch (stats.fm placeholders vs Spotify ids) - match first top track by artist name. */
+/** Uri mismatch (stats.fm placeholders vs Spotify ids) — match first top track by artist name. */
 function copyArtistImageFromTopTracksByName(stats: StatsResult): void {
 	const byName = new Map<string, string>();
 	for (const t of stats.topTracks) {

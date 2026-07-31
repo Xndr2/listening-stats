@@ -1,6 +1,6 @@
 import { LS_KEYS } from "../../shared/constants/storage-keys";
 import type { AppError } from "../../shared/errors";
-import { classifyStatsFmError } from "../../shared/errors";
+import { classifyHttpError } from "../../shared/errors";
 import type { WorldChartKind } from "../../shared/types/world-charts";
 import type { WorldChartDataSource, WorldTrack, WorldWindow } from "../world-charts-service";
 import {
@@ -88,7 +88,7 @@ export function WorldChartsPage() {
 			setTracks(trackResult.data);
 			trackSource = trackResult.source ?? "statsfm";
 		} else {
-			setError(classifyStatsFmError(trackResult.status, trackResult.message));
+			setError(classifyHttpError(trackResult.status, trackResult.message));
 			setTracks([]);
 		}
 

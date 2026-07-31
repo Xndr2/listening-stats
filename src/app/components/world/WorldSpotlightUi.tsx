@@ -29,7 +29,7 @@ function tileFallback(seed: string, label: string): { a: string; b: string; init
 	};
 }
 
-export function Indicator({ value }: { value: WorldIndicator | null | undefined }) {
+function Indicator({ value }: { value: WorldIndicator | null | undefined }) {
 	if (!value) return null;
 	const dir = value === "UP" ? "up" : value === "DOWN" ? "down" : "new";
 	return (
@@ -44,7 +44,7 @@ export function Indicator({ value }: { value: WorldIndicator | null | undefined 
 	);
 }
 
-export function WorldArt({
+function WorldArt({
 	src,
 	alt,
 	size = 44,
@@ -140,7 +140,7 @@ export function WorldKindTabs({ value, onChange }: { value: WorldChartKind; onCh
 	);
 }
 
-export function TrackPlayButton({ item, size = 28 }: { item: WorldTrack; size?: number }) {
+function TrackPlayButton({ item, size = 28 }: { item: WorldTrack; size?: number }) {
 	const tooltip = trackPlayTooltip(item);
 
 	const onClick = (e: { stopPropagation: () => void }) => {
@@ -165,9 +165,7 @@ export function TrackPlayButton({ item, size = 28 }: { item: WorldTrack; size?: 
 	);
 }
 
-export type ChartKind = WorldChartKind;
-
-export function describeItem(item: WorldTrack, kind: WorldChartKind) {
+function describeItem(item: WorldTrack, kind: WorldChartKind) {
 	if (kind === "track") {
 		return { title: item.title, sub: item.artist, art: item.artUrl };
 	}

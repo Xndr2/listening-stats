@@ -2,18 +2,16 @@ import { CloseIcon } from "../../icons";
 import { AboutTab } from "./AboutTab";
 import { DataTab } from "./DataTab";
 import { DisplayTab } from "./DisplayTab";
-import { PlaylistTab } from "./PlaylistTab";
 import { ProvidersTab } from "./ProvidersTab";
 import { TrackingTab } from "./TrackingTab";
 
 const { useState, useEffect } = Spicetify.React;
 
-export type SettingsTab = "tracking" | "display" | "playlist" | "data" | "providers" | "about";
+export type SettingsTab = "tracking" | "display" | "data" | "providers" | "about";
 
 const TAB_LABELS: Record<SettingsTab, string> = {
 	tracking: "Tracking",
 	display: "Display",
-	playlist: "Playlist",
 	data: "Data",
 	providers: "Providers",
 	about: "About",
@@ -77,7 +75,7 @@ export function SettingsModal({
 				</div>
 
 				<div className="settings-tabs" role="tablist">
-					{(["tracking", "display", "playlist", "data", "providers", "about"] as const).map((tab) => (
+					{(["tracking", "display", "data", "providers", "about"] as const).map((tab) => (
 						<button
 							type="button"
 							key={tab}
@@ -95,7 +93,6 @@ export function SettingsModal({
 				{activeTab === "display" && (
 					<DisplayTab onPrefsChanged={onPrefsChanged} announcementDismissKey={announcementDismissKey} />
 				)}
-				{activeTab === "playlist" && <PlaylistTab />}
 				{activeTab === "data" && <DataTab onRefresh={onRefresh} />}
 				{activeTab === "providers" && <ProvidersTab />}
 				{activeTab === "about" && (

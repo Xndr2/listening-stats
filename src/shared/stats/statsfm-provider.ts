@@ -1,6 +1,6 @@
 import { type SfmResult, type StatsFmConfig, sfmCircuitBreaker, sfmGet, validateUsername } from "../api/statsfm-client";
 import { LS_KEYS } from "../constants/storage-keys";
-import { classifyStatsFmError, StatsFmError } from "../errors";
+import { ClassifiedError, classifyHttpError } from "../errors";
 import type { Period, RecentPlay, StatsResult, TopAlbum, TopArtist, TopGenre, TopTrack } from "../types/stats";
 import type {
 	SfmDateStats,
@@ -276,7 +276,7 @@ export class StatsFmProvider implements StatsProvider {
 		const statsErr = extractFailure(statsRes);
 		if (tracksErr && artistsErr && statsErr) {
 			const resetAt = sfmCircuitBreaker.getResetAt() ?? undefined;
-			throw new StatsFmError(classifyStatsFmError(tracksErr.status, tracksErr.message, resetAt));
+			throw new ClassifiedError(classifyHttpError(tracksErr.status, tracksErr.message, resetAt));
 		}
 
 		// Extract fulfilled data with fallbacks
@@ -721,7 +721,7 @@ export class StatsFmProvider implements StatsProvider {
 					peakHour: 0,
 				},
 				3,
-				classifyStatsFmError(datesFailure.status, datesFailure.message),
+				classifyHttpError(datesFailure.status, datesFailure.message),
 			);
 		} else {
 			onWave(

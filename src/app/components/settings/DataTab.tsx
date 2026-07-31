@@ -1,9 +1,8 @@
 import { EVENTS } from "../../../shared/constants/events";
-import { LOCAL_PERIODS } from "../../../shared/stats/periods";
-import { providerRegistry } from "../../../shared/stats/provider";
 import { statsCache } from "../../../shared/stats/stats-cache";
 import { db } from "../../../shared/storage/db";
-import { importFileEvents, type ParseResult, parseJsonEvents, parseV1Csv } from "../../../shared/storage/import";
+import { importFileEvents, type ParseResult, parseHistoryCsv, parseJsonEvents } from "../../../shared/storage/import";
+import { parseSpotifyZip, type SpotifyZipParseResult } from "../../../shared/storage/spotify-zip";
 import { downloadFile } from "../../utils";
 import { SettingRow, SettingsGroup } from "./controls";
 
@@ -13,7 +12,7 @@ interface Props {
 	onRefresh: () => void;
 }
 
-type ImportPhase = "idle" | "importing" | "complete";
+type ImportPhase = "idle" | "parsing" | "confirm-zip" | "importing" | "complete";
 
 interface ImportProgress {
 	current: number;
@@ -35,12 +34,52 @@ export function DataTab({ onRefresh }: Props) {
 		total: 0,
 	});
 	const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+	const [pendingZip, setPendingZip] = useState<SpotifyZipParseResult | null>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const handleRefresh = () => {
 		statsCache.invalidate();
 		onRefresh();
 		Spicetify.showNotification("Stats refreshed");
+	};
+
+	/** Chunked bulk insert with progress + UI-thread yields; finishes into the summary card. */
+	const runImport = async (parseResult: ParseResult) => {
+		setImportPhase("importing");
+		setImportProgress({ current: 0, total: parseResult.events.length });
+
+		const CHUNK_SIZE = 500;
+		let totalImported = 0;
+		let totalSkipped = 0;
+		let totalErrors = parseResult.errors;
+		let allErrorDetails = [...parseResult.errorDetails];
+
+		for (let i = 0; i < parseResult.events.length; i += CHUNK_SIZE) {
+			const chunk = parseResult.events.slice(i, i + CHUNK_SIZE);
+			const result = await importFileEvents(chunk);
+			totalImported += result.imported;
+			totalSkipped += result.skipped;
+			totalErrors += result.errors;
+			allErrorDetails = allErrorDetails.concat(result.errorDetails);
+
+			setImportProgress({
+				current: Math.min(i + CHUNK_SIZE, parseResult.events.length),
+				total: parseResult.events.length,
+			});
+			// Yield to UI thread
+			await new Promise((r) => setTimeout(r, 0));
+		}
+
+		statsCache.invalidate();
+		window.dispatchEvent(new CustomEvent(EVENTS.PLAY_RECORDED));
+
+		setImportSummary({
+			imported: totalImported,
+			skipped: totalSkipped,
+			errors: totalErrors,
+			errorDetails: allErrorDetails.slice(0, 10),
+		});
+		setImportPhase("complete");
 	};
 
 	const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,9 +91,10 @@ export function DataTab({ onRefresh }: Props) {
 
 		const isCSV = file.name.endsWith(".csv");
 		const isJSON = file.name.endsWith(".json");
+		const isZIP = file.name.endsWith(".zip");
 
-		if (!isCSV && !isJSON) {
-			Spicetify.showNotification("Unsupported file type. Use .csv or .json.", true);
+		if (!isCSV && !isJSON && !isZIP) {
+			Spicetify.showNotification("Unsupported file type. Use .csv, .json or .zip.", true);
 			return;
 		}
 
@@ -65,19 +105,25 @@ export function DataTab({ onRefresh }: Props) {
 			return;
 		}
 
-		setImportPhase("importing");
-		setImportProgress({ current: 0, total: 0 });
-
 		try {
-			const text = await file.text();
-
-			// Parse based on file type
-			let parseResult: ParseResult;
-			if (isCSV) {
-				parseResult = await parseV1Csv(text);
-			} else {
-				parseResult = await parseJsonEvents(text);
+			if (isZIP) {
+				setImportPhase("parsing");
+				const zipResult = await parseSpotifyZip(await file.arrayBuffer());
+				if (zipResult.events.length === 0) {
+					Spicetify.showNotification("Import failed: no music plays found in this zip", true);
+					setImportPhase("idle");
+					return;
+				}
+				// Zip imports re-add everything Spotify ever recorded, so let the
+				// user choose replace vs merge before touching the database.
+				setPendingZip(zipResult);
+				setImportPhase("confirm-zip");
+				return;
 			}
+
+			setImportPhase("parsing");
+			const text = await file.text();
+			const parseResult: ParseResult = isCSV ? await parseHistoryCsv(text) : await parseJsonEvents(text);
 
 			if (parseResult.events.length === 0 && parseResult.errors === 0) {
 				Spicetify.showNotification("Import failed: file contains no events", true);
@@ -85,46 +131,30 @@ export function DataTab({ onRefresh }: Props) {
 				return;
 			}
 
-			setImportProgress({ current: 0, total: parseResult.events.length });
-
-			// Yield to UI thread periodically during import for large files
-			const CHUNK_SIZE = 500;
-			let totalImported = 0;
-			let totalSkipped = 0;
-			let totalErrors = parseResult.errors;
-			let allErrorDetails = [...parseResult.errorDetails];
-
-			for (let i = 0; i < parseResult.events.length; i += CHUNK_SIZE) {
-				const chunk = parseResult.events.slice(i, i + CHUNK_SIZE);
-				const result = await importFileEvents(chunk);
-				totalImported += result.imported;
-				totalSkipped += result.skipped;
-				totalErrors += result.errors;
-				allErrorDetails = allErrorDetails.concat(result.errorDetails);
-
-				setImportProgress({
-					current: Math.min(i + CHUNK_SIZE, parseResult.events.length),
-					total: parseResult.events.length,
-				});
-				// Yield to UI thread
-				await new Promise((r) => setTimeout(r, 0));
-			}
-
-			statsCache.invalidate();
-			window.dispatchEvent(new CustomEvent(EVENTS.PLAY_RECORDED));
-
-			setImportSummary({
-				imported: totalImported,
-				skipped: totalSkipped,
-				errors: totalErrors,
-				errorDetails: allErrorDetails.slice(0, 10),
-			});
-			setImportPhase("complete");
+			await runImport(parseResult);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : "Unknown import error";
 			Spicetify.showNotification(message, true);
 			setImportPhase("idle");
 			console.error("[DataTab] Import error:", err);
+		}
+	};
+
+	const handleZipImport = async (replaceExisting: boolean) => {
+		if (!pendingZip) return;
+		const zip = pendingZip;
+		setPendingZip(null);
+		try {
+			if (replaceExisting) {
+				// Only play history - preferences and the artist enrichment cache stay.
+				await db.playEvents.clear();
+			}
+			await runImport(zip);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Unknown import error";
+			Spicetify.showNotification(message, true);
+			setImportPhase("idle");
+			console.error("[DataTab] Zip import error:", err);
 		}
 	};
 
@@ -135,16 +165,15 @@ export function DataTab({ onRefresh }: Props) {
 
 	const handleExportJson = async () => {
 		try {
-			const activeProvider = providerRegistry.getActive();
-			const allTimePeriod =
-				activeProvider?.getSupportedPeriods().find((p) => p.id.endsWith("all-time") || p.label === "All Time") ??
-				LOCAL_PERIODS[4];
-			const stats = await activeProvider?.calculateStats(allTimePeriod);
-			if (!stats) {
-				Spicetify.showNotification("No active provider", true);
+			// Raw play-event dump, not aggregated stats: this is the shape
+			// parseJsonEvents accepts, so a backup can be re-imported later.
+			const events = await db.playEvents.toArray();
+			if (events.length === 0) {
+				Spicetify.showNotification("No local play history to export", true);
 				return;
 			}
-			downloadFile(JSON.stringify(stats, null, 2), "listening-stats.json", "application/json");
+			const backup = events.map(({ id: _id, ...rest }) => rest);
+			downloadFile(JSON.stringify(backup), "listening-stats-backup.json", "application/json");
 		} catch (err) {
 			Spicetify.showNotification("Export failed. Check console.", true);
 			console.error("[DataTab] Export JSON error:", err);
@@ -153,23 +182,36 @@ export function DataTab({ onRefresh }: Props) {
 
 	const handleExportCsv = async () => {
 		try {
-			const activeProvider = providerRegistry.getActive();
-			const allTimePeriod =
-				activeProvider?.getSupportedPeriods().find((p) => p.id.endsWith("all-time") || p.label === "All Time") ??
-				LOCAL_PERIODS[4];
-			const stats = await activeProvider?.calculateStats(allTimePeriod);
-			if (!stats) {
-				Spicetify.showNotification("No active provider", true);
+			// Raw play-event dump in the v2 header format parseHistoryCsv accepts,
+			// so the backup can be re-imported. Newlines are flattened: the CSV
+			// parser is line-based.
+			const events = await db.playEvents.toArray();
+			if (events.length === 0) {
+				Spicetify.showNotification("No local play history to export", true);
 				return;
 			}
-			const header = "Rank,Track,Artist,Album,Plays,Duration\n";
-			const rows = stats.topTracks
-				.map(
-					(t) =>
-						`${t.rank},"${t.trackName.replace(/"/g, '""')}","${t.artistName.replace(/"/g, '""')}","${t.albumName.replace(/"/g, '""')}",${t.count},${t.durationMs}`,
+			const esc = (s: string) => `"${s.replace(/"/g, '""').replace(/[\r\n]+/g, " ")}"`;
+			const header =
+				"Track,Artist,Album,Duration (ms),Played (ms),Started At,Ended At,Type,Track URI,Artist URI,Album URI,Album Art\n";
+			const rows = events
+				.map((e) =>
+					[
+						esc(e.trackName),
+						esc(e.artistName),
+						esc(e.albumName),
+						e.durationMs,
+						e.playedMs,
+						new Date(e.startedAt).toISOString(),
+						new Date(e.endedAt).toISOString(),
+						e.type,
+						esc(e.trackUri),
+						esc(e.artistUri),
+						esc(e.albumUri),
+						esc(e.albumArt ?? ""),
+					].join(","),
 				)
 				.join("\n");
-			downloadFile(header + rows, "listening-stats.csv", "text/csv");
+			downloadFile(header + rows, "listening-stats-backup.csv", "text/csv");
 		} catch (err) {
 			Spicetify.showNotification("Export failed. Check console.", true);
 			console.error("[DataTab] Export CSV error:", err);
@@ -240,7 +282,7 @@ export function DataTab({ onRefresh }: Props) {
 					<input
 						ref={fileInputRef}
 						type="file"
-						accept=".csv,.json"
+						accept=".csv,.json,.zip"
 						style={{ display: "none" }}
 						onChange={handleFileSelected}
 						aria-label="Import play history file"
@@ -257,11 +299,96 @@ export function DataTab({ onRefresh }: Props) {
 						>
 							<div>
 								<div className="settings-label">Import play history</div>
-								<div className="settings-sublabel">.csv or .json from a v1 export</div>
+								<div className="settings-sublabel">
+									A .json backup from this app, .csv / .json from a v1 export, or the Spotify "Extended streaming
+									history" .zip from spotify.com/account/privacy
+								</div>
 							</div>
 							<button type="button" className="btn-primary" onClick={() => fileInputRef.current?.click()}>
 								Import
 							</button>
+						</div>
+					)}
+
+					{importPhase === "parsing" && (
+						<div className="import-progress">
+							<span className="import-progress-label">Reading file...</span>
+							<progress className="import-progress-bar" />
+						</div>
+					)}
+
+					{importPhase === "confirm-zip" && pendingZip && (
+						<div className="import-result-card">
+							<p
+								style={{
+									margin: 0,
+									fontSize: "var(--font-size-sm, 14px)",
+									color: "var(--spice-text)",
+								}}
+							>
+								Found <strong>{pendingZip.events.length.toLocaleString()}</strong> music plays in {pendingZip.filesRead}{" "}
+								history file
+								{pendingZip.filesRead === 1 ? "" : "s"}
+								{pendingZip.ignored > 0
+									? ` (${pendingZip.ignored.toLocaleString()} podcast/zero-length rows ignored)`
+									: ""}
+								. This export contains everything Spotify ever recorded for your account - including plays this app
+								already tracked.
+							</p>
+							<div
+								style={{
+									display: "flex",
+									flexDirection: "column",
+									gap: "8px",
+									width: "100%",
+								}}
+							>
+								<div
+									style={{
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "space-between",
+										gap: "12px",
+									}}
+								>
+									<div className="settings-sublabel" style={{ flex: 1 }}>
+										<strong>Replace (recommended):</strong> deletes your existing local play history first, then imports
+										the export. Guarantees no duplicate plays.
+									</div>
+									<button type="button" className="btn-primary" onClick={() => handleZipImport(true)}>
+										Replace
+									</button>
+								</div>
+								<div
+									style={{
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "space-between",
+										gap: "12px",
+									}}
+								>
+									<div className="settings-sublabel" style={{ flex: 1 }}>
+										<strong>Merge:</strong> keeps your current history and skips exact duplicates (same start time +
+										track). Plays tracked live by this app have slightly different timestamps, so some may appear twice.
+										Use this for the 2nd+ zip of a multi-zip export.
+									</div>
+									<button type="button" className="btn-secondary" onClick={() => handleZipImport(false)}>
+										Merge
+									</button>
+								</div>
+								<div style={{ display: "flex", justifyContent: "flex-end" }}>
+									<button
+										type="button"
+										className="btn-secondary"
+										onClick={() => {
+											setPendingZip(null);
+											setImportPhase("idle");
+										}}
+									>
+										Cancel
+									</button>
+								</div>
+							</div>
 						</div>
 					)}
 
@@ -316,13 +443,13 @@ export function DataTab({ onRefresh }: Props) {
 					)}
 				</div>
 
-				<SettingRow label="Export data as JSON">
+				<SettingRow label="Export play history as JSON">
 					<button type="button" className="btn-secondary" onClick={handleExportJson}>
 						Export
 					</button>
 				</SettingRow>
 
-				<SettingRow label="Export top tracks as CSV">
+				<SettingRow label="Export play history as CSV">
 					<button type="button" className="btn-secondary" onClick={handleExportCsv}>
 						Export
 					</button>

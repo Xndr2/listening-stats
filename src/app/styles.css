@@ -54,11 +54,23 @@ body:has(.stats-page) .main-topBar-container {
 	z-index: 100;
 	margin: 0 calc(-1 * var(--space-xl, 32px)) var(--space-md, 16px);
 	padding: var(--space-lg, 24px) var(--space-xl, 32px) var(--space-md, 16px);
-	/* Solid bar: themes may set --spice-main with alpha; rgb triple is opaque */
-	background: var(--spice-main);
-	background-color: rgb(var(--spice-rgb-main));
+	/* Frosted glass: translucent theme color + blur keeps scrolled content
+	   readable underneath while transparency themes keep their background
+	   visible instead of getting an opaque slab. */
+	background: rgba(var(--spice-rgb-main, 18, 18, 18), 0.72);
+	-webkit-backdrop-filter: blur(16px) saturate(1.4);
+	backdrop-filter: blur(16px) saturate(1.4);
 	border-bottom: 1px solid rgba(var(--spice-rgb-text, 255 255 255), 0.06);
 	box-sizing: border-box;
+}
+
+/* Without backdrop-filter a translucent bar would let text scroll straight
+   through the header - fall back to the old solid bar. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+	.stats-page-sticky {
+		background: var(--spice-main);
+		background-color: rgb(var(--spice-rgb-main));
+	}
 }
 
 /* Filter Pill */

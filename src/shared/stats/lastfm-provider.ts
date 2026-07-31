@@ -57,7 +57,7 @@ function computeStreakFromRecent(tracks: LfmRecentTrack[]): number {
 	return streak;
 }
 
-export class LastfmProvider implements StatsProvider {
+class LastfmProvider implements StatsProvider {
 	private config: LastfmProviderConfig | null = null;
 
 	getProviderInfo(): ProviderInfo {

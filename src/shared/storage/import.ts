@@ -35,14 +35,26 @@ export type ParseResult = {
 /** v1 raw-history CSV header (includes parentheses in Duration / Played column names). */
 const V1_CSV_HEADER = "Track,Artist,Album,Duration (ms),Played (ms),Started At,Ended At";
 
+/** v2 backup CSV header: v1 columns plus type/URIs/art so exports round-trip losslessly. */
+const V2_CSV_HEADER = `${V1_CSV_HEADER},Type,Track URI,Artist URI,Album URI,Album Art`;
+
 /** Cap error details at 10 entries to avoid bloating the result */
 const MAX_ERROR_DETAILS = 10;
 
-/** Album art from imported files ends up in <img src> and CSS url(); only allow Spotify CDN shapes. */
+/**
+ * Album art from imported files ends up in <img src> and CSS url(). Restrict to
+ * the CDNs this app itself writes (Spotify, Last.fm, stats.fm) - an arbitrary
+ * https URL would let a crafted import file beacon the user's IP to any host
+ * on every dashboard render.
+ */
+const ALBUM_ART_HOSTS = new Set(["lastfm.freetls.fastly.net", "cdn.stats.fm"]);
+
 function isSafeAlbumArtUrl(value: string): boolean {
 	if (value.startsWith("spotify:image:")) return true;
 	try {
-		return new URL(value).protocol === "https:";
+		const url = new URL(value);
+		if (url.protocol !== "https:") return false;
+		return url.hostname.endsWith(".scdn.co") || ALBUM_ART_HOSTS.has(url.hostname);
 	} catch {
 		return false;
 	}
@@ -87,16 +99,18 @@ function splitCsvRow(row: string): string[] {
 // ──────────────────────────────────────────────────────
 
 /**
- * Parse a v1 CSV export into an array of PlayEvent-shaped objects.
+ * Parse a raw-history CSV export into an array of PlayEvent-shaped objects.
  *
- * Expected header (exact match required):
- *   Track,Artist,Album,Duration (ms),Played (ms),Started At,Ended At
+ * Accepts two headers (exact match required):
+ *   v1: Track,Artist,Album,Duration (ms),Played (ms),Started At,Ended At
+ *   v2: v1 + Type,Track URI,Artist URI,Album URI,Album Art (this app's backup export)
  *
  * Started At / Ended At are ISO 8601 strings  -  converted to Unix ms via new Date().getTime().
  * Rows with invalid timestamps or non-numeric numeric fields are skipped and counted as errors.
- * All valid events get synthetic URIs and type: "play".
+ * v1 rows get synthetic URIs and type: "play"; v2 rows keep their type, URIs and
+ * (safe-host) album art, falling back to synthetic URIs when the URI columns are empty.
  */
-export async function parseV1Csv(text: string): Promise<ParseResult> {
+export async function parseHistoryCsv(text: string): Promise<ParseResult> {
 	// Split on \n and filter empty lines
 	const lines = text
 		.split("\n")
@@ -108,16 +122,17 @@ export async function parseV1Csv(text: string): Promise<ParseResult> {
 	}
 
 	const header = lines[0];
-	if (header !== V1_CSV_HEADER) {
+	const isV2 = header === V2_CSV_HEADER;
+	if (!isV2 && header !== V1_CSV_HEADER) {
 		// Detect known non-importable CSV formats and give specific guidance
 		if (header.startsWith("Period,")) {
 			throw new Error(
-				'Import failed: this is a stats summary CSV, not a raw history export. Use "Raw History (CSV)" in v1 to get importable data.',
+				'Import failed: this is a stats summary CSV, not a raw history export. Use "Export play history as CSV" to create an importable backup.',
 			);
 		}
 		if (header.startsWith("Rank,")) {
 			throw new Error(
-				'Import failed: this is a stats summary CSV, not a raw history export. Use "Raw History (CSV)" in v1 to get importable data.',
+				'Import failed: this is a stats summary CSV, not a raw history export. Use "Export play history as CSV" to create an importable backup.',
 			);
 		}
 		throw new Error(`Import failed: unrecognized CSV format (expected v1 export). Got: "${header.slice(0, 60)}"`);
@@ -173,9 +188,12 @@ export async function parseV1Csv(text: string): Promise<ParseResult> {
 			continue;
 		}
 
-		const uris = await generateSyntheticUris(track, artist, album);
+		const csvTrackUri = isV2 ? fields[8] : "";
+		const uris = csvTrackUri
+			? { trackUri: csvTrackUri, artistUri: fields[9] ?? "", albumUri: fields[10] ?? "" }
+			: await generateSyntheticUris(track, artist, album);
 
-		events.push({
+		const event: Omit<PlayEvent, "id"> = {
 			trackName: track,
 			artistName: artist,
 			albumName: album,
@@ -183,9 +201,16 @@ export async function parseV1Csv(text: string): Promise<ParseResult> {
 			playedMs,
 			startedAt,
 			endedAt,
-			type: "play",
+			type: isV2 && fields[7] === "skip" ? "skip" : "play",
 			...uris,
-		});
+		};
+
+		const csvAlbumArt = isV2 ? fields[11] : "";
+		if (csvAlbumArt && isSafeAlbumArtUrl(csvAlbumArt)) {
+			event.albumArt = csvAlbumArt;
+		}
+
+		events.push(event);
 	}
 
 	return { events, errors, errorDetails };
@@ -203,7 +228,8 @@ export async function parseV1Csv(text: string): Promise<ParseResult> {
  *
  * Required fields: trackName, artistName, startedAt, endedAt, durationMs, playedMs.
  * Missing albumName defaults to "". Missing URIs get synthetic values.
- * All events get type: "play" regardless of source.
+ * type "skip" is preserved so this app's own JSON backups round-trip; anything
+ * else becomes "play".
  */
 export async function parseJsonEvents(text: string): Promise<ParseResult> {
 	let parsed: unknown;
@@ -301,7 +327,7 @@ export async function parseJsonEvents(text: string): Promise<ParseResult> {
 			trackUri,
 			artistUri,
 			albumUri,
-			type: "play",
+			type: item.type === "skip" ? "skip" : "play",
 		};
 
 		if (typeof item.albumArt === "string" && isSafeAlbumArtUrl(item.albumArt)) {

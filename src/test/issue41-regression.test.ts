@@ -217,7 +217,7 @@ describe("Issue 41: playbar widget mounts with retry", () => {
 	});
 
 	it("findPlaybarMount returns null when no matching elements exist", async () => {
-		const { findPlaybarMount } = await import("../app/index");
+		const { findPlaybarMount } = await import("../app/widget-mount");
 		expect(findPlaybarMount()).toBeNull();
 	});
 
@@ -225,7 +225,7 @@ describe("Issue 41: playbar widget mounts with retry", () => {
 		const el = document.createElement("div");
 		el.className = "main-nowPlayingWidget-nowPlaying";
 		document.body.appendChild(el);
-		const { findPlaybarMount } = await import("../app/index");
+		const { findPlaybarMount } = await import("../app/widget-mount");
 		expect(findPlaybarMount()).toBe(el);
 	});
 
@@ -233,7 +233,7 @@ describe("Issue 41: playbar widget mounts with retry", () => {
 		const el = document.createElement("div");
 		el.className = "main-nowPlayingBar-left";
 		document.body.appendChild(el);
-		const { findPlaybarMount } = await import("../app/index");
+		const { findPlaybarMount } = await import("../app/widget-mount");
 		expect(findPlaybarMount()).toBe(el);
 	});
 
@@ -241,7 +241,7 @@ describe("Issue 41: playbar widget mounts with retry", () => {
 		const el = document.createElement("div");
 		el.setAttribute("data-testid", "now-playing-widget");
 		document.body.appendChild(el);
-		const { findPlaybarMount } = await import("../app/index");
+		const { findPlaybarMount } = await import("../app/widget-mount");
 		expect(findPlaybarMount()).toBe(el);
 	});
 });

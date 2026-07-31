@@ -1,14 +1,10 @@
 declare const __VERSION__: string;
 
-import type { ParsedRemoteAnnouncement } from "../shared/announcements/remote-announcement";
-import { fetchRemoteAnnouncement } from "../shared/announcements/remote-announcement";
 import { EVENTS } from "../shared/constants/events";
 import { LS_KEYS } from "../shared/constants/storage-keys";
-import type { AppError } from "../shared/errors";
-import { classifyStatsFmError, StatsFmError } from "../shared/errors";
 import { initProviders } from "../shared/stats/init-providers";
 import { LOCAL_PERIODS, WORLD_TAB_PERIOD, WORLD_TAB_PERIOD_ID } from "../shared/stats/periods";
-import { allLoading, allResolved, EMPTY_STATS, type SectionSlots, slotKeyForWave } from "../shared/stats/progressive";
+import type { SectionSlots } from "../shared/stats/progressive";
 import type { ProviderRegistry } from "../shared/stats/provider";
 import { providerRegistry } from "../shared/stats/provider";
 import {
@@ -16,12 +12,10 @@ import {
 	safeParseProviderPeriods,
 	savePeriodForProvider,
 } from "../shared/stats/provider-periods-storage";
-import { getRankMode } from "../shared/stats/rank-mode";
 import { statsCache } from "../shared/stats/stats-cache";
-import type { Period, StatsResult } from "../shared/types/stats";
+import type { Period } from "../shared/types/stats";
 import type { UpdateCheckResult } from "../shared/update/update-check";
 import { checkForAppUpdate, isUpdatePromptSnoozed } from "../shared/update/update-check";
-import { resolveAnnouncementBanner } from "./banners";
 import { getActivityMode, getSectionsForProvider } from "./capabilities";
 import { ActivitySection } from "./components/ActivitySection";
 import { AnnouncementBanner } from "./components/AnnouncementBanner";
@@ -42,17 +36,14 @@ import { TopGenres } from "./components/TopGenres";
 import { TopLists } from "./components/TopLists";
 import { UpdateModal } from "./components/UpdateModal";
 import { WorldChartsPage } from "./components/WorldChartsPage";
+import { useAnnouncementBanner } from "./hooks/useAnnouncementBanner";
+import { useRecapOffer } from "./hooks/useRecapOffer";
+import { useStatsLoader } from "./hooks/useStatsLoader";
 import { getPreferences, setPreference } from "./preferences";
-import type { RecapSource } from "./recap";
-import { buildRecapSummary, dismissRecap, getRecapSource, isRecapDismissed, loadRecapStats } from "./recap";
+import { buildRecapSummary } from "./recap";
 import { getTourSteps, shouldAutoStartTour } from "./tour";
 
-export function buildCacheKey(activeProviderId: string, periodId: string): string {
-	// Local results depend on the rank mode; keying on it matches LocalProvider's
-	// internal cache key exactly, so both layers share one entry per mode.
-	if (activeProviderId === "local") return `local:${periodId}:${getRankMode()}`;
-	return `${activeProviderId}:${periodId}`;
-}
+export { buildCacheKey } from "./hooks/useStatsLoader";
 
 export function shouldShowWizard(): boolean {
 	return !localStorage.getItem(LS_KEYS.PROVIDER_WIZARD_SEEN);
@@ -77,21 +68,12 @@ function getProviderPeriods(): Period[] {
 	return provider?.getSupportedPeriods() ?? LOCAL_PERIODS;
 }
 
-const { useState, useEffect, useCallback, useRef, useMemo } = Spicetify.React;
+const { useState, useEffect, useCallback, useMemo } = Spicetify.React;
 
 function App() {
 	const [periods, setPeriods] = useState<Period[]>(LOCAL_PERIODS);
 	const [activePeriod, setActivePeriod] = useState<Period>(LOCAL_PERIODS[0]);
-	const [stats, setStats] = useState<StatsResult | null>(null);
-	const [sectionSlots, setSectionSlots] = useState<SectionSlots>(allLoading());
-	const [listColumnLoading, setListColumnLoading] = useState({
-		tracks: true,
-		artists: true,
-		albums: true,
-	});
-	const [sectionErrors, setSectionErrors] = useState<Record<string, AppError | null>>({});
-	const generationRef = useRef(0);
-	const [activeRequestLabel, setActiveRequestLabel] = useState<string>("");
+	const { stats, sectionSlots, listColumnLoading, sectionErrors, activeRequestLabel, loadStats } = useStatsLoader();
 	const [showSettings, setShowSettings] = useState(false);
 	const [initialized, setInitialized] = useState(false);
 	const [prefsVersion, setPrefsVersion] = useState(0);
@@ -103,107 +85,8 @@ function App() {
 	const [tourActive, setTourActive] = useState(() => shouldAutoStartTour(__VERSION__));
 	const [activePage, setActivePage] = useState<string>(() => getPreferences().activePage);
 	const [showShare, setShowShare] = useState(false);
-	const [remoteAnnouncement, setRemoteAnnouncement] = useState<ParsedRemoteAnnouncement | null>(null);
-	const [recapOffer, setRecapOffer] = useState<{ source: RecapSource; stats: StatsResult } | null>(null);
-	const [showRecap, setShowRecap] = useState(false);
-	const recapCheckedRef = useRef(false);
 	const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult | null>(null);
 	const [showUpdateModal, setShowUpdateModal] = useState(false);
-	// silent=true skips loading skeleton (used for background refresh)
-	const loadStats = useCallback(async (period: Period, silent = false) => {
-		const gen = ++generationRef.current;
-		const activeId = providerRegistry.getActiveId() ?? "local";
-		const cacheKey = buildCacheKey(activeId, period.id);
-		setActiveRequestLabel(`${activeId}:${period.id}`);
-		if (!silent) {
-			setSectionSlots(allLoading());
-			setListColumnLoading({ tracks: true, artists: true, albums: true });
-			setStats(null);
-		}
-		setSectionErrors({});
-		try {
-			if (!silent) {
-				const cached = statsCache.get<StatsResult>(cacheKey);
-				if (cached) {
-					setStats(cached);
-					setSectionSlots(allResolved());
-					setListColumnLoading({
-						tracks: false,
-						artists: false,
-						albums: false,
-					});
-					return;
-				}
-			}
-			const provider = providerRegistry.getActive();
-			if (!provider) throw new Error("No active provider");
-
-			if (provider.calculateStatsProgressive) {
-				let hasWaveError = false;
-				const result = await provider.calculateStatsProgressive(period, (partial, wave, waveError) => {
-					if (gen !== generationRef.current) return;
-					const slotKey = slotKeyForWave(wave);
-					if ("topTracks" in partial) {
-						setListColumnLoading((prev) => ({ ...prev, tracks: false }));
-					}
-					if ("topArtists" in partial) {
-						setListColumnLoading((prev) => ({ ...prev, artists: false }));
-					}
-					if ("topAlbums" in partial) {
-						setListColumnLoading((prev) => ({ ...prev, albums: false }));
-					}
-					if ("dailyPlayCounts" in partial || "listeningDays" in partial) {
-						setSectionSlots((prev) => ({ ...prev, consistency: "resolved" }));
-					}
-					if (waveError) {
-						hasWaveError = true;
-						setSectionErrors((prev) => ({ ...prev, [slotKey]: waveError }));
-						setSectionSlots((prev) => ({ ...prev, [slotKey]: "error" }));
-					} else {
-						setStats((prev) => (prev ? { ...prev, ...partial } : { ...EMPTY_STATS, ...partial }));
-						setSectionSlots((prev) => ({ ...prev, [slotKey]: "resolved" }));
-					}
-				});
-				if (gen !== generationRef.current) return;
-				// Always apply the terminal result to avoid stale/missing section holes.
-				setStats((prev) => ({ ...(prev ?? EMPTY_STATS), ...result }));
-				setListColumnLoading({ tracks: false, artists: false, albums: false });
-				setSectionSlots((prev) => ({
-					overview: prev.overview === "error" ? "error" : "resolved",
-					lists: prev.lists === "error" ? "error" : "resolved",
-					activity: prev.activity === "error" ? "error" : "resolved",
-					consistency: prev.consistency === "error" ? "error" : "resolved",
-				}));
-				if (!hasWaveError) {
-					statsCache.set(cacheKey, result);
-				}
-			} else {
-				const result = await provider.calculateStats(period);
-				if (gen !== generationRef.current) return;
-				statsCache.set(cacheKey, result);
-				setStats(result);
-				setSectionSlots(allResolved());
-				setListColumnLoading({ tracks: false, artists: false, albums: false });
-			}
-		} catch (e: unknown) {
-			if (gen !== generationRef.current) return;
-			const appError =
-				e instanceof StatsFmError
-					? e.appError
-					: classifyStatsFmError(0, e instanceof Error ? e.message : "Failed to load stats");
-			setSectionErrors({
-				overview: appError,
-				lists: appError,
-				activity: appError,
-			});
-			setSectionSlots({
-				overview: "error",
-				lists: "error",
-				activity: "error",
-				consistency: "error",
-			});
-		}
-	}, []);
 
 	const periodTabsPeriods = useMemo(() => [...periods, WORLD_TAB_PERIOD], [periods]);
 	const activePeriodForTabs = useMemo(
@@ -267,12 +150,6 @@ function App() {
 		return () => window.removeEventListener(EVENTS.PREFS_CHANGED, handler);
 	}, []);
 
-	useEffect(() => {
-		fetchRemoteAnnouncement()
-			.then(setRemoteAnnouncement)
-			.catch(() => {});
-	}, []);
-
 	const refreshUpdateCheck = useCallback(async () => {
 		const p = getPreferences();
 		const r = await checkForAppUpdate(__VERSION__, p.receiveBetaUpdates);
@@ -322,6 +199,9 @@ function App() {
 	const handlePrefsChanged = useCallback(() => {
 		setPrefsVersion((v) => v + 1);
 	}, []);
+
+	const { resolvedBanner, dismissBanner: handleDismissBanner } = useAnnouncementBanner(__VERSION__, handlePrefsChanged);
+	const { recapOffer, showRecap, setShowRecap, dismissOffer: handleDismissRecap } = useRecapOffer(initialized, stats);
 
 	const handleReceiveBetaUpdatesChange = useCallback(
 		(val: boolean) => {
@@ -536,79 +416,7 @@ function App() {
 		);
 	};
 
-	const resolvedBanner = useMemo(
-		() => resolveAnnouncementBanner(__VERSION__, remoteAnnouncement),
-		[remoteAnnouncement],
-	);
-
-	useEffect(() => {
-		if (!resolvedBanner) return;
-		const p = getPreferences();
-		if (p.showAnnouncementBanner) return;
-		const cur = resolvedBanner.dismissKey;
-		const hid = p.announcementBannerHiddenForDismissKey;
-		if (cur !== hid) {
-			setPreference("showAnnouncementBanner", true);
-			setPreference("announcementBannerHiddenForDismissKey", "");
-			window.dispatchEvent(new CustomEvent(EVENTS.PREFS_CHANGED));
-			handlePrefsChanged();
-		}
-	}, [resolvedBanner, handlePrefsChanged]);
-
 	const activeBanner = !prefs.showAnnouncementBanner ? null : resolvedBanner;
-
-	// Monthly recap: offer a banner once per month when last month has plays.
-	// Independent of the announcement banner so remote GitHub announcements stay visible.
-	useEffect(() => {
-		// Wait for the dashboard's own load to finish (stats non-null) so the recap
-		// computation hits the provider's stats cache instead of racing the initial
-		// API burst - a concurrent duplicate load can trip stats.fm rate limits.
-		if (!initialized || !stats || recapCheckedRef.current) return;
-		recapCheckedRef.current = true;
-		const source = getRecapSource(providerRegistry.getActiveId() ?? "local");
-		if (isRecapDismissed(source.monthKey)) return;
-		const provider = providerRegistry.getActive();
-		if (!provider) return;
-		loadRecapStats(provider, source)
-			.then((recapStats) => {
-				if (recapStats) setRecapOffer({ source, stats: recapStats });
-			})
-			.catch(() => {});
-	}, [initialized, stats]);
-
-	// Settings > Display "Preview recap" hook - always recomputes and opens the modal.
-	useEffect(() => {
-		const handler = () => {
-			const source = getRecapSource(providerRegistry.getActiveId() ?? "local");
-			const provider = providerRegistry.getActive();
-			if (!provider) return;
-			loadRecapStats(provider, source)
-				.then((recapStats) => {
-					if (recapStats) {
-						setRecapOffer({ source, stats: recapStats });
-						setShowRecap(true);
-					} else {
-						Spicetify.showNotification("No plays recorded for last month yet.");
-					}
-				})
-				.catch(() => Spicetify.showNotification("Could not load recap stats.", true));
-		};
-		window.addEventListener(EVENTS.OPEN_RECAP, handler);
-		return () => window.removeEventListener(EVENTS.OPEN_RECAP, handler);
-	}, []);
-
-	const handleDismissRecap = useCallback(() => {
-		if (recapOffer) dismissRecap(recapOffer.source.monthKey);
-		setRecapOffer(null);
-	}, [recapOffer]);
-
-	const handleDismissBanner = useCallback(() => {
-		if (!resolvedBanner) return;
-		setPreference("showAnnouncementBanner", false);
-		setPreference("announcementBannerHiddenForDismissKey", resolvedBanner.dismissKey);
-		window.dispatchEvent(new CustomEvent(EVENTS.PREFS_CHANGED));
-		handlePrefsChanged();
-	}, [resolvedBanner, handlePrefsChanged]);
 
 	const renderContent = () => {
 		if (activePage === "world") {

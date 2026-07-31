@@ -70,7 +70,7 @@ export interface PlayerData {
 
 /**
  * True for items that should be recorded as plays. Excludes Spotify DJ voice
- * clips and ads - they are not music and would pollute the stats.
+ * clips and ads — they are not music and would pollute the stats.
  */
 export function isTrackableItem(item: { uri?: string; provider?: string }): boolean {
 	if (item.provider === "narration" || item.provider === "ad") return false;
@@ -241,7 +241,7 @@ export class TrackingFSM {
 				this._state.accumulatedPlayMs += Date.now() - this._state.playStartTime;
 			}
 			this._state.isPlaying = false;
-			// Record now if the banked time crossed the threshold - the user may
+			// Record now if the banked time crossed the threshold — the user may
 			// close Spotify without the track ever ending or changing.
 			void this._maybeRecordThresholdCross();
 		} else if (!wasPlaying && !isPaused) {

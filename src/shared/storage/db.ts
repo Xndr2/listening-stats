@@ -4,7 +4,7 @@ import type { ArtistRecord } from "../types/stats";
 
 let versionChangeCallback: (() => void) | undefined;
 
-export class ListeningStatsDB extends Dexie {
+class ListeningStatsDB extends Dexie {
 	playEvents!: EntityTable<PlayEvent, "id">;
 	artists!: EntityTable<ArtistRecord, "uri">;
 

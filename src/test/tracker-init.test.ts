@@ -159,20 +159,6 @@ describe("tracker/index  -  initTracker()", () => {
 		expect(stub.Player.getRepeat).toHaveBeenCalled();
 	});
 
-	it("destroyPoller() is exported and is a no-op (does not call removeEventListener)", async () => {
-		const stub = makeSpicetifyStub();
-		(globalThis as unknown as Record<string, unknown>).Spicetify = stub;
-
-		const { initTracker, destroyPoller } = await import("../extension/tracker/index");
-		await initTracker();
-
-		// destroyPoller should be a function and not throw
-		expect(typeof destroyPoller).toBe("function");
-		expect(() => destroyPoller()).not.toThrow();
-		// Should NOT call removeEventListener
-		expect(stub.Player.removeEventListener).not.toHaveBeenCalled();
-	});
-
 	it("re-register callback re-creates and updates all three window sentinel refs", async () => {
 		const stub = makeSpicetifyStub();
 		(globalThis as unknown as Record<string, unknown>).Spicetify = stub;

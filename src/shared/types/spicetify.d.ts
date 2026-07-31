@@ -46,6 +46,13 @@ declare namespace Spicetify {
 
 		/** Client session; accessToken authorizes internal spclient endpoints. */
 		const Session: { accessToken?: string } | undefined;
+
+		/** Current user lookup. Missing on some client versions - always feature-detect. */
+		const UserAPI:
+			| {
+					getUser?(): Promise<{ username?: string; displayName?: string } | null | undefined>;
+			  }
+			| undefined;
 	}
 
 	namespace Locale {
@@ -110,9 +117,6 @@ declare namespace Spicetify {
 			| null
 			| undefined;
 	}
-	/** Spotify account handle when exposed by the client (optional). */
-	const User: { username?: string } | undefined;
-
 	/** Display a toast notification */
 	function showNotification(message: string, isError?: boolean): void;
 	namespace CosmosAsync {

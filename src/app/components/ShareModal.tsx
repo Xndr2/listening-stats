@@ -37,7 +37,7 @@ const SIZES: { id: ShareSize; label: string }[] = [
 	{ id: "story", label: "Story" },
 ];
 
-function getShareCaptionHandle(): string {
+function getStatsfmHandle(): string {
 	try {
 		const raw = localStorage.getItem(LS_KEYS.STATSFM_CONFIG);
 		if (raw) {
@@ -48,8 +48,6 @@ function getShareCaptionHandle(): string {
 	} catch {
 		/* ignore */
 	}
-	const u = Spicetify.User?.username;
-	if (u && String(u).trim()) return String(u).trim();
 	return "";
 }
 
@@ -64,7 +62,24 @@ export function ShareModal({ stats, activePeriod, onClose, initialVariant, varia
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
 
-	const username = getShareCaptionHandle();
+	const [username, setUsername] = useState(getStatsfmHandle);
+	// Fall back to the Spotify account handle via Platform.UserAPI (async,
+	// feature-detected - the API is missing on some client versions).
+	useEffect(() => {
+		if (username) return;
+		let cancelled = false;
+		Spicetify.Platform.UserAPI?.getUser?.()
+			.then((user) => {
+				const handle = (user?.displayName ?? user?.username ?? "").trim();
+				if (!cancelled && handle) setUsername(handle);
+			})
+			.catch(() => {
+				/* keep empty caption */
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [username]);
 	const periodLabel = activePeriod.label;
 	const periodBoundaries = activePeriod.getBoundaries();
 	const periodDayCount = Math.max(1, Math.round((periodBoundaries.end - periodBoundaries.start) / 86_400_000));
