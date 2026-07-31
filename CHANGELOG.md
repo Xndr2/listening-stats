@@ -1,11 +1,22 @@
 ## What's Changed
 
-- Add streak tracking with CalendarHeatmap for stats.fm provider by @Death-Watcher in https://github.com/Xndr2/listening-stats/pull/34
-- Bugfix/statsfm null genres export by @Death-Watcher in https://github.com/Xndr2/listening-stats/pull/35
-- Increase heatmap cells, total-time font, genre bars proportional to total by @Death-Watcher in https://github.com/Xndr2/listening-stats/pull/36
+**Added**
+• Auto top-songs playlist.
+> A daily auto-updating Spotify playlist of your top tracks (5–30 songs, local or stats.fm source, private by default) with its own Playlist settings tab. LastFM will be added later.
 
-## New Contributors
+• Spotify ZIP import
+> Drop the Extended Streaming History .zip from your Spotify privacy export into Settings > Data and get your lifetime stats.
+> Get the zip at https://www.spotify.com/account/privacy/
 
-- @Death-Watcher made their first contribution in https://github.com/Xndr2/listening-stats/pull/34
+• Sort your local top tracks/artists/albums by streams or by minutes listened.
+• For you nerds: Installers now verify a sha256 checksum before installing.
 
-**Full Changelog**: https://github.com/Xndr2/listening-stats/compare/v2.0.1...v2.0.2
+**Changed**
+• The Wrapped share card got a full redesign.
+• The playbar play-count pill now also shows even if the LS dashboard hasn't loaded!
+• Share captions fall back to your Spotify display name if you haven't set a stats.fm handle.
+
+**Fixed**
+• Windows installer no longer fails an otherwise successful install during temp-file cleanup (thanks @giri256).
+• stats.fm rate-limit errors caused by the recap loading at the same time as the dashboard.
+• Playbar count no longer shows the previous track's number after a quick track switch.
