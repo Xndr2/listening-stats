@@ -48,6 +48,11 @@ const sharedOptions = {
 	minify: isProduction,
 	sourcemap: !isProduction,
 	loader: { ".css": "text" },
+	// Import dexie's plain ESM dist directly, bypassing its import-wrapper.mjs.
+	// The wrapper registers globalThis[Symbol.for("Dexie")] and throws
+	// "Two different versions of Dexie loaded in the same app" when another
+	// Spicetify app (e.g. Marketplace) bundles a different dexie patch version.
+	alias: { dexie: "dexie/dist/modern/dexie.mjs" },
 };
 
 const extConfig = {
