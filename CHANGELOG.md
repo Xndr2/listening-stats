@@ -1,7 +1,8 @@
 ## What's Changed
 
-**Added**  
+v2.1.3 Hotfix fixes the marketplace issues.  
 
+**Added**  
 • Auto top-songs playlist.  
 > A daily auto-updating Spotify playlist of your top tracks (5–30 songs, local or stats.fm source, private by default) with its own Playlist settings tab. LastFM will be added later.
 
