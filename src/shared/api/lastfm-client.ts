@@ -252,3 +252,27 @@ export async function lastfmGetTopAlbums(
 		imageUrl: bestImage(a.image),
 	}));
 }
+
+interface LfmTrackInfoRaw {
+	track?: { userplaycount?: string };
+}
+
+export async function lastfmGetTrackUserPlaycount(
+	apiKey: string,
+	username: string,
+	artist: string,
+	track: string,
+): Promise<number | null> {
+	try {
+		const data = await lastfmUserFetch<LfmTrackInfoRaw>(apiKey, "track.getInfo", {
+			artist,
+			track,
+			username,
+			autocorrect: "1",
+		});
+		const raw = data.track?.userplaycount;
+		return raw !== undefined ? parseInt(raw, 10) || 0 : null;
+	} catch {
+		return null;
+	}
+}

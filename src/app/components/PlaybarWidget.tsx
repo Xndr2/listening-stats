@@ -1,3 +1,4 @@
+import { fetchLastfmLifetimeTrackPlaycount, readLastfmUsername } from "../../shared/api/lastfm-track-plays";
 import {
 	fetchStatsFmLifetimeTrackStreams,
 	fetchStatsFmPeriodTrackStreams,
@@ -62,6 +63,23 @@ function useNowPlayingCount(): TrackPlayInfo | null {
 					const firstPlayedAt = lifetime != null ? null : localFirst;
 					commit({ count, firstPlayedAt, periodStreams, periodLabel });
 					return;
+				}
+			}
+
+			if (providerRegistry.getActiveId() === "lastfm") {
+				const username = readLastfmUsername();
+				if (username) {
+					const item = Spicetify.Player.data?.item;
+					const trackName = item?.name as string | undefined;
+					const metadata = item?.metadata as Record<string, unknown> | undefined;
+					const artistName = metadata?.artist_name as string | undefined;
+					if (trackName && artistName) {
+						const lifetime = await fetchLastfmLifetimeTrackPlaycount(artistName, trackName);
+						const count = lifetime ?? localCount;
+						const firstPlayedAt = lifetime != null ? null : localFirst;
+						commit({ count, firstPlayedAt, periodStreams: null, periodLabel: null });
+						return;
+					}
 				}
 			}
 
