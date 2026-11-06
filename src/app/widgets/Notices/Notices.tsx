@@ -17,8 +17,7 @@ import { useSetting } from "../../hooks/useSetting";
 import { useApp } from "../../state";
 import "./Notices.css";
 
-const INSTALL_LINUX =
-	"curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.sh | bash";
+const INSTALL_LINUX = "curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.sh | bash";
 const INSTALL_WIN = "irm https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1 | iex";
 const SNOOZE_DAYS = 3;
 
