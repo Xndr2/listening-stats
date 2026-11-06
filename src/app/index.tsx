@@ -1,22 +1,54 @@
+/**
+ * index.js - the custom app page. Spicetify calls the global `render()`
+ * (exposed via the footer in build.mjs) and mounts what it returns.
+ *
+ * base.css is imported first so its tokens precede component CSS in the
+ * bundled style.css.
+ */
+import "./styles/base.css";
+import { type ReactNode, useLayoutEffect, useRef } from "react";
+import { installGlobalCapture } from "../shared/errors/capture";
 import App from "./App";
-import { ErrorBoundary } from "./components/ErrorBoundary";
-import { injectStyles } from "./styles";
-import { mountPlaybarWidget } from "./widget-mount";
+import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
+import { Tooltip } from "./components/Tooltip/Tooltip";
 
-declare const __VERSION__: string;
+installGlobalCapture("app");
 
-const { React } = Spicetify;
+/**
+ * Sets `is-fit` when the pane is at least 860 x 600 (the layout that fills the
+ * pane, see Dashboard.css). This was a size container query, but Chromium
+ * re-checks those mid-layout whenever anything on the page changes, and that
+ * cancels a wheel scroll in progress inside the top list.
+ */
+function Root({ children }: { children: ReactNode }) {
+	const ref = useRef<HTMLDivElement>(null);
+	useLayoutEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		const ro = new ResizeObserver(([e]) => {
+			el.classList.toggle("is-fit", e.contentRect.width >= 860 && e.contentRect.height >= 600);
+		});
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, []);
+	return (
+		<div className="ls-root" ref={ref}>
+			{children}
+		</div>
+	);
+}
 
 export function render() {
-	injectStyles();
-	// The extension bundle mounts the playbar widget at startup; this is a
-	// fallback for setups where extension.js did not load. No-op if mounted.
-	mountPlaybarWidget();
-
-	return React.createElement(ErrorBoundary, { appVersion: __VERSION__ }, React.createElement(App));
+	return (
+		<Root>
+			<ErrorBoundary>
+				<App />
+			</ErrorBoundary>
+			<Tooltip />
+		</Root>
+	);
 }
 
 export function unmount() {
-	// The playbar widget is owned by the extension bundle and stays mounted
-	// across navigation; nothing to clean up here.
+	// Query cache and listeners are module-level and survive navigation on purpose.
 }

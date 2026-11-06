@@ -1,42 +1,54 @@
-export const LS_KEYS = {
-	PLAY_THRESHOLD: "listening-stats:playThreshold",
-	PLAY_THRESHOLD_MODE: "listening-stats:playThresholdMode",
-	PLAY_THRESHOLD_PERCENT: "listening-stats:playThresholdPercent",
-	TRACKING_PAUSED: "listening-stats:tracking-paused",
-	SKIP_REPEATS: "listening-stats:skip-repeats",
-	LAST_UPDATE: "listening-stats:lastUpdate",
-	LOGGING: "listening-stats:logging",
-	// New in v2
-	TRACKING_HEALTH: "listening-stats:tracking-health",
-	LAST_WRITE: "listening-stats:lastWrite",
-	ACTIVE_PROVIDER: "listening-stats:active-provider",
-	PREFERENCES: "listening-stats:preferences",
-	MIGRATION_PENDING: "listening-stats:migration-pending",
-	// stats.fm provider (v2.2)
-	STATSFM_CONFIG: "listening-stats:statsfm",
-	PROVIDER_WIZARD_SEEN: "listening-stats:provider-wizard-seen",
-	// Period persistence (v2.3)
-	PROVIDER_PERIODS: "listening-stats:provider-periods",
-	// Health dot (v2.3)
-	STATSFM_HEALTH: "listening-stats:statsfm-health",
-	// Announcement banner (v2.6)
-	DISMISSED_BANNER_VERSION: "listening-stats:dismissed-banner-version",
-	// Last.fm provider + World Charts (v2.6)
-	LASTFM_API_KEY: "listening-stats:lastfm-api-key",
-	LASTFM_CONFIG: "listening-stats:lastfm-provider",
-	WORLD_CHARTS_SCOPE: "listening-stats:world-charts-scope",
-	WORLD_CHARTS_WINDOW: "listening-stats:world-charts-window",
-	// Guided tour (v2.6)
-	TOUR_SEEN_VERSION: "listening-stats:tour-seen-version",
-	// Remote announcement dismiss id (GitHub ANNOUNCEMENT.md)
-	DISMISSED_REMOTE_ANNOUNCEMENT_ID: "listening-stats:dismissed-remote-announcement-id",
-	// Update modal snooze (epoch ms  -  show prompt again after this time)
-	UPDATE_PROMPT_SNOOZE_UNTIL: "listening-stats:update-prompt-snooze-until",
-	// Monthly recap banner dismissal (month key, e.g. "2026-06")
-	RECAP_DISMISSED_MONTH: "listening-stats:recap-dismissed-month",
-	// Local stats ranking mode: "streams" | "minutes"
-	RANK_MODE: "listening-stats:rank-mode",
-	// Auto top-songs playlist settings + build state
-	PLAYLIST_CONFIG: "listening-stats:playlist-config",
-	PLAYLIST_STATE: "listening-stats:playlist-state",
+/**
+ * Every localStorage key the app owns, in one place.
+ *
+ * Keys shared with v2 keep v2's exact name AND value encoding, so a user who
+ * downgrades still finds their settings. Keys only v3 uses live under
+ * "listening-stats:v3:".
+ */
+const V2 = "listening-stats:";
+const V3 = "listening-stats:v3:";
+
+export const V2_KEYS = {
+	PLAY_THRESHOLD: `${V2}playThreshold`,
+	PLAY_THRESHOLD_MODE: `${V2}playThresholdMode`,
+	PLAY_THRESHOLD_PERCENT: `${V2}playThresholdPercent`,
+	TRACKING_PAUSED: `${V2}tracking-paused`,
+	SKIP_REPEATS: `${V2}skip-repeats`,
+	LOGGING: `${V2}logging`,
+	TRACKING_HEALTH: `${V2}tracking-health`,
+	LAST_WRITE: `${V2}lastWrite`,
+	ACTIVE_PROVIDER: `${V2}active-provider`,
+	PREFERENCES: `${V2}preferences`,
+	STATSFM_CONFIG: `${V2}statsfm`,
+	LASTFM_CONFIG: `${V2}lastfm-provider`,
+	LASTFM_API_KEY: `${V2}lastfm-api-key`,
+	PROVIDER_WIZARD_SEEN: `${V2}provider-wizard-seen`,
+	PROVIDER_PERIODS: `${V2}provider-periods`,
+	RANK_MODE: `${V2}rank-mode`,
+	PLAYLIST_CONFIG: `${V2}playlist-config`,
+	PLAYLIST_STATE: `${V2}playlist-state`,
+	TOUR_SEEN_VERSION: `${V2}tour-seen-version`,
+	RECAP_DISMISSED_MONTH: `${V2}recap-dismissed-month`,
+	UPDATE_PROMPT_SNOOZE_UNTIL: `${V2}update-prompt-snooze-until`,
+	DISMISSED_REMOTE_ANNOUNCEMENT_ID: `${V2}dismissed-remote-announcement-id`,
+	WORLD_CHARTS_WINDOW: `${V2}world-charts-window`,
 } as const;
+
+/** Prefix for settings that only v3 knows about. */
+export const V3_PREFIX = V3;
+
+export const V3_KEYS = {
+	PLAYLISTS: `${V3}playlists`,
+	DEVICE_ID: `${V3}device-id`,
+	FIRST_RUN_SNAPSHOT_DONE: `${V3}snapshot-done`,
+	TRACKER_HEALTH: `${V3}tracker-health`,
+} as const;
+
+/** What the extension writes to V3_KEYS.TRACKER_HEALTH and the settings page reads back. */
+export interface TrackerHealth {
+	startedAt: number;
+	lastEventAt: number;
+	lastWriteAt: number;
+	lastError: string | null;
+	privateSession: boolean;
+}

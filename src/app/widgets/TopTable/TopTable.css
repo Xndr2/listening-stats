@@ -1,0 +1,240 @@
+.ls-top .ls-widget-head {
+	flex-wrap: wrap;
+}
+
+.ls-rank-label {
+	white-space: nowrap;
+}
+
+.ls-top-scroll {
+	margin: 0 calc(-1 * var(--ls-space-2));
+	padding: 0 var(--ls-space-2);
+	scrollbar-width: thin;
+	scrollbar-color: var(--ls-bar) transparent;
+}
+
+.ls-table {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: fixed;
+}
+
+/* The header stays put while the list scrolls under it. */
+.ls-table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: color-mix(in srgb, var(--ls-bg) 95%, var(--ls-text));
+	padding: 0 var(--ls-space-2) var(--ls-space-2);
+	border-bottom: 1px solid var(--ls-line);
+	font-size: var(--ls-fs-xs);
+	font-weight: 600;
+	color: var(--ls-subtext);
+	text-align: left;
+}
+
+/* A little air between the header line and the first row. */
+.ls-table tbody::before {
+	content: "";
+	display: block;
+	height: var(--ls-space-2);
+}
+
+.ls-table td {
+	padding: 6px var(--ls-space-2);
+	vertical-align: middle;
+}
+
+.ls-row {
+	transition: background-color var(--ls-fast) var(--ls-ease);
+}
+
+.ls-row:hover {
+	background: var(--ls-hover);
+}
+
+.ls-row.is-link {
+	cursor: pointer;
+}
+
+.ls-row td:first-child {
+	border-radius: 4px 0 0 4px;
+}
+
+.ls-row td:last-child {
+	border-radius: 0 4px 4px 0;
+}
+
+.ls-col-rank {
+	width: 40px;
+	text-align: right !important;
+	color: var(--ls-subtext);
+}
+
+.ls-col-num {
+	width: 72px;
+	text-align: right !important;
+}
+
+.ls-col-like {
+	width: 44px;
+	text-align: center !important;
+}
+
+.ls-col-album {
+	width: 28%;
+}
+
+.ls-strong {
+	font-weight: 700;
+}
+
+.ls-row-main {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-3);
+	min-width: 0;
+}
+
+.ls-row-art {
+	position: relative;
+	flex: none;
+}
+
+.ls-row-play {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: var(--ls-radius-art);
+	background: rgba(0, 0, 0, 0.55);
+	color: #fff;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity var(--ls-fast) var(--ls-ease);
+}
+
+.ls-row:hover .ls-row-play,
+.ls-row-play:focus-visible {
+	opacity: 1;
+}
+
+.ls-row-text {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1;
+}
+
+/* As wide as the text, so a tooltip centres on it and the rest of the row stays row. */
+.ls-row-title,
+.ls-row-album {
+	display: block;
+	width: fit-content;
+	max-width: 100%;
+	padding: 0;
+	border: 0;
+	background: none;
+	text-align: left;
+	color: var(--ls-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: pointer;
+}
+
+.ls-row-title {
+	font-size: var(--ls-fs-md);
+	font-weight: 500;
+}
+
+.ls-row-album {
+	font-size: var(--ls-fs-sm);
+	color: var(--ls-subtext) !important;
+}
+
+.ls-row-title:hover,
+.ls-row-album:hover {
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.ls-row-sub {
+	font-size: var(--ls-fs-sm);
+	color: var(--ls-subtext);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Capped so the bar stays readable on very wide panes. Out of the flow, so
+   the title and artist centre on the cover instead of riding up above the bar. */
+.ls-row-bar {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: -6px;
+	display: block;
+	max-width: 420px;
+	height: 2px;
+	background: var(--ls-track);
+	border-radius: 1px;
+	overflow: hidden;
+}
+
+.ls-row-bar span {
+	display: block;
+	height: 100%;
+	background: var(--ls-accent);
+	transform-origin: left;
+	transition:
+		width 600ms var(--ls-ease),
+		transform 600ms var(--ls-ease);
+}
+
+@starting-style {
+	.ls-row-bar span {
+		transform: scaleX(0);
+	}
+}
+
+.ls-top-foot {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding-top: var(--ls-space-2);
+	margin-top: var(--ls-space-1);
+	border-top: 1px solid var(--ls-line);
+	font-size: var(--ls-fs-xs);
+}
+
+.ls-empty {
+	margin: var(--ls-space-4) 0;
+}
+
+.ls-filter {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-3);
+	margin: 0 0 var(--ls-space-2);
+	color: var(--ls-subtext);
+}
+
+.ls-filter strong {
+	color: var(--ls-text);
+}
+
+@container ls-page (max-width: 1200px) {
+	.ls-col-album {
+		display: none;
+	}
+}
+
+@container ls-page (max-width: 760px) {
+	.ls-col-time {
+		display: none;
+	}
+}

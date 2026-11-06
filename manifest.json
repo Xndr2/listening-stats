@@ -7,6 +7,6 @@
   "preview": "preview.png",
   "readme": "README.md",
   "branch": "dist",
-  "authors": [{ "name": "Xndr2", "url": "https://github.com/Xndr2" }, { "name": "HeadshotInteractive", "url": "https://github.com/HeadshotInteractive"}],
+  "authors": [{ "name": "Xndr2", "url": "https://github.com/Xndr2" }],
   "tags": ["Listening", "Stats"]
 }

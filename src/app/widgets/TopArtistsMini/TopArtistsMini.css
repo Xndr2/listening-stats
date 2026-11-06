@@ -1,0 +1,33 @@
+.ls-mini {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 2px;
+}
+
+.ls-mini-item {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-3);
+	width: 100%;
+	padding: 4px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+
+.ls-mini-item:hover {
+	background: var(--ls-hover);
+}
+
+.ls-mini-name {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}

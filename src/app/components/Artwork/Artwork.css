@@ -1,0 +1,22 @@
+.ls-art {
+	position: relative;
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	border-radius: var(--ls-radius-art);
+	background: var(--ls-hover);
+	color: var(--ls-subtext);
+}
+
+.ls-art.is-round {
+	border-radius: 50%;
+}
+
+.ls-art img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}

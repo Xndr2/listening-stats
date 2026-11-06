@@ -1,0 +1,63 @@
+.ls-world {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.ls-world-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: var(--ls-space-3);
+	margin-bottom: var(--ls-space-4);
+}
+
+.ls-world-title {
+	margin: 0 0 var(--ls-space-1);
+	font-size: var(--ls-fs-xl);
+	letter-spacing: -0.02em;
+}
+
+.ls-world-head p {
+	margin: 0;
+}
+
+.ls-col-you {
+	width: 72px;
+	text-align: center !important;
+}
+
+.ls-col-streams {
+	width: 110px;
+	text-align: right !important;
+}
+
+.ls-you-chip {
+	display: inline-block;
+	min-width: 28px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: rgba(var(--ls-rgb-accent), 0.18);
+	color: var(--ls-text);
+	font-size: var(--ls-fs-xs);
+	font-weight: 700;
+}
+
+.ls-ellipsis {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ls-root.is-fit {
+	.ls-world {
+		flex: 1;
+	}
+	.ls-world-card {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+}

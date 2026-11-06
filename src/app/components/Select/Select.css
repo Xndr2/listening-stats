@@ -1,0 +1,61 @@
+.ls-select {
+	display: inline-flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--ls-space-3);
+	min-width: 160px;
+	padding: 8px 12px;
+	border: 1px solid var(--ls-line);
+	border-radius: 6px;
+	background: var(--ls-panel);
+	color: var(--ls-text);
+	font: inherit;
+	font-weight: 600;
+	text-align: left;
+	cursor: pointer;
+	transition:
+		border-color var(--ls-fast) var(--ls-ease),
+		background-color var(--ls-fast) var(--ls-ease);
+}
+
+.ls-select:hover {
+	border-color: var(--ls-subtext);
+}
+
+.ls-select:focus-visible {
+	outline: 2px solid var(--ls-text);
+	outline-offset: 0;
+	border-color: transparent;
+}
+
+.ls-select svg {
+	flex: none;
+	color: var(--ls-subtext);
+}
+
+.ls-select.is-pill {
+	min-width: 0;
+	padding: 7px 14px;
+	border: 0;
+	border-radius: 999px;
+}
+
+.ls-select.is-pill:hover {
+	background: var(--ls-hover);
+}
+
+.ls-select-value {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ls-select-menu {
+	min-width: max(anchor-size(width), 180px);
+	max-height: min(360px, 60vh);
+	overflow-y: auto;
+}
+
+.ls-select-menu .ls-menu-item[aria-selected="true"] {
+	color: var(--ls-accent);
+}

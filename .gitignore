@@ -1,7 +1,3 @@
 node_modules/
 dist/
-coverage/
-*.tgz
-.DS_Store
-.claude/
-.pnpm-store/
+.vscode/

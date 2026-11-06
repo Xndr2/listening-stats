@@ -1,42 +1,31 @@
 {
   "name": "listening-stats",
-  "version": "2.1.5",
+  "version": "3.0.0-dev",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
+    "dev": "node build.mjs --watch --live",
+    "build:prod": "NODE_ENV=production node build.mjs",
     "watch": "node build.mjs --watch",
     "watch:deploy": "node build.mjs --watch --deploy",
     "deploy": "npm run build && npm run deploy:files && spicetify config custom_apps listening-stats && spicetify apply",
-    "deploy:files": "mkdir -p ~/.config/spicetify/CustomApps/listening-stats && cp dist/index.js dist/extension.js manifest.json ~/.config/spicetify/CustomApps/listening-stats/",
+    "deploy:files": "node build.mjs --copy-only",
     "undeploy": "spicetify config custom_apps listening-stats- && rm -rf ~/.config/spicetify/CustomApps/listening-stats && spicetify apply",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
-    "test": "vitest run --reporter=verbose",
-    "test:watch": "vitest --reporter=verbose",
-    "sandcastle": "npx tsx .sandcastle/main.ts"
+    "check": "npm run lint && npm run typecheck && npm run build"
   },
   "devDependencies": {
-    "@ai-hero/sandcastle": "^0.5.8",
-    "@biomejs/biome": "^2.5.6",
+    "@biomejs/biome": "^2.5.13",
     "@fal-works/esbuild-plugin-global-externals": "^2.1.2",
-    "@testing-library/react": "^16.3.2",
-    "@types/node": "^25.5.0",
-    "@types/react": "^18.3.28",
-    "@types/react-dom": "^18.3.7",
-    "@types/semver": "^7.7.1",
-    "@vitest/coverage-v8": "^4.1.10",
-    "esbuild": "^0.28.1",
-    "fake-indexeddb": "^6.2.5",
-    "jsdom": "^29.1.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.10"
-  },
-  "dependencies": {
-    "dexie": "^4.4.4",
-    "semver": "^7.8.5"
+    "@types/node": "^25.9.6",
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5",
+    "esbuild": "^0.28.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "^7.0.2"
   }
 }

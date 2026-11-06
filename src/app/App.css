@@ -1,0 +1,26 @@
+.ls-footer {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--ls-space-2) var(--ls-space-4);
+	margin-top: var(--ls-space-4);
+	padding-top: var(--ls-space-2);
+	border-top: 1px solid var(--ls-line);
+	font-size: var(--ls-fs-xs);
+	color: var(--ls-subtext);
+}
+
+.ls-footer strong {
+	color: var(--ls-text);
+}
+
+.ls-footer-support {
+	margin-left: auto;
+	color: var(--ls-subtext);
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.ls-footer-support:hover {
+	color: var(--ls-text);
+	text-decoration: underline;
+}

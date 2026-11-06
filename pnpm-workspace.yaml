@@ -2,6 +2,4 @@ packages:
   - '.'
 
 allowBuilds:
-  '@parcel/watcher': true
   esbuild: true
-  msgpackr-extract: true

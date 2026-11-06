@@ -1,0 +1,116 @@
+/*
+ * Two layouts:
+ * - Fit (pane at least 860 x 600, `.is-fit` on .ls-root): the dashboard fills the pane exactly and
+ *   never scrolls as a whole. The top lists scroll inside their card, the
+ *   side column scrolls on its own, recently played scrolls sideways.
+ * - Flow (smaller): everything stacks and the page scrolls normally.
+ */
+.ls-dash-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) clamp(300px, 24%, 440px);
+	gap: var(--ls-space-4);
+	align-items: start;
+}
+
+.ls-dash-main,
+.ls-dash-rail {
+	display: grid;
+	gap: var(--ls-space-4);
+	min-width: 0;
+	align-content: start;
+}
+
+.ls-slot {
+	min-width: 0;
+}
+
+/* Fit mode is a class (see Root in index.tsx), not a size query. */
+.ls-root.is-fit {
+	.ls-main {
+		flex: 1 1 0;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.ls-dash {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.ls-dash-grid {
+		flex: 1;
+		min-height: 0;
+		align-items: stretch;
+		grid-template-rows: minmax(0, 1fr);
+	}
+	/* Flex here so the top lists take the leftover height wherever they sit in the order. */
+	.ls-dash-main {
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.ls-slot {
+		flex: none;
+	}
+	.ls-slot-top {
+		flex: 1 1 0;
+		min-height: 220px;
+		display: flex;
+	}
+	.ls-slot-top > .ls-top {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.ls-top-scroll {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+	}
+	.ls-dash-rail {
+		min-height: 0;
+		overflow-y: auto;
+		scrollbar-width: thin;
+		display: flex;
+		flex-direction: column;
+	}
+	/* The bar charts take the rail's spare height, so the column ends level with the main one. */
+	.ls-dash-rail > .ls-slot-hour,
+	.ls-dash-rail > .ls-slot-weekday {
+		flex: 1 0 auto;
+		display: flex;
+	}
+	.ls-dash-rail > .ls-slot-hour > .ls-widget,
+	.ls-dash-rail > .ls-slot-weekday > .ls-widget {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+	}
+	.ls-dash-rail .ls-bars-wrap {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+	}
+	.ls-dash-rail .ls-bars {
+		flex: 1;
+		height: auto;
+		min-height: 88px;
+	}
+}
+
+@container ls-page (max-width: 859px) {
+	.ls-dash-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.ls-dash-rail {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@container ls-page (max-width: 560px) {
+	.ls-dash-rail {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}

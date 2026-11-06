@@ -1,0 +1,18 @@
+/* Matches Spotify's own tooltips: elevated surface, small bold-ish text. */
+.ls-tooltip {
+	position: fixed;
+	inset: auto;
+	margin: 0;
+	max-width: 280px;
+	padding: 4px 8px;
+	border: 0;
+	border-radius: 4px;
+	background: var(--spice-main-elevated, #282828);
+	color: var(--ls-text);
+	font-size: var(--ls-fs-sm);
+	font-weight: 600;
+	line-height: 1.4;
+	box-shadow: 0 8px 24px rgba(var(--spice-rgb-shadow, 0, 0, 0), 0.5);
+	pointer-events: none;
+	overflow-wrap: anywhere;
+}

@@ -1,0 +1,45 @@
+.ls-crash {
+	max-width: 60ch;
+	margin: 10vh auto 0;
+}
+
+.ls-crash h1 {
+	margin: 0 0 var(--ls-space-3);
+	font-size: var(--ls-fs-xl);
+	letter-spacing: -0.02em;
+}
+
+.ls-crash-msg {
+	padding: var(--ls-space-3);
+	border-radius: var(--ls-radius);
+	background: var(--ls-panel);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: var(--ls-fs-xs);
+	overflow-wrap: anywhere;
+}
+
+.ls-crash-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--ls-space-2);
+	margin-top: var(--ls-space-4);
+}
+
+.ls-btn-secondary {
+	padding: 7px 16px;
+	border: 1px solid var(--ls-line);
+	border-radius: 999px;
+	background: transparent;
+	font-weight: 700;
+	cursor: pointer;
+	transition: border-color var(--ls-fast) var(--ls-ease);
+}
+
+.ls-btn-secondary:hover:not(:disabled) {
+	border-color: var(--ls-text);
+}
+
+.ls-btn-secondary:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}

@@ -1,6 +1,6 @@
 # Listening Stats  -  install or update for Spicetify (Windows).
 # Usage:
-#   irm https://raw.githubusercontent.com/HeadshotInteractive/listening-stats/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.ps1 | iex
 #
 # If Spicetify CLI is missing, installs it under LocalAppData\spicetify (non-interactive; no Marketplace).
 # Set $env:LISTENING_STATS_SKIP_SPICETIFY_INSTALL = "1" to only install LS (fail if spicetify missing).
@@ -30,7 +30,7 @@ try {
 # non-zero exit (including expected ones during recovery) and the script aborts.
 try { $PSNativeCommandUseErrorActionPreference = $false } catch { }
 
-$RepoSlug = "HeadshotInteractive/listening-stats"
+$RepoSlug = "Xndr2/listening-stats"
 $AppName = "listening-stats"
 $MinZipBytes = 2000
 

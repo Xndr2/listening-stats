@@ -1,0 +1,85 @@
+.ls-notice {
+	margin-bottom: var(--ls-space-4);
+	padding: var(--ls-space-3) var(--ls-space-4);
+	border-radius: var(--ls-radius);
+	background: rgba(var(--ls-rgb-accent), 0.12);
+	animation: ls-notice-in 200ms var(--ls-ease) both;
+}
+
+@keyframes ls-notice-in {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
+
+.ls-notice-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--ls-space-3);
+}
+
+.ls-notice-text {
+	margin: 0;
+	min-width: 0;
+}
+
+.ls-notice-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-2);
+	flex: none;
+}
+
+.ls-notice-more {
+	margin-top: var(--ls-space-3);
+	padding-top: var(--ls-space-3);
+	border-top: 1px solid var(--ls-line);
+	display: grid;
+	gap: var(--ls-space-2);
+	max-width: 70ch;
+}
+
+.ls-notice-cmd {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-2);
+}
+
+.ls-notice-cmd code {
+	flex: 1;
+	min-width: 0;
+	overflow-x: auto;
+	white-space: nowrap;
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: var(--ls-panel);
+	font-size: var(--ls-fs-xs);
+}
+
+.ls-md p,
+.ls-md ul {
+	margin: var(--ls-space-1) 0;
+}
+
+.ls-md ul {
+	padding-left: var(--ls-space-4);
+}
+
+.ls-md-h {
+	margin: var(--ls-space-3) 0 var(--ls-space-1);
+	font-size: var(--ls-fs-md);
+}
+
+.ls-md a {
+	color: var(--ls-text);
+	text-underline-offset: 3px;
+}
+
+.ls-md code {
+	padding: 1px 4px;
+	border-radius: 3px;
+	background: var(--ls-panel);
+	font-size: 0.9em;
+}

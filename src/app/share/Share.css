@@ -1,0 +1,112 @@
+.ls-share {
+	width: min(980px, calc(100vw - 64px));
+	max-height: calc(100vh - 64px);
+	padding: var(--ls-space-5);
+	border: 0;
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--ls-bg) 92%, var(--ls-text));
+	color: var(--ls-text);
+	box-shadow: 0 24px 64px rgba(var(--spice-rgb-shadow, 0, 0, 0), 0.55);
+}
+
+.ls-share[open] {
+	animation: ls-dialog-in 180ms var(--ls-ease) both;
+}
+
+.ls-share::backdrop {
+	background: rgba(0, 0, 0, 0.6);
+}
+
+.ls-share-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: var(--ls-space-4);
+}
+
+.ls-share-head h2 {
+	margin: 0;
+	font-size: var(--ls-fs-xl);
+	letter-spacing: -0.02em;
+}
+
+.ls-share-body {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: var(--ls-space-6);
+	align-items: start;
+}
+
+.ls-share-preview {
+	display: flex;
+	justify-content: center;
+}
+
+.ls-share-preview img,
+.ls-share-preview .ls-skel {
+	display: block;
+	border-radius: 8px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.ls-share-preview.is-story img,
+.ls-share-preview.is-story .ls-skel {
+	height: min(560px, 62vh);
+	aspect-ratio: 9 / 16;
+}
+
+.ls-share-preview.is-square img,
+.ls-share-preview.is-square .ls-skel {
+	width: min(440px, 46vw);
+	aspect-ratio: 1;
+}
+
+.ls-share-preview.is-wide img,
+.ls-share-preview.is-wide .ls-skel {
+	width: min(500px, 50vw);
+	aspect-ratio: 1200 / 630;
+}
+
+.ls-share-controls {
+	display: grid;
+	gap: var(--ls-space-4);
+	align-content: start;
+}
+
+.ls-share-field {
+	display: grid;
+	gap: var(--ls-space-2);
+	justify-items: start;
+}
+
+.ls-share-field .ls-input {
+	max-width: 320px;
+}
+
+.ls-share-toggles {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--ls-space-2) var(--ls-space-5);
+	padding: var(--ls-space-3) 0;
+	border-top: 1px solid var(--ls-line);
+	border-bottom: 1px solid var(--ls-line);
+}
+
+.ls-share-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--ls-space-3);
+	font-weight: 600;
+}
+
+.ls-share-actions {
+	display: flex;
+	gap: var(--ls-space-2);
+}
+
+@media (max-width: 760px) {
+	.ls-share-body {
+		grid-template-columns: 1fr;
+	}
+}
