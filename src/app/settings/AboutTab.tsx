@@ -6,11 +6,11 @@ import { formatReport, githubIssueUrl } from "../../shared/errors/report";
 import { isReportingConfigured, sendReport } from "../../shared/errors/sentry";
 import { availableUpdate, type ReleaseInfo } from "../../shared/remote/updates";
 import { Icon } from "../components/Icon";
+import { OPEN_UPDATE_EVENT } from "../components/UpdateDialog/UpdateDialog";
 import { formatAgo } from "../format";
 import { useSetting } from "../hooks/useSetting";
 import { TOUR_EVENT } from "../onboarding/Tour";
 import { useApp } from "../state";
-import { UpdateNotice } from "../widgets/Notices/Notices";
 import { Row, Section, ToggleRow } from "./controls";
 
 function copy(text: string): void {
@@ -158,7 +158,15 @@ export function AboutTab() {
 	}, [beta]);
 	return (
 		<>
-			{update && <UpdateNotice r={update} />}
+			{update && (
+				<button
+					type="button"
+					className="ls-btn-primary ls-update-cta"
+					onClick={() => window.dispatchEvent(new Event(OPEN_UPDATE_EVENT))}
+				>
+					Update to Listening Stats {update.version}
+				</button>
+			)}
 			<Section title="Listening Stats">
 				<Row label="Version" control={<span className="ls-num">{APP_VERSION}</span>} />
 				<ToggleRow name="betaUpdates" label="Tell me about beta versions" />

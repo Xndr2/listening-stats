@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { APP_VERSION, BUYMEACOFFEE_URL } from "../shared/constants/app";
 import { Header } from "./components/Header/Header";
+import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
 import { Dashboard } from "./layout/Dashboard";
 import { needsSetup, SetupWizard } from "./onboarding/SetupWizard";
 import { shouldShowTour, TOUR_EVENT, Tour } from "./onboarding/Tour";
@@ -36,6 +37,7 @@ function Views() {
 			{touring && <Tour onDone={() => setTouring(false)} />}
 			<SettingsView />
 			<ShareDialog open={sharing} onClose={() => setSharing(false)} />
+			<UpdateDialog />
 			<footer className="ls-footer">
 				<span>
 					Listening Stats <strong>v{APP_VERSION}</strong>
