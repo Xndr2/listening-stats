@@ -30,7 +30,7 @@ function copy(text: string): void {
 	Spicetify.showNotification("Copied. Paste it in a terminal.");
 }
 
-function UpdateNotice({ r, onClose }: { r: ReleaseInfo; onClose: () => void }) {
+export function UpdateNotice({ r, onClose }: { r: ReleaseInfo; onClose?: () => void }) {
 	const [open, setOpen] = useState(false);
 	const isWin = navigator.userAgent.includes("Windows");
 	return (
@@ -43,15 +43,17 @@ function UpdateNotice({ r, onClose }: { r: ReleaseInfo; onClose: () => void }) {
 					<button type="button" className="ls-link" onClick={() => setOpen(!open)} aria-expanded={open}>
 						{open ? "Hide details" : "What's new"}
 					</button>
-					<button
-						type="button"
-						className="ls-icon-btn"
-						aria-label="Remind me later"
-						data-tip="Remind me in a few days"
-						onClick={onClose}
-					>
-						<Icon name="close" />
-					</button>
+					{onClose && (
+						<button
+							type="button"
+							className="ls-icon-btn"
+							aria-label="Remind me later"
+							data-tip="Remind me in a few days"
+							onClick={onClose}
+						>
+							<Icon name="close" />
+						</button>
+					)}
 				</div>
 			</div>
 			{open && (

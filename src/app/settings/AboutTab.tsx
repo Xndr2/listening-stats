@@ -4,10 +4,13 @@ import { EVENTS, listen } from "../../shared/constants/events";
 import { clearErrors, deleteError, type ErrorEntry, getErrors, toEntry } from "../../shared/errors/log";
 import { formatReport, githubIssueUrl } from "../../shared/errors/report";
 import { isReportingConfigured, sendReport } from "../../shared/errors/sentry";
+import { availableUpdate, type ReleaseInfo } from "../../shared/remote/updates";
 import { Icon } from "../components/Icon";
 import { formatAgo } from "../format";
+import { useSetting } from "../hooks/useSetting";
 import { TOUR_EVENT } from "../onboarding/Tour";
 import { useApp } from "../state";
+import { UpdateNotice } from "../widgets/Notices/Notices";
 import { Row, Section, ToggleRow } from "./controls";
 
 function copy(text: string): void {
@@ -148,8 +151,14 @@ function ErrorLog() {
 
 export function AboutTab() {
 	const { setView, setSettingsOpen } = useApp();
+	const [beta] = useSetting("betaUpdates");
+	const [update, setUpdate] = useState<ReleaseInfo | null>(null);
+	useEffect(() => {
+		void availableUpdate(beta).then(setUpdate, () => setUpdate(null));
+	}, [beta]);
 	return (
 		<>
+			{update && <UpdateNotice r={update} />}
 			<Section title="Listening Stats">
 				<Row label="Version" control={<span className="ls-num">{APP_VERSION}</span>} />
 				<ToggleRow name="betaUpdates" label="Tell me about beta versions" />
