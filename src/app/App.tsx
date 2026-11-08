@@ -44,7 +44,12 @@ function Views() {
 				</span>
 				<span>Made with ❤️ by Xndr</span>
 				<span className="ls-footer-links">
-					<a className="ls-footer-support" href={`https://github.com/${GITHUB_REPO}`} target="_blank" rel="noreferrer noopener">
+					<a
+						className="ls-footer-support"
+						href={`https://github.com/${GITHUB_REPO}`}
+						target="_blank"
+						rel="noreferrer noopener"
+					>
 						GitHub
 					</a>
 					<a className="ls-footer-support" href={DISCORD_URL} target="_blank" rel="noreferrer noopener">
