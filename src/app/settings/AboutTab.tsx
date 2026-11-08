@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { APP_VERSION, BUYMEACOFFEE_URL, GITHUB_REPO } from "../../shared/constants/app";
+import { APP_VERSION, BUYMEACOFFEE_URL, DISCORD_URL, GITHUB_REPO } from "../../shared/constants/app";
 import { EVENTS, listen } from "../../shared/constants/events";
 import { clearErrors, deleteError, type ErrorEntry, getErrors, toEntry } from "../../shared/errors/log";
 import { formatReport, githubIssueUrl } from "../../shared/errors/report";
@@ -197,6 +197,14 @@ export function AboutTab() {
 					control={
 						<a className="ls-link" href={`https://github.com/${GITHUB_REPO}`} target="_blank" rel="noreferrer noopener">
 							GitHub
+						</a>
+					}
+				/>
+				<Row
+					label="Community"
+					control={
+						<a className="ls-link" href={DISCORD_URL} target="_blank" rel="noreferrer noopener">
+							Discord
 						</a>
 					}
 				/>

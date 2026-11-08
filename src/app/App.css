@@ -13,8 +13,13 @@
 	color: var(--ls-text);
 }
 
-.ls-footer-support {
+.ls-footer-links {
 	margin-left: auto;
+	display: flex;
+	gap: var(--ls-space-3);
+}
+
+.ls-footer-support {
 	color: var(--ls-subtext);
 	font-weight: 700;
 	text-decoration: none;

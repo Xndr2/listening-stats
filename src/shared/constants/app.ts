@@ -20,3 +20,6 @@ export const GITHUB_REPO = "Xndr2/listening-stats";
 
 /** Support link shown in the footer and in Settings, About. Same as v2. */
 export const BUYMEACOFFEE_URL = "https://buymeacoffee.com/xndr_";
+
+/** Community Discord, shown in the footer and in Settings, About. */
+export const DISCORD_URL = "https://discord.gg/XtqbFAHk6a";

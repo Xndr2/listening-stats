@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { APP_VERSION, BUYMEACOFFEE_URL } from "../shared/constants/app";
+import { APP_VERSION, BUYMEACOFFEE_URL, DISCORD_URL, GITHUB_REPO } from "../shared/constants/app";
 import { Header } from "./components/Header/Header";
 import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
 import { Dashboard } from "./layout/Dashboard";
@@ -12,7 +12,7 @@ import { WorldView } from "./world/WorldView";
 import "./App.css";
 
 function Views() {
-	const { view, provider } = useApp();
+	const { view } = useApp();
 	const [sharing, setSharing] = useState(false);
 	const [setup, setSetup] = useState(needsSetup);
 	const [touring, setTouring] = useState(false);
@@ -42,10 +42,18 @@ function Views() {
 				<span>
 					Listening Stats <strong>v{APP_VERSION}</strong>
 				</span>
-				<span>{provider.id === "local" ? "Local · tracked on this device" : `Data from ${provider.name}`}</span>
-				<a className="ls-footer-support" href={BUYMEACOFFEE_URL} target="_blank" rel="noreferrer noopener">
-					Buy me a coffee
-				</a>
+				<span>Made with ❤️ by Xndr</span>
+				<span className="ls-footer-links">
+					<a className="ls-footer-support" href={`https://github.com/${GITHUB_REPO}`} target="_blank" rel="noreferrer noopener">
+						GitHub
+					</a>
+					<a className="ls-footer-support" href={DISCORD_URL} target="_blank" rel="noreferrer noopener">
+						Discord
+					</a>
+					<a className="ls-footer-support" href={BUYMEACOFFEE_URL} target="_blank" rel="noreferrer noopener">
+						Buy me a coffee
+					</a>
+				</span>
 			</footer>
 		</>
 	);
