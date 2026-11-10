@@ -1,98 +1,72 @@
-import Dexie from "dexie";
-import { EVENTS } from "../constants/events";
-import { LS_KEYS } from "../constants/storage-keys";
-
 /**
- * Provider connections live in localStorage, which some Spotify / Spicetify
- * updates reset while IndexedDB (play history) survives. These keys are
- * mirrored into IndexedDB so a reset no longer forces users to reconnect
- * stats.fm or re-enter their Last.fm API key.
+ * Some Spotify/Spicetify updates wipe localStorage but keep IndexedDB. v2
+ * therefore mirrors the provider connection keys into a small IndexedDB, and
+ * v3 keeps that going: restore what's missing at startup, mirror on change.
+ *
+ * v2's mirror: "listening-stats-credentials", Dexie version(1) = native 10,
+ * store "kv", out-of-line keys = the localStorage key names.
  */
-const MIRRORED_KEYS = [
-	LS_KEYS.STATSFM_CONFIG,
-	LS_KEYS.LASTFM_CONFIG,
-	LS_KEYS.LASTFM_API_KEY,
-	LS_KEYS.ACTIVE_PROVIDER,
+import { V2_KEYS } from "../constants/storage-keys";
+import { existingVersion, openDb, req, txDone } from "./idb";
+
+export const MIRROR_DB_NAME = "listening-stats-credentials";
+const MIRROR_VERSION = 10;
+
+export const MIRRORED_KEYS = [
+	V2_KEYS.STATSFM_CONFIG,
+	V2_KEYS.LASTFM_CONFIG,
+	V2_KEYS.LASTFM_API_KEY,
+	V2_KEYS.ACTIVE_PROVIDER,
 ] as const;
 
-const MIRROR_DB_NAME = "listening-stats-credentials";
-
-function openMirror(): Dexie {
-	const mirror = new Dexie(MIRROR_DB_NAME);
-	mirror.version(1).stores({ kv: "" });
-	return mirror;
+async function openMirror(): Promise<IDBDatabase | null> {
+	const v = await existingVersion(MIRROR_DB_NAME);
+	const db = await openDb(MIRROR_DB_NAME, v === null ? MIRROR_VERSION : undefined, (d) => {
+		if (!d.objectStoreNames.contains("kv")) d.createObjectStore("kv");
+	});
+	if (!db.objectStoreNames.contains("kv")) {
+		db.close();
+		return null;
+	}
+	return db;
 }
 
-/** Copies the current values into the mirror, dropping keys the user removed (disconnect). */
+/** Fills keys missing from localStorage from the mirror. Returns how many it restored. */
+export async function restoreMissingCredentials(): Promise<number> {
+	const missing = MIRRORED_KEYS.filter((k) => localStorage.getItem(k) === null);
+	if (missing.length === 0) return 0;
+	const db = await openMirror();
+	if (!db) return 0;
+	try {
+		const store = db.transaction("kv").objectStore("kv");
+		let restored = 0;
+		for (const key of missing) {
+			const value = await req(store.get(key));
+			if (typeof value === "string") {
+				localStorage.setItem(key, value);
+				restored++;
+			}
+		}
+		return restored;
+	} finally {
+		db.close();
+	}
+}
+
+/** Copies the current values into the mirror; removed keys (disconnects) are removed there too. */
 export async function mirrorCredentials(): Promise<void> {
-	const mirror = openMirror();
+	const db = await openMirror();
+	if (!db) return;
 	try {
-		const kv = mirror.table<string, string>("kv");
-		await mirror.transaction("rw", kv, async () => {
-			for (const key of MIRRORED_KEYS) {
-				const value = localStorage.getItem(key);
-				if (value === null) await kv.delete(key);
-				else await kv.put(value, key);
-			}
-		});
+		const tx = db.transaction("kv", "readwrite");
+		const store = tx.objectStore("kv");
+		for (const key of MIRRORED_KEYS) {
+			const value = localStorage.getItem(key);
+			if (value === null) store.delete(key);
+			else store.put(value, key);
+		}
+		await txDone(tx);
 	} finally {
-		mirror.close();
+		db.close();
 	}
-}
-
-/**
- * Startup: puts back mirrored keys that localStorage lost and refreshes the
- * mirror from the keys still present. Never deletes mirror entries - a missing
- * key here means a reset, not a disconnect. Returns true when anything was restored.
- */
-export async function restoreCredentials(): Promise<boolean> {
-	const mirror = openMirror();
-	let restored = false;
-	try {
-		const kv = mirror.table<string, string>("kv");
-		await mirror.transaction("rw", kv, async () => {
-			for (const key of MIRRORED_KEYS) {
-				const value = localStorage.getItem(key);
-				if (value !== null) {
-					await kv.put(value, key);
-					continue;
-				}
-				const saved = await kv.get(key);
-				if (typeof saved === "string") {
-					localStorage.setItem(key, saved);
-					restored = true;
-				}
-			}
-		});
-	} finally {
-		mirror.close();
-	}
-	return restored;
-}
-
-let listening = false;
-
-/**
- * Restores lost provider keys, then keeps the mirror in sync: every connect,
- * disconnect and provider switch dispatches PROVIDER_CHANGED. Safe to call
- * from both bundles; failures only cost the safety net, never startup.
- */
-export async function startCredentialMirror(): Promise<boolean> {
-	if (!listening) {
-		listening = true;
-		window.addEventListener(EVENTS.PROVIDER_CHANGED, () => {
-			mirrorCredentials().catch((err) => console.warn("[listening-stats] credential mirror failed:", err));
-		});
-	}
-	try {
-		return await restoreCredentials();
-	} catch (err) {
-		console.warn("[listening-stats] credential restore failed:", err);
-		return false;
-	}
-}
-
-/** Used by "wipe all data" so a wipe is not undone by the next startup. */
-export async function deleteCredentialMirror(): Promise<void> {
-	await Dexie.delete(MIRROR_DB_NAME);
 }

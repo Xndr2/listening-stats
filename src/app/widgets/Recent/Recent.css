@@ -1,0 +1,84 @@
+/* One row, scrolling sideways. Cards snap so a scroll never stops mid-card. */
+.ls-recent {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: 248px;
+	gap: var(--ls-space-2);
+	margin: 0 calc(-1 * var(--ls-space-2));
+	padding: 0 var(--ls-space-2) var(--ls-space-2);
+	list-style: none;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scroll-snap-type: x proximity;
+	scrollbar-width: thin;
+	scrollbar-color: var(--ls-bar) transparent;
+}
+
+.ls-recent-card {
+	scroll-snap-align: start;
+	min-width: 0;
+	cursor: pointer;
+}
+
+.ls-recent-inner {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-3);
+	padding: 6px;
+	border-radius: 6px;
+	transition: background-color var(--ls-fast) var(--ls-ease);
+}
+
+.ls-recent-card:hover .ls-recent-inner {
+	background: var(--ls-hover);
+}
+
+.ls-recent-card:hover .ls-recent-play,
+.ls-recent-play:focus-visible {
+	opacity: 1;
+}
+
+.ls-recent-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1;
+	line-height: 1.3;
+}
+
+.ls-recent-title {
+	width: fit-content;
+	max-width: 100%;
+	padding: 0;
+	border: 0;
+	background: none;
+	text-align: left;
+	font-weight: 600;
+	color: var(--ls-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: pointer;
+}
+
+.ls-recent-title:hover {
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.ls-recent-sub,
+.ls-recent-when {
+	font-size: var(--ls-fs-xs);
+	color: var(--ls-subtext);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ls-recent-when {
+	color: var(--ls-accent);
+}
+
+.ls-recent-skel {
+	height: 60px;
+}

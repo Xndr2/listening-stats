@@ -1,0 +1,42 @@
+.ls-seg {
+	display: inline-flex;
+	gap: 2px;
+	padding: 3px;
+	border-radius: 999px;
+	background: var(--ls-panel);
+	flex: none;
+}
+
+.ls-seg-opt {
+	border: 0;
+	background: transparent;
+	border-radius: 999px;
+	padding: 6px 12px;
+	font-size: var(--ls-fs-sm);
+	font-weight: 600;
+	color: var(--ls-text);
+	cursor: pointer;
+	white-space: nowrap;
+	transition:
+		background-color var(--ls-fast) var(--ls-ease),
+		color var(--ls-fast) var(--ls-ease);
+}
+
+.ls-seg-sm .ls-seg-opt {
+	padding: 4px 10px;
+	font-size: var(--ls-fs-xs);
+}
+
+.ls-seg-opt:hover:not([aria-checked="true"]):not(:disabled) {
+	background: var(--ls-hover);
+}
+
+.ls-seg-opt[aria-checked="true"] {
+	background: var(--ls-accent);
+	color: var(--ls-on-accent);
+}
+
+.ls-seg-opt:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}

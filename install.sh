@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Listening Stats  -  install or update for Spicetify (macOS / Linux).
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/HeadshotInteractive/listening-stats/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Xndr2/listening-stats/main/install.sh | bash
 # Opt in to prereleases (only used when strictly newer than the latest stable release):
 #   LISTENING_STATS_PRERELEASE=1 curl -fsSL … | bash
 #
@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-REPO_SLUG="HeadshotInteractive/listening-stats"
+REPO_SLUG="Xndr2/listening-stats"
 APP_NAME="listening-stats"
 MIN_ZIP_BYTES=2000
 

@@ -1,0 +1,40 @@
+.ls-like,
+.ls-like-slot {
+	display: inline-flex;
+	width: 32px;
+	height: 32px;
+	flex: none;
+}
+
+.ls-like {
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--ls-subtext) !important;
+	cursor: pointer;
+	opacity: 0;
+	transition:
+		opacity var(--ls-fast) var(--ls-ease),
+		color var(--ls-fast) var(--ls-ease),
+		transform var(--ls-fast) var(--ls-ease);
+}
+
+/* Like Spotify: outline hearts appear on hover, liked ones always show. */
+.ls-row:hover .ls-like,
+.ls-recent-card:hover .ls-like,
+.ls-like:focus-visible,
+.ls-like.is-liked {
+	opacity: 1;
+}
+
+.ls-like:hover {
+	color: var(--ls-text) !important;
+	transform: scale(1.06);
+}
+
+.ls-like.is-liked {
+	color: var(--ls-accent) !important;
+}

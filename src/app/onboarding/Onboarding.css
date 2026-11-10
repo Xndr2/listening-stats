@@ -1,0 +1,107 @@
+.ls-setup {
+	max-width: 720px;
+	margin: var(--ls-space-6) auto;
+}
+
+.ls-setup-title {
+	margin: 0 0 var(--ls-space-3);
+	font-size: 2rem;
+	letter-spacing: -0.02em;
+}
+
+.ls-setup-lead {
+	margin: 0 0 var(--ls-space-5);
+	max-width: 62ch;
+	color: var(--ls-subtext);
+	font-size: var(--ls-fs-md);
+}
+
+.ls-setup-choice {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: var(--ls-space-3);
+}
+
+.ls-setup-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--ls-space-2);
+	padding: var(--ls-space-5);
+	border: 1px solid var(--ls-line);
+	border-radius: var(--ls-radius);
+	background: var(--ls-panel);
+	text-align: left;
+	cursor: pointer;
+	transition:
+		border-color var(--ls-fast) var(--ls-ease),
+		background-color var(--ls-fast) var(--ls-ease);
+}
+
+.ls-setup-card:hover {
+	border-color: var(--ls-accent);
+	background: var(--ls-hover);
+}
+
+.ls-setup-card-title {
+	font-size: var(--ls-fs-lg);
+	font-weight: 700;
+}
+
+.ls-setup-sources {
+	display: grid;
+	gap: var(--ls-space-5);
+}
+
+.ls-setup-done {
+	margin-top: var(--ls-space-5);
+}
+
+.ls-tour-ring {
+	position: fixed;
+	z-index: 1000;
+	border: 2px solid var(--ls-accent);
+	border-radius: 10px;
+	pointer-events: none;
+	box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+	transition: all 220ms var(--ls-ease);
+}
+
+.ls-tour {
+	position: fixed;
+	z-index: 1001;
+	width: 320px;
+	padding: var(--ls-space-4);
+	border-radius: var(--ls-radius);
+	background: var(--spice-main-elevated, #282828);
+	color: var(--ls-text);
+	box-shadow: 0 16px 32px rgba(var(--spice-rgb-shadow, 0, 0, 0), 0.4);
+	transition:
+		top 220ms var(--ls-ease),
+		left 220ms var(--ls-ease);
+}
+
+.ls-tour p {
+	margin: 0;
+}
+
+.ls-tour-title {
+	font-weight: 700;
+	font-size: var(--ls-fs-md);
+	margin-bottom: var(--ls-space-1) !important;
+}
+
+.ls-tour-text {
+	color: var(--ls-subtext);
+}
+
+.ls-tour-foot {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-3);
+	margin-top: var(--ls-space-4);
+}
+
+.ls-tour-foot .ls-muted {
+	margin-right: auto;
+	font-size: var(--ls-fs-xs);
+}

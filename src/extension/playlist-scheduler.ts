@@ -1,27 +1,34 @@
-import { maybeUpdateDailyPlaylist } from "../shared/playlist/builder";
-import { toLocalDateKey } from "../shared/util/date-key";
-
-const DAY_CHECK_INTERVAL_MS = 60_000;
-
 /**
- * Runs the daily playlist refresh: once at Spotify startup, and again when the
- * local calendar day changes while the client stays open. A one-minute
- * day-key poll (instead of a timeout aimed at midnight) also survives
- * sleep/resume clock jumps.
+ * Refreshes due auto playlists: shortly after Spotify starts, then whenever
+ * the local day changes while Spotify stays open (a one-minute day check
+ * survives sleep and clock jumps better than a timer aimed at midnight).
  */
-export function initPlaylistScheduler(): void {
-	let lastSeenDay = toLocalDateKey(Date.now());
+import { captureError } from "../shared/errors/capture";
+import { dayStamp } from "../shared/playlists/marker";
+import { spotifyPlaylistApi } from "../shared/playlists/spotify-api";
+import { runDue } from "../shared/playlists/sync";
 
-	void maybeUpdateDailyPlaylist().catch((err) => {
-		console.error("[listening-stats] playlist scheduler run failed:", err);
-	});
+async function tick(): Promise<void> {
+	const api = spotifyPlaylistApi();
+	if (!api) return;
+	try {
+		const results = await runDue(api);
+		for (const r of Object.values(results)) {
+			if (r.status === "error") void captureError(new Error(r.message), "extension", "handled", "playlists");
+		}
+	} catch (err) {
+		void captureError(err, "extension", "handled", "playlists");
+	}
+}
 
+export function startPlaylistScheduler(): void {
+	let day = dayStamp();
+	// Adopting also finds playlists made on other devices, so run even with none configured.
+	setTimeout(() => void tick(), 20_000);
 	setInterval(() => {
-		const day = toLocalDateKey(Date.now());
-		if (day === lastSeenDay) return;
-		lastSeenDay = day;
-		void maybeUpdateDailyPlaylist().catch((err) => {
-			console.error("[listening-stats] playlist scheduler run failed:", err);
-		});
-	}, DAY_CHECK_INTERVAL_MS);
+		const now = dayStamp();
+		if (now === day) return;
+		day = now;
+		void tick();
+	}, 60_000);
 }

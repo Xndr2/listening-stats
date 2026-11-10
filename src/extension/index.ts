@@ -1,72 +1,33 @@
-import { EVENTS } from "../shared/constants/events";
-import { startCredentialMirror } from "../shared/storage/credential-mirror";
-import { initPlaylistScheduler } from "./playlist-scheduler";
-import { initTracker } from "./tracker/index";
+/**
+ * extension.js - runs at Spotify startup and stays alive in the background,
+ * whether or not the Listening Stats page is open. Owns the play tracker,
+ * the credential mirror and (later) the playlist scheduler and playbar pill.
+ */
+import { APP_VERSION, LOG_PREFIX } from "../shared/constants/app";
+import { EVENTS, listen } from "../shared/constants/events";
+import { enrichArtists } from "../shared/enrichment/artists";
+import { captureError, installGlobalCapture } from "../shared/errors/capture";
+import { mirrorCredentials, restoreMissingCredentials } from "../shared/storage/credential-mirror";
+import { waitForSpicetify } from "../shared/util/wait-for-spicetify";
+import { mountPlayCountPill } from "./playbar-pill/mount";
+import { startPlaylistScheduler } from "./playlist-scheduler";
+import { startTracker } from "./tracker";
 
-const POLL_INTERVAL_MS = 100;
-const POLL_TIMEOUT_MS = 30_000;
+async function bootstrap() {
+	installGlobalCapture("extension");
+	await waitForSpicetify();
+	const restored = await restoreMissingCredentials().catch(() => 0);
+	if (restored) console.log(`${LOG_PREFIX} restored ${restored} provider setting(s) from backup`);
+	void mirrorCredentials().catch(() => {});
+	listen(EVENTS.SETTINGS_CHANGED, () => void mirrorCredentials().catch(() => {}));
+	await startTracker();
+	startPlaylistScheduler();
+	mountPlayCountPill();
+	// Genres for local stats. Spotify throttles this hard, so: small batches, rarely.
+	const enrich = () => void enrichArtists().catch((err) => captureError(err, "extension", "handled", "enrichment"));
+	setTimeout(enrich, 30_000);
+	setInterval(enrich, 30 * 60_000);
+	console.log(`${LOG_PREFIX} extension v${APP_VERSION} running`);
+}
 
-(function bootstrap() {
-	const started = Date.now();
-	let widgetMountStarted = false;
-
-	function poll() {
-		// Wait until Player.addEventListener and React exist
-		const sp = (
-			globalThis as unknown as {
-				Spicetify?: { Player?: { addEventListener?: unknown }; React?: unknown; ReactDOM?: unknown };
-			}
-		).Spicetify;
-		if (!sp?.Player?.addEventListener || !sp.React || !sp.ReactDOM) {
-			if (Date.now() - started > POLL_TIMEOUT_MS) {
-				console.error("[listening-stats] Spicetify init timeout: Player API not found after 30s");
-				return;
-			}
-			setTimeout(poll, POLL_INTERVAL_MS);
-			return;
-		}
-
-		// Mount the playbar widget as soon as the APIs are up - it must not wait
-		// for track metadata (nothing may be playing yet) and must load even if
-		// the user never opens the Listening Stats page. Dynamic import so the
-		// widget's module graph (which touches Spicetify.React at eval time) is
-		// only evaluated once the APIs exist.
-		if (!widgetMountStarted) {
-			widgetMountStarted = true;
-			import("../app/widget-mount")
-				.then(({ mountPlaybarWidget }) => mountPlaybarWidget())
-				.catch((err) => {
-					console.error("[listening-stats] playbar widget mount error:", err);
-				});
-		}
-
-		// Wait until current track metadata is present
-		if (
-			!(globalThis as unknown as { Spicetify?: { Player?: { data?: { item?: unknown } } } }).Spicetify?.Player?.data
-				?.item
-		) {
-			if (Date.now() - started > POLL_TIMEOUT_MS) {
-				console.warn("[listening-stats] Spicetify init timeout: Player data not loaded after 30s");
-				// Tracker not started; health can reflect missing Player data
-				return;
-			}
-			setTimeout(poll, POLL_INTERVAL_MS);
-			return;
-		}
-
-		// Ready to attach tracker
-		console.log("[listening-stats] extension loaded, initializing tracker");
-		initTracker().catch((err) => {
-			console.error("[listening-stats] tracker init error:", err);
-		});
-		initPlaylistScheduler();
-	}
-
-	// Restore provider connections a Spotify/Spicetify update wiped from
-	// localStorage. The playbar widget reads them, so tell it to refresh.
-	void startCredentialMirror().then((restored) => {
-		if (restored) window.dispatchEvent(new CustomEvent(EVENTS.PROVIDER_CHANGED));
-	});
-
-	poll();
-})();
+bootstrap().catch((err) => void captureError(err, "extension", "uncaught", "bootstrap"));

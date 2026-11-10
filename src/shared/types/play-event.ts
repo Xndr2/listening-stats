@@ -1,5 +1,6 @@
+/** One row of `playEvents`. Field names and meaning are v2's; don't rename. */
 export interface PlayEvent {
-	id?: number; // auto-increment, undefined on insert
+	id?: number; // auto-increment, absent on insert
 	trackUri: string;
 	trackName: string;
 	artistName: string;
@@ -9,8 +10,18 @@ export interface PlayEvent {
 	albumArt?: string;
 	durationMs: number;
 	playedMs: number;
-	startedAt: number; // Unix ms timestamp
+	startedAt: number; // Unix ms
 	endedAt: number;
 	type?: "play" | "skip";
-	resolvedAt?: number | null; // null=not attempted, 0=no match found, timestamp=resolved
+	/** Imports only: null = not resolved yet, 0 = no match, timestamp = resolved */
+	resolvedAt?: number | null;
+}
+
+/** Artist enrichment row (`artists` store). */
+export interface ArtistRecord {
+	uri: string;
+	name: string;
+	genres: string[];
+	imageUrl: string | null;
+	updatedAt: number;
 }

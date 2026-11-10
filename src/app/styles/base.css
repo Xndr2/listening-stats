@@ -1,0 +1,119 @@
+/*
+ * Tokens and page shell. Imported first in src/app/index.tsx.
+ *
+ * Every colour comes from the user's Spicetify theme (--spice-*). Surfaces
+ * and lines are tints of the theme's text colour over its background, so a
+ * light theme gets darker panels and a dark theme lighter ones, with no
+ * per-theme code. Literal fallbacks only apply when a variable is missing.
+ */
+.ls-root,
+.ls-portal {
+	--ls-text: var(--spice-text, #fff);
+	--ls-subtext: var(--spice-subtext, #b3b3b3);
+	--ls-bg: var(--spice-main, #121212);
+	--ls-accent: var(--spice-button, #1db954);
+	--ls-accent-strong: var(--spice-button-active, #1ed760);
+	--ls-on-accent: var(--spice-main, #121212);
+	--ls-error: var(--spice-notification-error, #e22134);
+	--ls-rgb-text: var(--spice-rgb-text, 255, 255, 255);
+	--ls-rgb-accent: var(--spice-rgb-button, 29, 185, 84);
+
+	--ls-panel: rgba(var(--ls-rgb-text), 0.04);
+	--ls-hover: rgba(var(--ls-rgb-text), 0.08);
+	--ls-selected: rgba(var(--ls-rgb-text), 0.12);
+	--ls-line: rgba(var(--ls-rgb-text), 0.1);
+	--ls-bar: rgba(var(--ls-rgb-text), 0.3);
+	--ls-track: rgba(var(--ls-rgb-text), 0.07);
+	--ls-skeleton: rgba(var(--ls-rgb-text), 0.07);
+
+	--ls-space-1: 4px;
+	--ls-space-2: 8px;
+	--ls-space-3: 12px;
+	--ls-space-4: 16px;
+	--ls-space-5: 24px;
+	--ls-space-6: 32px;
+	--ls-radius: 8px;
+	--ls-radius-art: 4px;
+
+	--ls-fs-xs: 0.75rem; /* 12 */
+	--ls-fs-sm: 0.875rem; /* 14 */
+	--ls-fs-md: 1rem; /* 16 */
+	--ls-fs-lg: 1.25rem; /* 20 */
+	--ls-fs-xl: 1.75rem; /* 28 */
+	--ls-fs-hero: 3rem; /* 48 */
+
+	--ls-ease: cubic-bezier(0.16, 1, 0.3, 1);
+	--ls-fast: 160ms;
+}
+
+/* Things rendered outside the page container (portals) still need the
+   tokens above; .ls-root itself also contains fixed-position children,
+   because container-type makes it their containing block. */
+.ls-portal {
+	color: var(--ls-text);
+	font-size: var(--ls-fs-sm);
+	line-height: 1.4;
+}
+
+.ls-root {
+	box-sizing: border-box;
+	height: 100%;
+	overflow-y: auto;
+	padding: var(--ls-space-5) var(--ls-space-5) var(--ls-space-6);
+	color: var(--ls-text);
+	font-size: var(--ls-fs-sm);
+	line-height: 1.4;
+	/* size, not inline-size: the layout also responds to the pane's height (see Dashboard.css). */
+	container-type: size;
+	container-name: ls-page;
+	display: flex;
+	flex-direction: column;
+}
+
+.ls-root *,
+.ls-root *::before,
+.ls-root *::after {
+	box-sizing: inherit;
+}
+
+.ls-root ::selection {
+	background: rgba(var(--ls-rgb-accent), 0.35);
+	color: var(--ls-text);
+}
+
+.ls-root :focus-visible {
+	outline: 2px solid var(--ls-text);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+.ls-root button {
+	font: inherit;
+	color: inherit;
+}
+
+.ls-num {
+	font-variant-numeric: tabular-nums;
+}
+
+.ls-muted {
+	color: var(--ls-subtext);
+}
+
+.ls-visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ls-root *,
+	.ls-root *::before,
+	.ls-root *::after {
+		animation-duration: 1ms !important;
+		transition-duration: 1ms !important;
+	}
+}

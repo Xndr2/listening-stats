@@ -1,0 +1,49 @@
+#listening-stats-pill {
+	display: inline-flex;
+	align-items: center;
+	margin-inline-start: 8px;
+	min-width: 0;
+}
+
+.ls-pill {
+	white-space: nowrap;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	line-height: 1;
+	color: var(--spice-subtext, #b3b3b3);
+	animation: ls-pill-in 200ms ease-out both;
+}
+
+.ls-pill-pill {
+	padding: 4px 8px;
+	border-radius: 999px;
+	background: rgba(var(--spice-rgb-text, 255, 255, 255), 0.08);
+}
+
+.ls-pill-bubble {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 6px;
+	border-radius: 999px;
+	background: var(--spice-button, #1db954);
+	color: var(--spice-main, #121212);
+}
+
+.ls-pill-minimal {
+	padding: 0;
+}
+
+@keyframes ls-pill-in {
+	from {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ls-pill {
+		animation: none;
+	}
+}

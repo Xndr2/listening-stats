@@ -1,0 +1,83 @@
+.ls-widget {
+	background: var(--ls-panel);
+	border-radius: var(--ls-radius);
+	padding: var(--ls-space-4);
+	min-width: 0;
+}
+
+.ls-widget-head {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-3);
+	margin-bottom: var(--ls-space-3);
+	min-height: 28px;
+}
+
+.ls-widget-title {
+	margin: 0;
+	font-size: var(--ls-fs-md);
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+
+.ls-widget-aside {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-2);
+	color: var(--ls-subtext);
+	font-size: var(--ls-fs-xs);
+}
+
+.ls-widget-updating {
+	font-size: var(--ls-fs-xs);
+	color: var(--ls-subtext);
+	animation: ls-pulse 1.6s ease-in-out infinite;
+}
+
+.ls-widget-msg {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-2);
+	margin-top: var(--ls-space-2);
+	color: var(--ls-subtext);
+	font-size: var(--ls-fs-sm);
+}
+
+.ls-widget-msg svg {
+	flex: none;
+	color: var(--ls-error);
+}
+
+.ls-link {
+	background: none;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+	font-weight: 700;
+	color: var(--ls-text);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	text-decoration-color: rgba(var(--ls-rgb-text), 0.4);
+}
+
+.ls-link:hover {
+	text-decoration-color: currentColor;
+}
+
+.ls-skel {
+	background: var(--ls-skeleton);
+	border-radius: var(--ls-radius-art);
+	animation: ls-pulse 1.6s ease-in-out infinite;
+}
+
+.ls-skel-list {
+	display: grid;
+	gap: var(--ls-space-2);
+}
+
+@keyframes ls-pulse {
+	50% {
+		opacity: 0.55;
+	}
+}

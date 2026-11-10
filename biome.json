@@ -1,6 +1,12 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.6/schema.json",
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {
@@ -8,15 +14,15 @@
       "suspicious": {
         "noArrayIndexKey": "off"
       },
-      "security": {
-        "noDangerouslySetInnerHtml": "off"
-      },
       "a11y": {
         "noStaticElementInteractions": "off",
-        "useKeyWithClickEvents": "off",
-        "useAriaPropsSupportedByRole": "off",
-        "useFocusableInteractive": "off",
-        "useSemanticElements": "off"
+        "useKeyWithClickEvents": "off"
+      },
+      "complexity": {
+        "noImportantStyles": "off"
+      },
+      "style": {
+        "noDescendingSpecificity": "off"
       }
     }
   },
@@ -32,25 +38,8 @@
     }
   },
   "files": {
-    "includes": ["src/**", "!src/src/**"]
-  },
-  "overrides": [
-    {
-      "includes": ["src/test/**"],
-      "linter": {
-        "rules": {
-          "suspicious": {
-            "noExplicitAny": "off",
-            "useIterableCallbackReturn": "off"
-          },
-          "style": {
-            "noNonNullAssertion": "off"
-          },
-          "correctness": {
-            "noUnsafeOptionalChaining": "off"
-          }
-        }
-      }
-    }
-  ]
+    "includes": [
+      "src/**"
+    ]
+  }
 }

@@ -1,0 +1,132 @@
+.ls-overview {
+	margin-bottom: var(--ls-space-4);
+}
+
+/* Hero card spans two columns; stat cards fill the rest and wrap as the pane narrows. */
+.ls-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	grid-auto-rows: 118px;
+	gap: var(--ls-space-3);
+}
+
+.ls-tile {
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	min-width: 0;
+	padding: var(--ls-space-4);
+	border-radius: var(--ls-radius);
+	background: var(--ls-panel);
+}
+
+.ls-tile.ls-skel {
+	padding: 0;
+}
+
+.ls-hero-tile {
+	grid-column: span var(--ls-hero-span, 2);
+}
+
+.ls-tile-label {
+	font-size: 0.6875rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--ls-subtext);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ls-tile-value {
+	font-size: 1.75rem;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+	line-height: 1.1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ls-tile-detail {
+	font-size: var(--ls-fs-xs);
+	color: var(--ls-subtext);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ls-tile-empty {
+	grid-column: span 3;
+	justify-content: center;
+}
+
+.ls-hero-value {
+	font-size: 3rem;
+	font-weight: 800;
+	letter-spacing: -0.03em;
+	line-height: 1;
+	color: var(--ls-text);
+}
+
+/* Units smaller but in the same colour: the number reads as one value. */
+.ls-hero-unit {
+	font-size: 0.5em;
+	font-weight: 700;
+	margin: 0 0.35em 0 0.08em;
+	letter-spacing: 0;
+}
+
+.ls-hero-unit:last-child {
+	margin-right: 0;
+}
+
+.ls-hero-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--ls-space-1) var(--ls-space-3);
+	min-width: 0;
+}
+
+.ls-delta {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--ls-fs-xs);
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.ls-delta.is-up {
+	color: var(--ls-accent);
+}
+
+.ls-delta.is-down {
+	color: var(--ls-subtext);
+}
+
+@container ls-page (max-width: 640px) {
+	.ls-tiles {
+		grid-auto-rows: 104px;
+	}
+	.ls-hero-value {
+		font-size: 2.5rem;
+	}
+	.ls-tile-empty {
+		grid-column: span 2;
+	}
+}
+
+/* Fit mode: one row of cards. Cards are ordered by importance, so the ones that
+   don't fit (payout, skips...) drop off instead of pushing the page taller. */
+.ls-root.is-fit {
+	.ls-tiles {
+		--ls-fit: 1;
+		grid-template-rows: 118px;
+		grid-auto-rows: 0;
+		row-gap: 0;
+		overflow: hidden;
+	}
+}

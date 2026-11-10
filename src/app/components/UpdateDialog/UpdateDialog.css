@@ -1,0 +1,73 @@
+.ls-update {
+	width: min(560px, calc(100vw - 48px));
+	max-height: calc(100vh - 64px);
+	padding: var(--ls-space-5);
+	border: 0;
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--ls-bg) 92%, var(--ls-text));
+	color: var(--ls-text);
+	box-shadow: 0 24px 64px rgba(var(--spice-rgb-shadow, 0, 0, 0), 0.55);
+	flex-direction: column;
+	gap: var(--ls-space-3);
+}
+
+.ls-update[open] {
+	display: flex;
+	animation: ls-dialog-in 180ms var(--ls-ease) both;
+}
+
+.ls-update::backdrop {
+	background: rgba(0, 0, 0, 0.6);
+}
+
+.ls-update-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: var(--ls-space-3);
+}
+
+.ls-update-head h2 {
+	margin: 0;
+	font-size: var(--ls-fs-xl);
+	letter-spacing: -0.02em;
+}
+
+.ls-update-notes {
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 0;
+	overflow-y: auto;
+	max-width: 70ch;
+}
+
+.ls-update-foot {
+	display: grid;
+	/* 0 min-width keeps the long command inside the popup instead of widening it. */
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--ls-space-2);
+	padding-top: var(--ls-space-3);
+	border-top: 1px solid var(--ls-line);
+}
+
+.ls-update-cmd {
+	display: flex;
+	align-items: center;
+	gap: var(--ls-space-2);
+	min-width: 0;
+}
+
+.ls-update-cmd code {
+	flex: 1;
+	min-width: 0;
+	overflow-x: auto;
+	white-space: nowrap;
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: var(--ls-panel);
+	font-size: var(--ls-fs-xs);
+}
+
+.ls-update-cta {
+	margin-bottom: var(--ls-space-4);
+}
