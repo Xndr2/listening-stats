@@ -2,6 +2,7 @@
 import { EVENTS, emit } from "../constants/events";
 import { V3_KEYS } from "../constants/storage-keys";
 import type { PeriodId } from "../providers/periods";
+import { setLocal } from "../storage/local";
 import {
 	PLAYLIST_PERIODS,
 	PLAYLIST_REFRESH,
@@ -58,7 +59,7 @@ export function getPlaylists(): PlaylistConfig[] {
 }
 
 export function savePlaylists(list: PlaylistConfig[]): void {
-	localStorage.setItem(V3_KEYS.PLAYLISTS, JSON.stringify(list));
+	setLocal(V3_KEYS.PLAYLISTS, JSON.stringify(list));
 	emit(EVENTS.PLAYLISTS_CHANGED);
 }
 

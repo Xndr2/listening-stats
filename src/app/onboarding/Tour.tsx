@@ -7,6 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { APP_VERSION } from "../../shared/constants/app";
 import { V2_KEYS } from "../../shared/constants/storage-keys";
+import { setLocal } from "../../shared/storage/local";
 import "./Onboarding.css";
 
 const STEPS = [
@@ -49,7 +50,7 @@ export function Tour({ onDone }: { onDone: () => void }) {
 	const step = STEPS[i];
 
 	const finish = useCallback(() => {
-		localStorage.setItem(V2_KEYS.TOUR_SEEN_VERSION, APP_VERSION);
+		setLocal(V2_KEYS.TOUR_SEEN_VERSION, APP_VERSION);
 		onDone();
 	}, [onDone]);
 

@@ -105,8 +105,8 @@ export interface Provider {
 	periods: PeriodId[];
 	/** True when top lists carry real per-item play counts. */
 	perItemCounts(): boolean;
-	/** False when the source can only rank by play count. */
-	rankByMinutes: boolean;
+	/** False when the source (or this account) can only rank by play count. */
+	rankByMinutes(): boolean;
 
 	summary?(a: QueryArgs): Promise<Summary>;
 	topTracks?(a: QueryArgs): Promise<TopTrack[]>;

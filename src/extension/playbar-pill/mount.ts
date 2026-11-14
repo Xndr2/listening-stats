@@ -5,11 +5,15 @@
  */
 import { captureError } from "../../shared/errors/capture";
 import { PlayCountPill } from "./PlayCountPill";
-import css from "./pill.css";
+// As text in both bundles: the app build otherwise sends CSS to style.css.
+import css from "./pill.css" with { type: "text" };
 
 const ROOT_ID = "listening-stats-pill";
 const STYLE_ID = "listening-stats-pill-style";
-const TARGETS = [".main-nowPlayingWidget-nowPlaying", '[data-testid="now-playing-widget"]'];
+// The now-playing widget first (class, then the test id). Spotify 1.3 has
+// neither, so the left player-bar region (it also holds the cover art) is the
+// last resort, as in v2; without it the pill never showed on 1.3.
+const TARGETS = [".main-nowPlayingWidget-nowPlaying", '[data-testid="now-playing-widget"]', ".main-nowPlayingBar-left"];
 const BAR = [".Root__now-playing-bar", '[data-testid="now-playing-bar"]'];
 
 function find(selectors: string[]): HTMLElement | null {
@@ -32,9 +36,12 @@ export function mountPlayCountPill(): void {
 	const container = document.createElement("span");
 	container.id = ROOT_ID;
 
+	// Best target available now (moves out of the fallback once the widget shows
+	// up), kept as the last child: Spotify inserts track info after our node,
+	// which would push the pill in front of the cover art.
 	const attach = () => {
 		const target = find(TARGETS);
-		if (target && container.parentElement !== target) target.appendChild(container);
+		if (target && (container.parentElement !== target || container.nextElementSibling)) target.appendChild(container);
 	};
 
 	try {
@@ -52,17 +59,16 @@ export function mountPlayCountPill(): void {
 
 	attach();
 	let observed: HTMLElement | null = null;
-	const observer = new MutationObserver(() => {
-		if (!container.isConnected) attach();
-	});
+	const observer = new MutationObserver(attach);
 	const watch = () => {
-		const bar = find(BAR);
+		// Clients without the bar's known names: watch the target's parent instead.
+		const bar = find(BAR) ?? find(TARGETS)?.parentElement ?? null;
 		if (bar && bar !== observed) {
 			observer.disconnect();
 			observer.observe(bar, { childList: true, subtree: true });
 			observed = bar;
 		}
-		if (!container.isConnected) attach();
+		attach();
 	};
 	watch();
 	// The bar itself can be replaced (layout changes); check now and then.

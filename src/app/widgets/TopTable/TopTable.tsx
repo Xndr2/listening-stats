@@ -25,6 +25,7 @@ import "./TopTable.css";
 
 type Tab = "tracks" | "artists" | "albums" | "genres";
 const MAX_ROWS = 50;
+const PLUS_ONLY = "Sorting is for stats.fm Plus only. Free accounts are ranked by plays.";
 
 const QUERY: Record<Tab, "topTracks" | "topArtists" | "topAlbums" | "topGenres"> = {
 	tracks: "topTracks",
@@ -120,6 +121,8 @@ export function TopTable() {
 	/** Genre picked from the genres tab; filters the artists tab. */
 	const [genre, setGenre] = useState<string | null>(null);
 	const limit = expanded || genre ? MAX_ROWS : perList;
+	// Free stats.fm accounts are always ranked by plays (state.tsx forces it).
+	const plusOnly = provider.id === "statsfm" && !provider.rankByMinutes();
 
 	const available = (Object.keys(QUERY) as Tab[]).filter((t) => supports(provider, QUERY[t]));
 	const active = available.includes(tab) ? tab : (available[0] ?? "tracks");
@@ -180,12 +183,16 @@ export function TopTable() {
 						value={rank}
 						onChange={setRank}
 						options={[
-							{ value: "streams", label: "Plays" },
+							{ value: "streams", label: "Plays", disabled: plusOnly, title: plusOnly ? PLUS_ONLY : undefined },
 							{
 								value: "minutes",
 								label: "Time",
-								disabled: !provider.rankByMinutes,
-								title: provider.rankByMinutes ? undefined : `${provider.name} doesn't track listening time`,
+								disabled: !provider.rankByMinutes(),
+								title: provider.rankByMinutes()
+									? undefined
+									: plusOnly
+										? PLUS_ONLY
+										: `${provider.name} doesn't track listening time`,
 							},
 						]}
 					/>

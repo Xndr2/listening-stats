@@ -9,6 +9,7 @@
  */
 import { V3_KEYS } from "../constants/storage-keys";
 import { PERIOD_IDS, type PeriodId } from "../providers/periods";
+import { setLocal } from "../storage/local";
 
 export const PLAYLIST_SIZES = [10, 20, 30, 50] as const;
 export const PLAYLIST_SOURCES = ["local", "statsfm"] as const;
@@ -71,13 +72,16 @@ export function withMarker(description: string, text: string, m: Marker): string
 }
 
 /** A random id for this install, created once. Never leaves the device on its own. */
+let sessionDeviceId: string | null = null;
+
 export function deviceId(): string {
-	let id = localStorage.getItem(V3_KEYS.DEVICE_ID);
+	let id = localStorage.getItem(V3_KEYS.DEVICE_ID) ?? sessionDeviceId;
 	if (!id || !/^[a-f0-9]{32}$/.test(id)) {
 		const b = new Uint8Array(16);
 		crypto.getRandomValues(b);
 		id = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
-		localStorage.setItem(V3_KEYS.DEVICE_ID, id);
+		sessionDeviceId = id;
+		setLocal(V3_KEYS.DEVICE_ID, id);
 	}
 	return id;
 }

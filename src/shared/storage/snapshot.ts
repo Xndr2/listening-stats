@@ -10,6 +10,7 @@
 import { V3_KEYS } from "../constants/storage-keys";
 import type { PlayEvent } from "../types/play-event";
 import { existingVersion, openDb, req, txDone, withLock } from "./idb";
+import { setLocal } from "./local";
 import { getV2Db, PLAY_EVENTS, V2_DB_VERSION } from "./v2-db";
 
 export const BACKUP_DB_NAME = "listening-stats-backup";
@@ -26,7 +27,11 @@ export interface SnapshotEnvelope {
 	events: PlayEvent[];
 }
 
+/** Set when the flag couldn't be stored, so a full localStorage doesn't snapshot on every write. */
+let doneThisSession = false;
+
 function isDone(): boolean {
+	if (doneThisSession) return true;
 	try {
 		return localStorage.getItem(V3_KEYS.FIRST_RUN_SNAPSHOT_DONE) === "1";
 	} catch {
@@ -69,6 +74,6 @@ export async function ensureFirstRunSnapshot(): Promise<void> {
 				backup.close();
 			}
 		}
-		localStorage.setItem(V3_KEYS.FIRST_RUN_SNAPSHOT_DONE, "1");
+		doneThisSession = !setLocal(V3_KEYS.FIRST_RUN_SNAPSHOT_DONE, "1");
 	});
 }

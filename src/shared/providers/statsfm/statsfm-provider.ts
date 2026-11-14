@@ -3,8 +3,8 @@
  *
  * Every period is sent as an explicit after/before window, so stats.fm offers
  * the same periods as local data. Rank mode maps to orderBy. Free accounts
- * don't get per-item stream counts; perItemCounts() says so and the UI hides
- * those columns instead of showing zeros.
+ * don't get per-item stream counts or ranking by time; perItemCounts() and
+ * rankByMinutes() say so and the UI hides or disables those instead.
  */
 
 import { getJson } from "../../net/http";
@@ -114,7 +114,8 @@ export const statsFmProvider: Provider = {
 	name: "stats.fm",
 	periods: [...PERIOD_IDS],
 	perItemCounts: () => readStatsFmConfig()?.isPlus === true,
-	rankByMinutes: true,
+	// stats.fm ignores orderBy=TIME for free accounts and returns the plays order.
+	rankByMinutes: () => readStatsFmConfig()?.isPlus === true,
 
 	async summary(a): Promise<Summary> {
 		const u = username();

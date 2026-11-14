@@ -7,7 +7,7 @@ import { V2_KEYS } from "../constants/storage-keys";
 import type { PlayEvent } from "../types/play-event";
 import { req, txDone } from "./idb";
 import { ensureFirstRunSnapshot } from "./snapshot";
-import { getV2Db, PLAY_EVENTS } from "./v2-db";
+import { getV2Db, PLAY_EVENTS, playIndex } from "./v2-db";
 
 const DEDUP_WINDOW_MS = 3000;
 
@@ -41,7 +41,7 @@ export async function addPlayEvent(event: PlayEvent): Promise<number | null> {
 	const store = tx.objectStore(PLAY_EVENTS);
 	const bucket = Math.floor(event.startedAt / DEDUP_WINDOW_MS) * DEDUP_WINDOW_MS;
 	const nearby = (await req(
-		store.index("startedAt").getAll(IDBKeyRange.bound(bucket, bucket + DEDUP_WINDOW_MS, false, true)),
+		playIndex(store, "startedAt").getAll(IDBKeyRange.bound(bucket, bucket + DEDUP_WINDOW_MS, false, true)),
 	)) as PlayEvent[];
 	let id: number | null = null;
 	if (!nearby.some((e) => e.trackUri === event.trackUri)) {
@@ -115,11 +115,10 @@ export async function forEachPlayEventChunk(
 	let seenAtFrom = new Set<number>();
 	for (;;) {
 		const rows = (await req(
-			db
-				.transaction(PLAY_EVENTS)
-				.objectStore(PLAY_EVENTS)
-				.index("startedAt")
-				.getAll(IDBKeyRange.bound(from, end, false, true), chunkSize),
+			playIndex(db.transaction(PLAY_EVENTS).objectStore(PLAY_EVENTS), "startedAt").getAll(
+				IDBKeyRange.bound(from, end, false, true),
+				chunkSize,
+			),
 		)) as PlayEvent[];
 		const fresh = rows.filter((r) => !(r.startedAt === from && seenAtFrom.has(r.id as number)));
 		if (fresh.length > 0) await onChunk(fresh);
@@ -129,7 +128,7 @@ export async function forEachPlayEventChunk(
 			// A whole chunk shares one timestamp and we've seen it all: read that
 			// timestamp in one go and move past it, or we'd loop forever.
 			const same = (await req(
-				db.transaction(PLAY_EVENTS).objectStore(PLAY_EVENTS).index("startedAt").getAll(IDBKeyRange.only(from)),
+				playIndex(db.transaction(PLAY_EVENTS).objectStore(PLAY_EVENTS), "startedAt").getAll(IDBKeyRange.only(from)),
 			)) as PlayEvent[];
 			const rest = same.filter((r) => !seenAtFrom.has(r.id as number));
 			if (rest.length > 0) await onChunk(rest);
@@ -148,7 +147,7 @@ export async function forEachPlayEventChunk(
 export async function countTrackPlays(trackUri: string, start = 0, end = Number.MAX_SAFE_INTEGER): Promise<number> {
 	const db = await getV2Db();
 	const rows = (await req(
-		db.transaction(PLAY_EVENTS).objectStore(PLAY_EVENTS).index("trackUri").getAll(trackUri),
+		playIndex(db.transaction(PLAY_EVENTS).objectStore(PLAY_EVENTS), "trackUri").getAll(trackUri),
 	)) as PlayEvent[];
 	return rows.filter((r) => r.type !== "skip" && r.startedAt >= start && r.startedAt < end).length;
 }
@@ -156,7 +155,7 @@ export async function countTrackPlays(trackUri: string, start = 0, end = Number.
 /** The newest `limit` rows, newest first. */
 export async function recentPlayEvents(limit: number): Promise<PlayEvent[]> {
 	const db = await getV2Db();
-	const index = db.transaction(PLAY_EVENTS).objectStore(PLAY_EVENTS).index("startedAt");
+	const index = playIndex(db.transaction(PLAY_EVENTS).objectStore(PLAY_EVENTS), "startedAt");
 	return new Promise((resolve, reject) => {
 		const out: PlayEvent[] = [];
 		const cur = index.openCursor(null, "prev");

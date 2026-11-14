@@ -13,12 +13,15 @@ export const V2_DB_VERSION = 50;
 export const PLAY_EVENTS = "playEvents";
 export const ARTISTS = "artists";
 
-/** Creates whatever v2 stores are missing, with v2's index specs. */
-function ensureV2Schema(db: IDBDatabase): void {
-	if (!db.objectStoreNames.contains(PLAY_EVENTS)) {
-		const s = db.createObjectStore(PLAY_EVENTS, { keyPath: "id", autoIncrement: true });
-		for (const idx of ["startedAt", "trackUri", "artistUri", "type"]) s.createIndex(idx, idx);
-	}
+const PLAY_INDEXES = ["startedAt", "trackUri", "artistUri", "type"];
+
+/** Creates whatever v2 stores and play indexes are missing, with v2's specs. */
+function ensureV2Schema(db: IDBDatabase, tx: IDBTransaction): void {
+	const plays = db.objectStoreNames.contains(PLAY_EVENTS)
+		? tx.objectStore(PLAY_EVENTS)
+		: db.createObjectStore(PLAY_EVENTS, { keyPath: "id", autoIncrement: true });
+	// v1 named its indexes "by-startedAt" etc., so a v1 store has none of these.
+	for (const idx of PLAY_INDEXES) if (!plays.indexNames.contains(idx)) plays.createIndex(idx, idx);
 	if (!db.objectStoreNames.contains(ARTISTS)) {
 		const s = db.createObjectStore(ARTISTS, { keyPath: "uri" });
 		s.createIndex("updatedAt", "updatedAt");
@@ -31,7 +34,7 @@ async function openV2(): Promise<IDBDatabase> {
 		// Absent, or an older v2 install (native 40 had no artists store):
 		// bring it to exactly 50. A versionless open would make an empty v1 DB.
 		if (version === null || version < V2_DB_VERSION) {
-			return openDb(V2_DB_NAME, V2_DB_VERSION, (db) => ensureV2Schema(db));
+			return openDb(V2_DB_NAME, V2_DB_VERSION, ensureV2Schema);
 		}
 		return openDb(V2_DB_NAME, undefined);
 	});
@@ -40,3 +43,12 @@ async function openV2(): Promise<IDBDatabase> {
 const handle = lazyDb(openV2);
 
 export const getV2Db = handle.get;
+
+/**
+ * The play index on `field`. Falls back to v1's "by-" index of the same field:
+ * v3.0 brought v1 databases to version 50 without adding v2's indexes, and
+ * adding them now would need a version bump that locks v2 out.
+ */
+export function playIndex(store: IDBObjectStore, field: string): IDBIndex {
+	return store.index(store.indexNames.contains(field) ? field : `by-${field}`);
+}

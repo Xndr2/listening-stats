@@ -4,6 +4,7 @@
  */
 import { useState } from "react";
 import { V2_KEYS } from "../../shared/constants/storage-keys";
+import { setLocal } from "../../shared/storage/local";
 import { SourcesTab } from "../settings/SourcesTab";
 import { useApp } from "../state";
 import "./Onboarding.css";
@@ -20,7 +21,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 	const { provider } = useApp();
 	const [more, setMore] = useState(false);
 	const finish = () => {
-		localStorage.setItem(V2_KEYS.PROVIDER_WIZARD_SEEN, "1");
+		setLocal(V2_KEYS.PROVIDER_WIZARD_SEEN, "1");
 		onDone();
 	};
 	return (

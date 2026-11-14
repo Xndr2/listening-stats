@@ -85,7 +85,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
 	const provider = PROVIDERS[providerId];
 	const periodId = resolvePeriod(periods[providerId], provider);
-	const rank: RankMode = provider.rankByMinutes ? rankSetting : "streams";
+	const rank: RankMode = provider.rankByMinutes() ? rankSetting : "streams";
 
 	// The window is recomputed once a minute so "today" rolls over at midnight
 	// without a reload, but stays stable between renders.

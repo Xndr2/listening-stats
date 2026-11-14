@@ -28,10 +28,16 @@ interface WebArtist {
 }
 
 export class RateLimited extends Error {
-	constructor(public retryAfterMs: number) {
-		super(`Spotify asked to wait ${Math.round(retryAfterMs / 1000)}s`);
+	constructor(
+		public retryAfterMs: number,
+		message = `Spotify asked to wait ${Math.round(retryAfterMs / 1000)}s`,
+	) {
+		super(message);
 	}
 }
+
+/** Retry gap when Spotify's API can't be reached (offline, blocked). */
+const UNREACHABLE_RETRY_MS = 5 * 60_000;
 
 function token(): string | undefined {
 	try {
@@ -45,10 +51,16 @@ function token(): string | undefined {
 export async function fetchArtists(ids: string[]): Promise<WebArtist[]> {
 	const t = token();
 	if (!t) throw new Error("No Spotify session token");
+	// A network failure is expected now and then; it waits like a rate limit
+	// instead of being reported as a crash.
 	const res = await fetch(`https://api.spotify.com/v1/artists?ids=${ids.join(",")}`, {
 		headers: { Authorization: `Bearer ${t}` },
+	}).catch(() => {
+		throw new RateLimited(UNREACHABLE_RETRY_MS, "Couldn't reach Spotify, retrying in 5 minutes");
 	});
 	if (res.status === 429) throw new RateLimited((Number(res.headers.get("retry-after")) || 60) * 1000);
+	// The session token expired between reading and use; Spotify renews it itself.
+	if (res.status === 401) throw new RateLimited(60_000, "Spotify session expired, retrying in a minute");
 	if (!res.ok) throw new Error(`Spotify artist lookup failed (${res.status})`);
 	const body = (await res.json()) as { artists?: Array<WebArtist | null> };
 	return (body.artists ?? []).filter((a): a is WebArtist => !!a && typeof a.id === "string");

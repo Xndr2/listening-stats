@@ -77,7 +77,7 @@ export const lastFmProvider: Provider = {
 	name: "Last.fm",
 	periods: [...PERIOD_IDS],
 	perItemCounts: () => true,
-	rankByMinutes: false,
+	rankByMinutes: () => false,
 
 	async summary(a) {
 		const c = cfg();

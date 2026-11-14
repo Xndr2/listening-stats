@@ -15,6 +15,7 @@ import { fromV2PeriodId, PERIOD_LABELS, periodWindow } from "../providers/period
 import { PROVIDERS } from "../providers/registry";
 import { getSetting } from "../settings/registry";
 import { withLock } from "../storage/idb";
+import { setLocal } from "../storage/local";
 import {
 	dayStamp,
 	decodeMarker,
@@ -113,7 +114,7 @@ export async function adopt(api: PlaylistApi): Promise<PlaylistConfig[]> {
 		if (v2?.uri && byUri.has(v2.uri) && !known.has(v2.uri)) {
 			list.push({ id: newPlaylistId(), ...v2, edited: false, name: byUri.get(v2.uri)?.name ?? autoName(v2) });
 		}
-		localStorage.setItem(V2_ADOPTED, "1");
+		setLocal(V2_ADOPTED, "1");
 	}
 
 	savePlaylists(list);

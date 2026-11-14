@@ -109,7 +109,7 @@ export const localProvider: Provider = {
 	name: "Local",
 	periods: [...PERIOD_IDS],
 	perItemCounts: () => true,
-	rankByMinutes: true,
+	rankByMinutes: () => true,
 
 	async summary(a): Promise<Summary> {
 		const [agg, idx] = await Promise.all([forWindow(a), allTimeIndex()]);
