@@ -42,6 +42,7 @@ export const V3_KEYS = {
 	DEVICE_ID: `${V3}device-id`,
 	FIRST_RUN_SNAPSHOT_DONE: `${V3}snapshot-done`,
 	TRACKER_HEALTH: `${V3}tracker-health`,
+	LASTFM_PRO_NOTICE_DISMISSED: `${V3}lastfm-pro-notice-dismissed`,
 } as const;
 
 /** What the extension writes to V3_KEYS.TRACKER_HEALTH and the settings page reads back. */

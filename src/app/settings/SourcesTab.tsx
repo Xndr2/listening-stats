@@ -112,11 +112,12 @@ function LastFm() {
 			title="Last.fm"
 			description={
 				<>
-					Needs your username and your own API key (free, from{" "}
+					Needs your username and your own API key (from{" "}
 					<a href="https://www.last.fm/api/account/create" target="_blank" rel="noreferrer noopener">
 						last.fm/api
 					</a>
-					). Last.fm doesn't track listening time, so it ranks by plays only.
+					). Since 1 December, Last.fm only accepts keys from accounts with Last.fm Pro. Without Pro, use Local or
+					stats.fm instead. Last.fm doesn't track listening time, so it ranks by plays only.
 				</>
 			}
 		>

@@ -41,8 +41,13 @@ export const isValidLfmUsername = (u: string) => /^[A-Za-z][A-Za-z0-9_-]{1,14}$/
 
 // Last.fm error codes we treat specially
 const ERR_INVALID_KEY = 10;
+const ERR_SUSPENDED_KEY = 26;
 const ERR_NOT_FOUND = 6;
 const ERR_RATE = 29;
+
+// Since 1 Dec 2026 Last.fm only accepts keys whose owner has Pro, so a valid key can be rejected too
+const KEY_REJECTED =
+	"Last.fm didn't accept the API key. Since 1 December, keys only work if the account that owns them has Last.fm Pro.";
 
 export async function lfmCall<T>(
 	method: string,
@@ -62,12 +67,11 @@ export async function lfmCall<T>(
 		body = await getJson(`${BASE}?${qs}`, { signal });
 	} catch (e) {
 		// 403 from Last.fm = bad key; give the user something to act on
-		if (e instanceof HttpError && e.kind === "auth")
-			throw new HttpError("auth", "Last.fm didn't accept the API key", e.status);
+		if (e instanceof HttpError && e.kind === "auth") throw new HttpError("auth", KEY_REJECTED, e.status);
 		throw e;
 	}
 	if (typeof body?.error === "number") {
-		if (body.error === ERR_INVALID_KEY) throw new HttpError("auth", "Last.fm didn't accept the API key");
+		if (body.error === ERR_INVALID_KEY || body.error === ERR_SUSPENDED_KEY) throw new HttpError("auth", KEY_REJECTED);
 		if (body.error === ERR_NOT_FOUND) throw new HttpError("not-found", "Last.fm doesn't know that user");
 		if (body.error === ERR_RATE) throw new HttpError("rate-limited", "Last.fm asked us to slow down");
 		throw new HttpError("server", `Last.fm error ${body.error}`);
