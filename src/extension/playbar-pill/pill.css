@@ -32,6 +32,17 @@
 	color: var(--spice-main, #121212);
 }
 
+/* Possible fix for pill below image thumbnail -> #88 */
+.main-nowPlayingBar-left:has(> #listening-stats-pill) {
+	display: flex;
+	align-items: center;
+}
+
+.main-nowPlayingBar-left > #listening-stats-pill:empty {
+	display: none;
+}
+/*  */
+
 .ls-pill-minimal {
 	padding: 0;
 }
